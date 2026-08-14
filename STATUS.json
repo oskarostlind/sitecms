@@ -1,0 +1,22 @@
+{
+  "project": "sitecms",
+  "updated": "2026-08-15T00:00:00Z",
+  "phase": "scaffold",
+  "progress": 0,
+  "deploy_url": null,
+  "repo_url": "https://github.com/oskarostlind/sitecms",
+  "last_run_summary": "Projektet skapat, ingen körning ännu.",
+  "criteria": [
+    { "text": "Adminpanelen deployad på Vercel, senaste deploy grön", "met": false },
+    { "text": "Inloggning med roller: admin ser alla sajter, kund endast sin", "met": false },
+    { "text": "Kund kan redigera texter/bilder, inlägg, tjänster & priser, SEO", "met": false },
+    { "text": "Bilduppladdning fungerar (Vercel Blob)", "met": false },
+    { "text": "Innehålls-API levererar allt innehåll per sajt via API-nyckel", "met": false },
+    { "text": "Jjbygg cms-integration-branch hämtar innehåll live, ändring syns < 60 s", "met": false },
+    { "text": "Inga layoutbrott 375–1440 px", "met": false }
+  ],
+  "next_up": ["Scaffold Next.js + deploy", "Databas + Drizzle", "Datamodell"],
+  "blockers": [],
+  "assumptions": [],
+  "runs": 0
+}
