@@ -6,7 +6,6 @@ Skriv gärna in egna punkter här mellan körningarna — det är det enklaste s
 
 ## Att göra
 
-- [ ] Scaffold: Next.js 15 + TypeScript + Tailwind, tom adminpanel med login-skal, deploya till Vercel så en URL finns
 - [ ] Databas: verifiera DATABASE_URL (Neon via Vercel), sätt upp Drizzle + migrationsflöde
 - [ ] Datamodell: sites, users, memberships, pages, blocks, posts, services, media, api_keys — allt innehåll med site_id
 - [ ] Auth: Auth.js v5 credentials, roller admin/customer, skyddade routes, inloggningssida
@@ -26,3 +25,4 @@ Skriv gärna in egna punkter här mellan körningarna — det är det enklaste s
 ## Klart
 
 <!-- runnern flyttar hit avbockade punkter -->
+- [x] Scaffold: Next.js 15 + TypeScript + Tailwind, tom adminpanel med login-skal, deployad grön på Vercel

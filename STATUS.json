@@ -1,22 +1,50 @@
 {
   "project": "sitecms",
-  "updated": "2026-08-15T00:00:00Z",
-  "phase": "scaffold",
-  "progress": 0,
-  "deploy_url": null,
+  "updated": "2026-08-14T23:17:45.131538Z",
+  "phase": "building",
+  "progress": 14,
+  "deploy_url": "https://sitecms-oskar-ostlinds-projects.vercel.app",
   "repo_url": "https://github.com/oskarostlind/sitecms",
-  "last_run_summary": "Projektet skapat, ingen körning ännu.",
+  "last_run_summary": "Scaffold deployad grön på Vercel (Next.js 15 + Tailwind). Vercel-projekt kopplat till repot.",
   "criteria": [
-    { "text": "Adminpanelen deployad på Vercel, senaste deploy grön", "met": false },
-    { "text": "Inloggning med roller: admin ser alla sajter, kund endast sin", "met": false },
-    { "text": "Kund kan redigera texter/bilder, inlägg, tjänster & priser, SEO", "met": false },
-    { "text": "Bilduppladdning fungerar (Vercel Blob)", "met": false },
-    { "text": "Innehålls-API levererar allt innehåll per sajt via API-nyckel", "met": false },
-    { "text": "Jjbygg cms-integration-branch hämtar innehåll live, ändring syns < 60 s", "met": false },
-    { "text": "Inga layoutbrott 375–1440 px", "met": false }
+    {
+      "text": "Adminpanelen deployad på Vercel, senaste deploy grön",
+      "met": true
+    },
+    {
+      "text": "Inloggning med roller: admin ser alla sajter, kund endast sin",
+      "met": false
+    },
+    {
+      "text": "Kund kan redigera texter/bilder, inlägg, tjänster & priser, SEO",
+      "met": false
+    },
+    {
+      "text": "Bilduppladdning fungerar (Vercel Blob)",
+      "met": false
+    },
+    {
+      "text": "Innehålls-API levererar allt innehåll per sajt via API-nyckel",
+      "met": false
+    },
+    {
+      "text": "Jjbygg cms-integration-branch hämtar innehåll live, ändring syns < 60 s",
+      "met": false
+    },
+    {
+      "text": "Inga layoutbrott 375–1440 px",
+      "met": false
+    }
   ],
-  "next_up": ["Scaffold Next.js + deploy", "Databas + Drizzle", "Datamodell"],
+  "next_up": [
+    "Neon-databas + Drizzle",
+    "Datamodell",
+    "Auth med roller"
+  ],
   "blockers": [],
-  "assumptions": [],
-  "runs": 0
+  "assumptions": [
+    "Commits görs som oskarostlind (noreply-mail) — Vercel blockerar okända författare",
+    "vercel.json med framework nextjs krävdes eftersom projektet skapades före koden"
+  ],
+  "runs": 1
 }
