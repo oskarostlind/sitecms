@@ -6,22 +6,19 @@ Skriv gärna in egna punkter här mellan körningarna — det är det enklaste s
 
 ## Att göra
 
-- [ ] UI-polish + responsivitetsgenomgång 375-1440 px av alla nya vyer (media, användare, inställningar, aktivitet)
-
-- [ ] Egen domän för panelen (t.ex. cms.jjbyggboden.se) — läggs till i Vercel-projektet sitecms under Domains, uppdatera ev. AUTH-redirects
-- [ ] Google OAuth: env-variabler GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET behöver skapas i Google Cloud Console (redirect-URI: https://sitecms-oskar-ostlinds-projects.vercel.app/api/auth/callback/google) — flagga som blocker tills Oskar (eller en browser-session) fixat dem; koden ska redan vara på plats
-- [ ] Beslut: nyhetssektion på jjbyggboden.se som renderar publicerade inlägg (fråga = anteckna som assumption, bygg bakom feature-flagga)
-
-- [ ] Livetesta kund-redigeringsflödet i UI som Jesper (redigera block, spara, se ändring live)
-- [ ] Verifiera bilduppladdning mot Vercel Blob live (BLOB_READ_WRITE_TOKEN finns nu)
-
-- [ ] Bilduppladdning via Vercel Blob (ersätt bild i block, mediabibliotek per sajt)
-- [ ] Responsivitet 375–1440 px i panelen + polish
+- [ ] Egen domän för panelen (t.ex. cms.jjbyggboden.se) — läggs till i Vercel-projektet sitecms under Domains, uppdatera ev. AUTH-redirects (kräver Oskar)
+- [ ] Google OAuth: env-variabler GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET behöver skapas i Google Cloud Console (redirect-URI: https://sitecms-oskar-ostlinds-projects.vercel.app/api/auth/callback/google) — koden är på plats, knappen aktiveras automatiskt (kräver Oskar)
+- [ ] Browser-E2E i prod av kund-redigeringsflödet som Jesper (redigera block, spara, se ändring live på jjbyggboden.se) — kräver Oskars login i Chrome eller Google OAuth-env
 - [ ] Site 2: lägg upp timringskurs som sajt när piloten är verifierad
 
 ## Klart
 
 <!-- runnern flyttar hit avbockade punkter -->
+- [x] Verifiera bilduppladdning mot Vercel Blob live (run 4: inloggning som testkund via auth-API mot prod, POST /api/upload → blob-URL 200 publikt läsbar, media-rad i DB, cross-tenant-upload nekad 403)
+- [x] UI-polish + responsivitetsgenomgång 375-1440 px av alla nya vyer (media, användare, inställningar, aktivitet) — kodgranskning run 4: alla tabeller overflow-x-auto + min-w, responsiv mediagrid, mobilmeny, truncate/break-all; render-smoke i prod 200 på samtliga vyer
+- [x] Responsivitet 375–1440 px i panelen + polish (täckt av pass i run 3 + 4)
+- [x] Bilduppladdning via Vercel Blob (ersätt bild i block, mediabibliotek per sajt)
+- [x] Beslut: nyhetssektion på jjbyggboden.se som renderar publicerade inlägg (byggd + e2e-verifierad i run 3)
 - [x] Databas: verifiera DATABASE_URL (Neon via Vercel), sätt upp Drizzle + migrationsflöde
 - [x] Datamodell: sites, users, memberships, pages, blocks, posts, services, media, api_keys — allt innehåll med site_id
 - [x] Auth: Auth.js v5 credentials, roller admin/customer, skyddade routes, inloggningssida
