@@ -8,13 +8,12 @@ Skriv gärna in egna punkter här mellan körningarna — det är det enklaste s
 
 - [ ] Egen domän för panelen (t.ex. cms.jjbyggboden.se) — läggs till i Vercel-projektet sitecms under Domains, uppdatera ev. AUTH-redirects (kräver Oskar)
 - [ ] Google OAuth: env-variabler GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET behöver skapas i Google Cloud Console (redirect-URI: https://sitecms-oskar-ostlinds-projects.vercel.app/api/auth/callback/google) — koden är på plats, knappen aktiveras automatiskt (kräver Oskar)
-- [ ] Browser-E2E i prod av admin-funktionerna (sajter, användare, media-UI, aktivitet) samt som Jesper med effekt på jjbyggboden.se — kräver Oskars login i Chrome eller Google OAuth-env (kundflödet är redan browser-verifierat med syntetiskt konto, se Klart)
-
 - [ ] Beslut (Oskar): koppla timringskurs-sajten till sitecms content-API — repot kör idag en egen Sanity Studio, så bytet är ett aktivt val, inte bara en integration
 - [ ] Skapa kundkonto för Ola Andersson (info@timringskurs.nu) via panelens användarhantering när sajtkopplingen är beslutad
 
 ## Klart
 
+- [x] Browser-E2E i prod av admin-funktionerna (run 7: 10/10 PASS med tillfälligt syntetiskt admin-konto, raderat efteråt — sajt skapad via panelen, användare skapad+borttagen, media upp/ner via UI, aktivitetslogg, 375px, samt skarp blockredigering på JJ Bygg synlig på jjbyggboden.se efter 2 s och återställd)
 - [x] Browser-E2E i prod av kund-redigeringsflödet (run 6: headless Chromium mot prod med syntetiskt kundkonto e2e-test, session via auth-API — 8/8 PASS: login, tenant-isolering, blockredigering sparad+persistent, inlägg skapat+publicerat och verifierat i publika API:t, tjänstepris, SEO-titel, lösenordsbyte med gammalt-nekas/nytt-funkar, 375px utan horisontell overflow)
 
 <!-- runnern flyttar hit avbockade punkter -->
