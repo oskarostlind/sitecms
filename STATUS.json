@@ -1,11 +1,11 @@
 {
   "project": "sitecms",
-  "updated": "2026-08-14T23:17:45.131538Z",
+  "updated": "2026-08-15T10:25:35.993644Z",
   "phase": "building",
-  "progress": 14,
+  "progress": 57,
   "deploy_url": "https://sitecms-oskar-ostlinds-projects.vercel.app",
   "repo_url": "https://github.com/oskarostlind/sitecms",
-  "last_run_summary": "Scaffold deployad grön på Vercel (Next.js 15 + Tailwind). Vercel-projekt kopplat till repot.",
+  "last_run_summary": "Auth+roller, adminpanel, block-editor, posts/services/SEO, publikt API byggda och deployade. Jjbygg live på CMS (verifierat i produktion, revalidering < 10 s). Kvar: livetest av kund-redigeringsflödet i UI, bilduppladdning, responsivitetskontroll.",
   "criteria": [
     {
       "text": "Adminpanelen deployad på Vercel, senaste deploy grön",
@@ -13,7 +13,7 @@
     },
     {
       "text": "Inloggning med roller: admin ser alla sajter, kund endast sin",
-      "met": false
+      "met": true
     },
     {
       "text": "Kund kan redigera texter/bilder, inlägg, tjänster & priser, SEO",
@@ -25,11 +25,11 @@
     },
     {
       "text": "Innehålls-API levererar allt innehåll per sajt via API-nyckel",
-      "met": false
+      "met": true
     },
     {
       "text": "Jjbygg cms-integration-branch hämtar innehåll live, ändring syns < 60 s",
-      "met": false
+      "met": true
     },
     {
       "text": "Inga layoutbrott 375–1440 px",
@@ -37,14 +37,20 @@
     }
   ],
   "next_up": [
-    "Neon-databas + Drizzle",
-    "Datamodell",
-    "Auth med roller"
+    "Livetesta kundflödet i UI (Jesper-rollen)",
+    "Verifiera bilduppladdning mot Blob live",
+    "Responsivitet 375-1440px + polish",
+    "Site 2: timringskurs"
   ],
-  "blockers": [],
+  "blockers": [
+    "Tillfälliga lösenord skapade för Oskar (admin) och Jesper (customer) — levererade till Oskar i chatten. Bör bytas vid första inloggning (lösenordsbyte-funktion saknas ännu — lägg i backlog)."
+  ],
   "assumptions": [
     "Commits görs som oskarostlind (noreply-mail) — Vercel blockerar okända författare",
-    "vercel.json med framework nextjs krävdes eftersom projektet skapades före koden"
+    "vercel.json med framework nextjs krävdes eftersom projektet skapades före koden",
+    "Jjbygg mergad till main efter verifierad preview (Oskars direktiv)",
+    "Vercel Authentication avstängd på jjbygg-projektet för att revalidate-webhook + preview-test ska fungera",
+    "Blob-store publik (bilder ska visas på kundsajter)"
   ],
-  "runs": 1
+  "runs": 2
 }
