@@ -1,0 +1,51 @@
+import { and, eq } from "drizzle-orm";
+import { db, apiKeys, sites } from "@/lib/db";
+
+export type ApiSite = {
+  id: string;
+  name: string;
+  slug: string;
+  domain: string | null;
+};
+
+export type ApiAuthResult =
+  | { ok: true; site: ApiSite }
+  | { ok: false; status: number; error: string };
+
+/**
+ * Resolves a site by its public slug and checks the "x-api-key" header
+ * against that site's api_keys. Used by every route under /api/v1/sites.
+ */
+export async function authenticateSite(slug: string, request: Request): Promise<ApiAuthResult> {
+  const [site] = await db
+    .select({ id: sites.id, name: sites.name, slug: sites.slug, domain: sites.domain })
+    .from(sites)
+    .where(eq(sites.slug, slug))
+    .limit(1);
+
+  if (!site) {
+    return { ok: false, status: 404, error: "Sajten hittades inte." };
+  }
+
+  const apiKey = request.headers.get("x-api-key");
+  if (!apiKey) {
+    return { ok: false, status: 401, error: "API-nyckel saknas (header x-api-key)." };
+  }
+
+  const [match] = await db
+    .select({ id: apiKeys.id })
+    .from(apiKeys)
+    .where(and(eq(apiKeys.siteId, site.id), eq(apiKeys.key, apiKey)))
+    .limit(1);
+
+  if (!match) {
+    return { ok: false, status: 401, error: "Ogiltig API-nyckel för denna sajt." };
+  }
+
+  return { ok: true, site };
+}
+
+/** s-maxage=60 lets a CDN/edge cache the response; SWR keeps it fresh in the background. */
+export const CONTENT_CACHE_HEADERS: Record<string, string> = {
+  "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+};
