@@ -67,6 +67,7 @@ Prototypen är klar när alla dessa är sanna:
 - [ ] Mediabibliotek per sajt: lista, ladda upp och radera bilder
 - [ ] Publicerade inlägg exponeras via API:t och renderas på kundsajt när sajten har nyhetssektion (jjbygg: beslut i backlog)
 - [ ] Grundläggande aktivitetslogg: vem ändrade vad och när (audit-tabell + vy för admin)
+- [ ] E2E-BEVIS I PROD: varje funktion (login, blockredigering, bild, inlägg, tjänster, SEO, media, användare, sajt, aktivitet, lösenordsbyte) är verifierad i webbläsare mot produktionsmiljön — faktiskt utförd redigering + bekräftad effekt (på jjbyggboden.se där relevant). OBS: agenten får aldrig skriva lösenord i inloggningsfält — kräver att Oskar loggar in en gång i Chrome-fliken ELLER att Google OAuth-env finns (inloggning via aktiv Google-session).
 
 ## Autonomiläge
 
