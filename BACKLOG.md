@@ -9,11 +9,15 @@ Skriv gärna in egna punkter här mellan körningarna — det är det enklaste s
 - [ ] Egen domän för panelen (t.ex. cms.jjbyggboden.se) — läggs till i Vercel-projektet sitecms under Domains, uppdatera ev. AUTH-redirects (kräver Oskar)
 - [ ] Google OAuth: env-variabler GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET behöver skapas i Google Cloud Console (redirect-URI: https://sitecms-oskar-ostlinds-projects.vercel.app/api/auth/callback/google) — koden är på plats, knappen aktiveras automatiskt (kräver Oskar)
 - [ ] Browser-E2E i prod av kund-redigeringsflödet som Jesper (redigera block, spara, se ändring live på jjbyggboden.se) — kräver Oskars login i Chrome eller Google OAuth-env
-- [ ] Site 2: lägg upp timringskurs som sajt när piloten är verifierad
+
+- [ ] Beslut (Oskar): koppla timringskurs-sajten till sitecms content-API — repot kör idag en egen Sanity Studio, så bytet är ett aktivt val, inte bara en integration
+- [ ] Skapa kundkonto för Ola Andersson (info@timringskurs.nu) via panelens användarhantering när sajtkopplingen är beslutad
 
 ## Klart
 
 <!-- runnern flyttar hit avbockade punkter -->
+- [x] Site 2: timringskurs upplagd som sajt (run 5: sajt "Norrhed Skog", 3 sidor/17 block, 6 kurser som tjänster, SEO per sida, API-nyckel; innehåll seedat från oskarostlind/timringskurs, verifierat via content-API i prod)
+- [x] Säkerhetsfix: content-API:t CDN-cachade auktoriserade svar publikt (s-maxage utan Vary på x-api-key) → svar utan/med fel nyckel fick fullt innehåll i upp till 60 s. Nu private/no-store (run 5)
 - [x] Verifiera bilduppladdning mot Vercel Blob live (run 4: inloggning som testkund via auth-API mot prod, POST /api/upload → blob-URL 200 publikt läsbar, media-rad i DB, cross-tenant-upload nekad 403)
 - [x] UI-polish + responsivitetsgenomgång 375-1440 px av alla nya vyer (media, användare, inställningar, aktivitet) — kodgranskning run 4: alla tabeller overflow-x-auto + min-w, responsiv mediagrid, mobilmeny, truncate/break-all; render-smoke i prod 200 på samtliga vyer
 - [x] Responsivitet 375–1440 px i panelen + polish (täckt av pass i run 3 + 4)

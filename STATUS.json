@@ -1,30 +1,73 @@
 {
   "project": "sitecms",
-  "updated": "2026-08-15T12:20:00Z",
+  "updated": "2026-08-15T18:30:00Z",
   "phase": "building",
   "progress": 79,
   "deploy_url": "https://sitecms-oskar-ostlinds-projects.vercel.app",
   "repo_url": "https://github.com/oskarostlind/sitecms",
-  "last_run_summary": "Bilduppladdning verifierad live mot prod (login via auth-API som syntetiskt testkonto, upload → publik blob-URL, DB-rad, cross-tenant nekad 403). Responsivitetsgranskning av media/användare/inställningar/aktivitet utan anmärkning + render-smoke 200 på alla vyer i prod.",
+  "last_run_summary": "Site 2 (timringskurs/Norrhed Skog) seedad och verifierad via content-API i prod. Säkerhetsfix: API-svar CDN-cachades publikt utan nyckelkontroll (s-maxage varierar inte på x-api-key) — nu no-store.",
   "criteria": [
-    { "text": "Adminpanelen deployad på Vercel, senaste deploy grön", "met": true },
-    { "text": "Inloggning med roller: admin ser alla sajter, kund endast sin", "met": true },
-    { "text": "Kund kan redigera texter/bilder, inlägg, tjänster & priser, SEO", "met": false },
-    { "text": "Bilduppladdning fungerar (Vercel Blob)", "met": true },
-    { "text": "Innehålls-API levererar allt innehåll per sajt via API-nyckel", "met": true },
-    { "text": "Jjbygg cms-integration-branch hämtar innehåll live, ändring syns < 60 s", "met": true },
-    { "text": "Inga layoutbrott 375–1440 px", "met": true },
-    { "text": "Användare kan byta sitt eget lösenord", "met": true },
-    { "text": "Logga in med Google fungerar", "met": false },
-    { "text": "Admin kan hantera sajter och användare via panelen", "met": true },
-    { "text": "Mediabibliotek per sajt", "met": true },
-    { "text": "Inlägg exponeras via API och renderas på kundsajt (beslut)", "met": true },
-    { "text": "Aktivitetslogg (audit)", "met": true },
-    { "text": "E2E-bevis i webbläsare (prod) för varje funktion — kräver Oskars login i Chrome eller Google OAuth-env", "met": false }
+    {
+      "text": "Adminpanelen deployad på Vercel, senaste deploy grön",
+      "met": true
+    },
+    {
+      "text": "Inloggning med roller: admin ser alla sajter, kund endast sin",
+      "met": true
+    },
+    {
+      "text": "Kund kan redigera texter/bilder, inlägg, tjänster & priser, SEO",
+      "met": false
+    },
+    {
+      "text": "Bilduppladdning fungerar (Vercel Blob)",
+      "met": true
+    },
+    {
+      "text": "Innehålls-API levererar allt innehåll per sajt via API-nyckel",
+      "met": true
+    },
+    {
+      "text": "Jjbygg cms-integration-branch hämtar innehåll live, ändring syns < 60 s",
+      "met": true
+    },
+    {
+      "text": "Inga layoutbrott 375–1440 px",
+      "met": true
+    },
+    {
+      "text": "Användare kan byta sitt eget lösenord",
+      "met": true
+    },
+    {
+      "text": "Logga in med Google fungerar",
+      "met": false
+    },
+    {
+      "text": "Admin kan hantera sajter och användare via panelen",
+      "met": true
+    },
+    {
+      "text": "Mediabibliotek per sajt",
+      "met": true
+    },
+    {
+      "text": "Inlägg exponeras via API och renderas på kundsajt (beslut)",
+      "met": true
+    },
+    {
+      "text": "Aktivitetslogg (audit)",
+      "met": true
+    },
+    {
+      "text": "E2E-bevis i webbläsare (prod) för varje funktion — kräver Oskars login i Chrome eller Google OAuth-env",
+      "met": false
+    }
   ],
   "next_up": [
     "Browser-E2E av kund-redigeringsflödet i prod (väntar på Oskars login/Google-env)",
-    "Site 2: timringskurs"
+    "Beslut: koppla timringskurs-frontenden till sitecms (kör idag Sanity)",
+    "Kundkonto för Ola via panelen efter beslutet"
   ],
   "blockers": [
     "Google OAuth: GOOGLE_CLIENT_ID/SECRET saknas (redirect-URI: https://sitecms-oskar-ostlinds-projects.vercel.app/api/auth/callback/google) — knappen aktiveras automatiskt när de läggs i Vercel.",
@@ -39,7 +82,9 @@
     "Blob-store publik (bilder ska visas på kundsajter)",
     "VIKTIGT för framtida körningar: rotera ALDRIG befintliga användares lösenord (seed-users är idempotent — använd den, skapa inga egna seed-flöden). Undantag: det syntetiska E2E-kontot e2e-test@sitecms.local får roteras (scripts/e2e-fixtures.ts).",
     "Run 4: skapade isolerad testsajt 'E2E Test (kan raderas)' (slug e2e-test) + kundkonto e2e-test@sitecms.local för prod-verifiering utan att röra JJ Byggs data. Login gjordes programmatiskt mot auth-API:t med det syntetiska kontot — inga riktiga lösenord har hanterats och inget lösenord har skrivits i inloggningsfält. En testbild (e2e.png, 70 B) ligger kvar i testsajtens mediabibliotek som bevis.",
-    "Kriteriet 'Kund kan redigera...' hålls omarkerat tills browser-E2E som Jesper är gjord, trots att uppladdning + guards nu är verifierade via API."
+    "Kriteriet 'Kund kan redigera...' hålls omarkerat tills browser-E2E som Jesper är gjord, trots att uppladdning + guards nu är verifierade via API.",
+    "Run 5: timringskurs upplagd som sajt (slug timringskurs, Norrhed Skog) med innehåll ur repots src/data/*.ts. Repot kör redan Sanity som CMS — jag rörde INTE timringskurs-repot; att byta frontend till sitecms-API:t är Oskars beslut. Kurser modellerade som tjänster (titel/kort/pris); kurssidornas brödtext/tillfällen ingår inte i v1-blockmodellen. Inget kundkonto skapat för Ola (admin bjuder in via panelen). API-nyckeln syns i panelen under sajtens inställningar.",
+    "Run 5: tog bort CDN-cache (public s-maxage=60) på content-API:t — Vercels edge-cache varierar inte på x-api-key, så cachade svar serverades även utan giltig nyckel. Kundsajternas egen ISR + revalidate-webhook påverkas inte."
   ],
-  "runs": 4
+  "runs": 5
 }

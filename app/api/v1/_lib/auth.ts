@@ -45,7 +45,13 @@ export async function authenticateSite(slug: string, request: Request): Promise<
   return { ok: true, site };
 }
 
-/** s-maxage=60 lets a CDN/edge cache the response; SWR keeps it fresh in the background. */
+/**
+ * No CDN caching: the Vercel edge cache does not vary on the x-api-key
+ * header, so a "public, s-maxage" response authorized by a valid key would
+ * be served to unauthenticated requests for the cache lifetime. Customer
+ * sites cache on their side (Next fetch cache + on-demand revalidation),
+ * so serving fresh from the API also keeps the <60s revalidation honest.
+ */
 export const CONTENT_CACHE_HEADERS: Record<string, string> = {
-  "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+  "Cache-Control": "private, no-store",
 };
