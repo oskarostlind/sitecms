@@ -1,11 +1,11 @@
 {
   "project": "sitecms",
-  "updated": "2026-08-15T10:36:15.675110Z",
+  "updated": "2026-08-15T11:02:16.317298Z",
   "phase": "building",
-  "progress": 31,
+  "progress": 62,
   "deploy_url": "https://sitecms-oskar-ostlinds-projects.vercel.app",
   "repo_url": "https://github.com/oskarostlind/sitecms",
-  "last_run_summary": "Lösenordsbyte (Mitt konto) + Google-inloggning (aktiveras när GOOGLE_CLIENT_ID/SECRET finns) byggda. Done-kriterier utökade till full CMS-scope (13 st).",
+  "last_run_summary": "Våg 3: sajt-/användarhantering (admin), mediabibliotek med Blob-radering, audit-logg med vyer, nav uppdaterad. Deployat.",
   "criteria": [
     {
       "text": "Adminpanelen deployad på Vercel, senaste deploy grön",
@@ -37,7 +37,7 @@
     },
     {
       "text": "Användare kan byta sitt eget lösenord",
-      "met": false
+      "met": true
     },
     {
       "text": "Logga in med Google fungerar",
@@ -45,11 +45,11 @@
     },
     {
       "text": "Admin kan hantera sajter och användare via panelen",
-      "met": false
+      "met": true
     },
     {
       "text": "Mediabibliotek per sajt",
-      "met": false
+      "met": true
     },
     {
       "text": "Inlägg exponeras via API och renderas på kundsajt (beslut)",
@@ -57,14 +57,15 @@
     },
     {
       "text": "Aktivitetslogg (audit)",
-      "met": false
+      "met": true
     }
   ],
   "next_up": [
-    "Livetesta kundflödet i UI (Jesper-rollen)",
-    "Verifiera bilduppladdning mot Blob live",
-    "Responsivitet 375-1440px + polish",
-    "Site 2: timringskurs"
+    "UI-livetest av alla nya flöden",
+    "Inläggsvisning på jjbygg (beslut/feature-flagga)",
+    "Responsivitet 375-1440",
+    "Google OAuth-env (Oskar)",
+    "Egen domän (Oskar)"
   ],
   "blockers": [
     "Google OAuth kräver GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET från Google Cloud Console (redirect-URI: https://sitecms-oskar-ostlinds-projects.vercel.app/api/auth/callback/google). Koden är klar — knappen dyker upp automatiskt när env-variablerna läggs i Vercel."
@@ -76,5 +77,5 @@
     "Vercel Authentication avstängd på jjbygg-projektet för att revalidate-webhook + preview-test ska fungera",
     "Blob-store publik (bilder ska visas på kundsajter)"
   ],
-  "runs": 2
+  "runs": 3
 }

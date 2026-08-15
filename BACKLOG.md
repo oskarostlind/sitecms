@@ -8,13 +8,8 @@ Skriv gärna in egna punkter här mellan körningarna — det är det enklaste s
 
 - [ ] Egen domän för panelen (t.ex. cms.jjbyggboden.se) — läggs till i Vercel-projektet sitecms under Domains, uppdatera ev. AUTH-redirects
 - [ ] Google OAuth: env-variabler GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET behöver skapas i Google Cloud Console (redirect-URI: https://sitecms-oskar-ostlinds-projects.vercel.app/api/auth/callback/google) — flagga som blocker tills Oskar (eller en browser-session) fixat dem; koden ska redan vara på plats
-- [ ] Admin: sajthantering (skapa sajt, redigera namn/domän/revalidate-url, generera API-nyckel)
-- [ ] Admin: användarhantering (skapa kundanvändare med temp-lösenord, koppla till sajt, ta bort)
-- [ ] Mediabibliotek per sajt: grid med uppladdade bilder, ladda upp, radera (Blob + media-tabellen)
-- [ ] Aktivitetslogg: audit-tabell (userId, siteId, action, detail, ts) skriven från alla server actions + enkel vy för admin
 - [ ] Beslut: nyhetssektion på jjbyggboden.se som renderar publicerade inlägg (fråga = anteckna som assumption, bygg bakom feature-flagga)
 
-- [ ] Lösenordsbyte-funktion (kund ska kunna byta sitt tillfälliga lösenord)
 - [ ] Livetesta kund-redigeringsflödet i UI som Jesper (redigera block, spara, se ändring live)
 - [ ] Verifiera bilduppladdning mot Vercel Blob live (BLOB_READ_WRITE_TOKEN finns nu)
 
