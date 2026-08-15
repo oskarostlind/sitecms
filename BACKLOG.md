@@ -6,6 +6,8 @@ Skriv gärna in egna punkter här mellan körningarna — det är det enklaste s
 
 ## Att göra
 
+- [ ] UI-polish + responsivitetsgenomgång 375-1440 px av alla nya vyer (media, användare, inställningar, aktivitet)
+
 - [ ] Egen domän för panelen (t.ex. cms.jjbyggboden.se) — läggs till i Vercel-projektet sitecms under Domains, uppdatera ev. AUTH-redirects
 - [ ] Google OAuth: env-variabler GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET behöver skapas i Google Cloud Console (redirect-URI: https://sitecms-oskar-ostlinds-projects.vercel.app/api/auth/callback/google) — flagga som blocker tills Oskar (eller en browser-session) fixat dem; koden ska redan vara på plats
 - [ ] Beslut: nyhetssektion på jjbyggboden.se som renderar publicerade inlägg (fråga = anteckna som assumption, bygg bakom feature-flagga)

@@ -1,11 +1,11 @@
 {
   "project": "sitecms",
-  "updated": "2026-08-15T11:02:16.317298Z",
+  "updated": "2026-08-15T11:05:50.993574Z",
   "phase": "building",
   "progress": 62,
   "deploy_url": "https://sitecms-oskar-ostlinds-projects.vercel.app",
   "repo_url": "https://github.com/oskarostlind/sitecms",
-  "last_run_summary": "Våg 3: sajt-/användarhantering (admin), mediabibliotek med Blob-radering, audit-logg med vyer, nav uppdaterad. Deployat.",
+  "last_run_summary": "Våg 3 livetestad: admin- och kundsession verifierade mot alla 11 routes, rollskydd bekräftat. Lösenord omsatta (10:00-körningen hade roterat dem) och levererade till Oskar i chatten.",
   "criteria": [
     {
       "text": "Adminpanelen deployad på Vercel, senaste deploy grön",
@@ -68,14 +68,16 @@
     "Egen domän (Oskar)"
   ],
   "blockers": [
-    "Google OAuth kräver GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET från Google Cloud Console (redirect-URI: https://sitecms-oskar-ostlinds-projects.vercel.app/api/auth/callback/google). Koden är klar — knappen dyker upp automatiskt när env-variablerna läggs i Vercel."
+    "Google OAuth: GOOGLE_CLIENT_ID/SECRET saknas (redirect-URI: https://sitecms-oskar-ostlinds-projects.vercel.app/api/auth/callback/google) — knappen aktiveras automatiskt när de läggs i Vercel.",
+    "Egen domän för panelen (t.ex. cms.jjbyggboden.se) — kräver Oskars beslut i Vercel → Domains."
   ],
   "assumptions": [
     "Commits görs som oskarostlind (noreply-mail) — Vercel blockerar okända författare",
     "vercel.json med framework nextjs krävdes eftersom projektet skapades före koden",
     "Jjbygg mergad till main efter verifierad preview (Oskars direktiv)",
     "Vercel Authentication avstängd på jjbygg-projektet för att revalidate-webhook + preview-test ska fungera",
-    "Blob-store publik (bilder ska visas på kundsajter)"
+    "Blob-store publik (bilder ska visas på kundsajter)",
+    "VIKTIGT för framtida körningar: rotera ALDRIG befintliga användares lösenord (seed-users är idempotent — använd den, skapa inga egna seed-flöden)."
   ],
   "runs": 3
 }
