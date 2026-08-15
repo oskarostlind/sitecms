@@ -1,11 +1,11 @@
 {
   "project": "sitecms",
-  "updated": "2026-08-15T10:25:35.993644Z",
+  "updated": "2026-08-15T10:36:15.675110Z",
   "phase": "building",
-  "progress": 57,
+  "progress": 31,
   "deploy_url": "https://sitecms-oskar-ostlinds-projects.vercel.app",
   "repo_url": "https://github.com/oskarostlind/sitecms",
-  "last_run_summary": "Auth+roller, adminpanel, block-editor, posts/services/SEO, publikt API byggda och deployade. Jjbygg live på CMS (verifierat i produktion, revalidering < 10 s). Kvar: livetest av kund-redigeringsflödet i UI, bilduppladdning, responsivitetskontroll.",
+  "last_run_summary": "Lösenordsbyte (Mitt konto) + Google-inloggning (aktiveras när GOOGLE_CLIENT_ID/SECRET finns) byggda. Done-kriterier utökade till full CMS-scope (13 st).",
   "criteria": [
     {
       "text": "Adminpanelen deployad på Vercel, senaste deploy grön",
@@ -34,6 +34,30 @@
     {
       "text": "Inga layoutbrott 375–1440 px",
       "met": false
+    },
+    {
+      "text": "Användare kan byta sitt eget lösenord",
+      "met": false
+    },
+    {
+      "text": "Logga in med Google fungerar",
+      "met": false
+    },
+    {
+      "text": "Admin kan hantera sajter och användare via panelen",
+      "met": false
+    },
+    {
+      "text": "Mediabibliotek per sajt",
+      "met": false
+    },
+    {
+      "text": "Inlägg exponeras via API och renderas på kundsajt (beslut)",
+      "met": false
+    },
+    {
+      "text": "Aktivitetslogg (audit)",
+      "met": false
     }
   ],
   "next_up": [
@@ -43,7 +67,7 @@
     "Site 2: timringskurs"
   ],
   "blockers": [
-    "Tillfälliga lösenord skapade för Oskar (admin) och Jesper (customer) — levererade till Oskar i chatten. Bör bytas vid första inloggning (lösenordsbyte-funktion saknas ännu — lägg i backlog)."
+    "Google OAuth kräver GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET från Google Cloud Console (redirect-URI: https://sitecms-oskar-ostlinds-projects.vercel.app/api/auth/callback/google). Koden är klar — knappen dyker upp automatiskt när env-variablerna läggs i Vercel."
   ],
   "assumptions": [
     "Commits görs som oskarostlind (noreply-mail) — Vercel blockerar okända författare",

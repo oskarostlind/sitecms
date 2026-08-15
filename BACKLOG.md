@@ -6,6 +6,7 @@ Skriv gärna in egna punkter här mellan körningarna — det är det enklaste s
 
 ## Att göra
 
+- [ ] Egen domän för panelen (t.ex. cms.jjbyggboden.se) — läggs till i Vercel-projektet sitecms under Domains, uppdatera ev. AUTH-redirects
 - [ ] Google OAuth: env-variabler GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET behöver skapas i Google Cloud Console (redirect-URI: https://sitecms-oskar-ostlinds-projects.vercel.app/api/auth/callback/google) — flagga som blocker tills Oskar (eller en browser-session) fixat dem; koden ska redan vara på plats
 - [ ] Admin: sajthantering (skapa sajt, redigera namn/domän/revalidate-url, generera API-nyckel)
 - [ ] Admin: användarhantering (skapa kundanvändare med temp-lösenord, koppla till sajt, ta bort)
