@@ -61,6 +61,12 @@ Prototypen är klar när alla dessa är sanna:
 - [ ] Innehålls-API:t levererar allt innehåll per sajt via API-nyckel
 - [ ] Jjbygg-branchen `cms-integration` hämtar allt sitt innehåll från CMS:et på en Vercel preview-URL, och en ändring i panelen syns där inom 60 sekunder
 - [ ] Inga layoutbrott i panelen mellan 375px och 1440px
+- [ ] Användare kan byta sitt eget lösenord i panelen
+- [ ] "Logga in med Google" fungerar (Auth.js Google-provider; knappen visas när GOOGLE_CLIENT_ID/SECRET finns, kontot matchas på e-post mot befintlig användare — okända e-postadresser nekas)
+- [ ] Admin kan skapa/redigera sajter och bjuda in kundanvändare via panelen (ingen manuell DB-hantering)
+- [ ] Mediabibliotek per sajt: lista, ladda upp och radera bilder
+- [ ] Publicerade inlägg exponeras via API:t och renderas på kundsajt när sajten har nyhetssektion (jjbygg: beslut i backlog)
+- [ ] Grundläggande aktivitetslogg: vem ändrade vad och när (audit-tabell + vy för admin)
 
 ## Autonomiläge
 
