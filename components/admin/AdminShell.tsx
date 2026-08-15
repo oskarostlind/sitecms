@@ -8,6 +8,7 @@ type NavItem = {
   label: string;
   segment: string;
   exact?: boolean;
+  adminOnly?: boolean;
 };
 
 const NAV_ITEMS: NavItem[] = [
@@ -16,6 +17,20 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Inlägg", segment: "posts" },
   { label: "Tjänster & priser", segment: "services" },
   { label: "SEO", segment: "seo" },
+  { label: "Media", segment: "media" },
+  { label: "Aktivitet", segment: "aktivitet" },
+  { label: "Inställningar", segment: "installningar", adminOnly: true },
+];
+
+type AdminLink = {
+  label: string;
+  href: string;
+};
+
+const ADMIN_LINKS: AdminLink[] = [
+  { label: "Användare", href: "/admin/anvandare" },
+  { label: "All aktivitet", href: "/admin/aktivitet" },
+  { label: "Ny sajt", href: "/admin/sites/new" },
 ];
 
 type CurrentUser = {
@@ -39,6 +54,7 @@ export default function AdminShell({
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const isAdmin = user.role === "admin";
 
   const activeSiteId = useMemo(() => {
     const match = pathname.match(/\/admin\/sites\/([^/]+)/);
@@ -65,6 +81,8 @@ export default function AdminShell({
     if (exact) return pathname === href;
     return pathname === href || pathname.startsWith(`${href}/`);
   };
+
+  const visibleNavItems = NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin);
 
   const sidebarContent = (
     <div className="flex h-full flex-col">
@@ -103,28 +121,54 @@ export default function AdminShell({
         </div>
       )}
 
-      {activeSiteId && (
-        <nav className="flex-1 space-y-0.5 px-3">
-          {NAV_ITEMS.map((item) => {
-            const active = isActive(item.segment, item.exact);
-            return (
-              <a
-                key={item.label}
-                href={navHref(item.segment)}
-                className={`block rounded-lg px-3 py-2 text-sm transition-colors ${
-                  active
-                    ? "bg-neutral-800 font-medium text-white"
-                    : "text-neutral-300 hover:bg-neutral-800/60 hover:text-white"
-                }`}
-              >
-                {item.label}
-              </a>
-            );
-          })}
-        </nav>
-      )}
+      <div className="flex-1">
+        {activeSiteId && (
+          <nav className="space-y-0.5 px-3">
+            {visibleNavItems.map((item) => {
+              const active = isActive(item.segment, item.exact);
+              return (
+                <a
+                  key={item.label}
+                  href={navHref(item.segment)}
+                  className={`block rounded-lg px-3 py-2 text-sm transition-colors ${
+                    active
+                      ? "bg-neutral-800 font-medium text-white"
+                      : "text-neutral-300 hover:bg-neutral-800/60 hover:text-white"
+                  }`}
+                >
+                  {item.label}
+                </a>
+              );
+            })}
+          </nav>
+        )}
 
-      {!activeSiteId && <div className="flex-1" />}
+        {isAdmin && (
+          <div className="mt-4 px-3">
+            <p className="mb-1 px-3 text-[11px] font-medium uppercase tracking-wide text-neutral-500">
+              Administration
+            </p>
+            <nav className="space-y-0.5">
+              {ADMIN_LINKS.map((link) => {
+                const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
+                return (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    className={`block rounded-lg px-3 py-2 text-sm transition-colors ${
+                      active
+                        ? "bg-neutral-800 font-medium text-white"
+                        : "text-neutral-300 hover:bg-neutral-800/60 hover:text-white"
+                    }`}
+                  >
+                    {link.label}
+                  </a>
+                );
+              })}
+            </nav>
+          </div>
+        )}
+      </div>
 
       <div className="border-t border-neutral-800 px-4 py-4">
         <a
