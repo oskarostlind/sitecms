@@ -179,6 +179,21 @@ export const apiKeys = pgTable("api_keys", {
 ]);
 
 // ---------------------------------------------------------------------------
+// audit_logs
+// ---------------------------------------------------------------------------
+export const auditLogs = pgTable("audit_logs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull(),
+  userEmail: text("user_email").notNull(),
+  siteId: uuid("site_id").references(() => sites.id, { onDelete: "cascade" }),
+  // Machine-readable action key, e.g. 'blocks.update', 'posts.publish'.
+  action: text("action").notNull(),
+  // Human-readable (Swedish) summary shown in the activity log UI.
+  detail: text("detail"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ---------------------------------------------------------------------------
 // relations
 // ---------------------------------------------------------------------------
 export const sitesRelations = relations(sites, ({ many }) => ({
@@ -190,6 +205,7 @@ export const sitesRelations = relations(sites, ({ many }) => ({
   seoMeta: many(seoMeta),
   media: many(media),
   apiKeys: many(apiKeys),
+  auditLogs: many(auditLogs),
 }));
 
 export const usersRelations = relations(users, ({ many }) => ({
@@ -229,4 +245,8 @@ export const mediaRelations = relations(media, ({ one }) => ({
 
 export const apiKeysRelations = relations(apiKeys, ({ one }) => ({
   site: one(sites, { fields: [apiKeys.siteId], references: [sites.id] }),
+}));
+
+export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
+  site: one(sites, { fields: [auditLogs.siteId], references: [sites.id] }),
 }));

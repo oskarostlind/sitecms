@@ -8,6 +8,7 @@ import { db, posts } from "@/lib/db";
 import { requireSiteAccess } from "@/lib/guard";
 import { triggerSiteRevalidation } from "@/lib/revalidate";
 import { slugify } from "@/components/content/slugify";
+import { logActivity } from "@/lib/audit";
 
 function readString(formData: FormData, key: string): string {
   const value = formData.get(key);
@@ -43,7 +44,7 @@ async function uniqueSlug(siteId: string, base: string, excludeId?: string): Pro
 export async function savePost(formData: FormData): Promise<void> {
   const siteId = readString(formData, "siteId");
   const postId = readString(formData, "postId");
-  await requireSiteAccess(siteId);
+  const user = await requireSiteAccess(siteId);
 
   const title = readString(formData, "title") || "Namnlöst inlägg";
   const slugInput = readString(formData, "slug");
@@ -56,6 +57,7 @@ export async function savePost(formData: FormData): Promise<void> {
   const published = formData.get("published") === "on";
 
   let postIdForRevalidate = postId;
+  let justPublished = false;
 
   if (postId) {
     const [existing] = await db
@@ -67,6 +69,8 @@ export async function savePost(formData: FormData): Promise<void> {
     if (!existing) {
       throw new Error("Inlägget hittades inte.");
     }
+
+    justPublished = published && !existing.published;
 
     await db
       .update(posts)
@@ -81,6 +85,16 @@ export async function savePost(formData: FormData): Promise<void> {
         updatedAt: new Date(),
       })
       .where(eq(posts.id, postId));
+
+    await logActivity({
+      userId: user.id,
+      userEmail: user.email,
+      siteId,
+      action: justPublished ? "posts.publish" : "posts.update",
+      detail: justPublished
+        ? `Publicerade inlägget "${title}"`
+        : `Uppdaterade inlägget "${title}"`,
+    });
   } else {
     const [created] = await db
       .insert(posts)
@@ -97,6 +111,16 @@ export async function savePost(formData: FormData): Promise<void> {
       .returning({ id: posts.id });
 
     postIdForRevalidate = created.id;
+
+    await logActivity({
+      userId: user.id,
+      userEmail: user.email,
+      siteId,
+      action: "posts.create",
+      detail: published
+        ? `Skapade och publicerade inlägget "${title}"`
+        : `Skapade inlägget "${title}"`,
+    });
   }
 
   revalidatePath(`/admin/sites/${siteId}/posts`);
@@ -110,9 +134,25 @@ export async function savePost(formData: FormData): Promise<void> {
 
 /** Deletes a post. Bound to (siteId, postId) as a <form action> on the edit page. */
 export async function deletePost(siteId: string, postId: string): Promise<void> {
-  await requireSiteAccess(siteId);
+  const user = await requireSiteAccess(siteId);
+
+  const [existing] = await db
+    .select({ title: posts.title })
+    .from(posts)
+    .where(and(eq(posts.id, postId), eq(posts.siteId, siteId)))
+    .limit(1);
 
   await db.delete(posts).where(and(eq(posts.id, postId), eq(posts.siteId, siteId)));
+
+  if (existing) {
+    await logActivity({
+      userId: user.id,
+      userEmail: user.email,
+      siteId,
+      action: "posts.delete",
+      detail: `Tog bort inlägget "${existing.title}"`,
+    });
+  }
 
   revalidatePath(`/admin/sites/${siteId}/posts`);
   await triggerSiteRevalidation(siteId);

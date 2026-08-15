@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { db, services } from "@/lib/db";
 import { requireSiteAccess } from "@/lib/guard";
 import { triggerSiteRevalidation } from "@/lib/revalidate";
+import { logActivity } from "@/lib/audit";
 
 function readString(formData: FormData, key: string): string {
   const value = formData.get(key);
@@ -19,7 +20,7 @@ async function afterChange(siteId: string): Promise<void> {
 
 /** Adds a new blank service at the end of the list, ready for inline editing. */
 export async function createService(siteId: string): Promise<void> {
-  await requireSiteAccess(siteId);
+  const user = await requireSiteAccess(siteId);
 
   const existing = await db
     .select({ sortOrder: services.sortOrder })
@@ -39,6 +40,13 @@ export async function createService(siteId: string): Promise<void> {
   });
 
   await afterChange(siteId);
+  await logActivity({
+    userId: user.id,
+    userEmail: user.email,
+    siteId,
+    action: "services.create",
+    detail: "Lade till en ny tjänst",
+  });
   redirect(`/admin/sites/${siteId}/services`);
 }
 
@@ -48,7 +56,7 @@ export async function updateService(
   serviceId: string,
   formData: FormData,
 ): Promise<void> {
-  await requireSiteAccess(siteId);
+  const user = await requireSiteAccess(siteId);
 
   const title = readString(formData, "title") || "Namnlös tjänst";
   const description = readString(formData, "description") || null;
@@ -61,15 +69,37 @@ export async function updateService(
     .where(and(eq(services.id, serviceId), eq(services.siteId, siteId)));
 
   await afterChange(siteId);
+  await logActivity({
+    userId: user.id,
+    userEmail: user.email,
+    siteId,
+    action: "services.update",
+    detail: `Uppdaterade tjänsten "${title}"`,
+  });
   redirect(`/admin/sites/${siteId}/services`);
 }
 
 export async function deleteService(siteId: string, serviceId: string): Promise<void> {
-  await requireSiteAccess(siteId);
+  const user = await requireSiteAccess(siteId);
+
+  const [existing] = await db
+    .select({ title: services.title })
+    .from(services)
+    .where(and(eq(services.id, serviceId), eq(services.siteId, siteId)))
+    .limit(1);
 
   await db.delete(services).where(and(eq(services.id, serviceId), eq(services.siteId, siteId)));
 
   await afterChange(siteId);
+  if (existing) {
+    await logActivity({
+      userId: user.id,
+      userEmail: user.email,
+      siteId,
+      action: "services.delete",
+      detail: `Tog bort tjänsten "${existing.title}"`,
+    });
+  }
   redirect(`/admin/sites/${siteId}/services`);
 }
 

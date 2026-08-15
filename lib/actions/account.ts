@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { db, users } from "@/lib/db";
 import { requireUser } from "@/lib/guard";
+import { logActivity } from "@/lib/audit";
 
 const MIN_PASSWORD_LENGTH = 10;
 
@@ -58,6 +59,14 @@ export async function changePasswordAction(formData: FormData): Promise<void> {
     .update(users)
     .set({ passwordHash: newPasswordHash, updatedAt: new Date() })
     .where(eq(users.id, user.id));
+
+  await logActivity({
+    userId: user.id,
+    userEmail: user.email,
+    siteId: null,
+    action: "account.password_change",
+    detail: "Bytte lösenord",
+  });
 
   redirect("/admin/konto?success=1");
 }

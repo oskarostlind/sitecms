@@ -1,11 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { blocks } from "@/lib/db/schema";
+import { blocks, pages } from "@/lib/db/schema";
 import { requireSiteAccess } from "@/lib/guard";
 import { triggerSiteRevalidation } from "@/lib/revalidate";
+import { logActivity } from "@/lib/audit";
 
 export type BlockUpdate = {
   blockId: string;
@@ -26,7 +27,7 @@ export async function updateBlocks(
   siteId: string,
   updates: BlockUpdate[]
 ): Promise<UpdateBlocksResult> {
-  await requireSiteAccess(siteId);
+  const user = await requireSiteAccess(siteId);
 
   if (!updates || updates.length === 0) {
     return { ok: true };
@@ -53,6 +54,31 @@ export async function updateBlocks(
     await triggerSiteRevalidation(siteId);
   } catch (err) {
     console.error("updateBlocks: triggerSiteRevalidation misslyckades", err);
+  }
+
+  // Aktivitetsloggen: ta reda på vilken/vilka sidor blocken tillhör så
+  // loggposten blir begriplig ("Uppdaterade 3 block på Startsida").
+  try {
+    const affectedPages = await db
+      .selectDistinct({ title: pages.title })
+      .from(blocks)
+      .innerJoin(pages, eq(blocks.pageId, pages.id))
+      .where(inArray(blocks.id, updates.map((u) => u.blockId)));
+
+    const pageLabel =
+      affectedPages.length === 1
+        ? affectedPages[0].title
+        : `${affectedPages.length} sidor`;
+
+    await logActivity({
+      userId: user.id,
+      userEmail: user.email,
+      siteId,
+      action: "blocks.update",
+      detail: `Uppdaterade ${updates.length} block på ${pageLabel}`,
+    });
+  } catch (err) {
+    console.error("updateBlocks: kunde inte skriva aktivitetslogg", err);
   }
 
   return { ok: true };
