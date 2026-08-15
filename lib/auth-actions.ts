@@ -40,6 +40,16 @@ export async function loginAction(formData: FormData): Promise<void> {
 }
 
 /**
+ * Server action backing the "Logga in med Google" button on /login. Only
+ * rendered when googleAuthEnabled is true. Auth.js redirects to Google's
+ * consent screen; on return, the signIn callback in lib/auth.ts decides
+ * whether the account is allowed in (it must already exist in `users`).
+ */
+export async function loginWithGoogleAction(): Promise<void> {
+  await signIn("google", { redirectTo: "/admin" });
+}
+
+/**
  * Server action for logging out. Clears the session and redirects to /login.
  */
 export async function logoutAction(): Promise<void> {

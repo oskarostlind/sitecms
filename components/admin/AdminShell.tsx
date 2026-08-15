@@ -137,7 +137,17 @@ export default function AdminShell({
           {user.name}
         </div>
         <div className="truncate text-xs text-neutral-500">{user.email}</div>
-        <form action={logoutAction} className="mt-3">
+        <a
+          href="/admin/konto"
+          className={`mt-3 block rounded-lg px-3 py-2 text-sm transition-colors ${
+            pathname === "/admin/konto"
+              ? "bg-neutral-800 font-medium text-white"
+              : "text-neutral-300 hover:bg-neutral-800/60 hover:text-white"
+          }`}
+        >
+          Mitt konto
+        </a>
+        <form action={logoutAction} className="mt-2">
           <button
             type="submit"
             className="w-full rounded-lg border border-neutral-700 px-3 py-2 text-left text-sm text-neutral-300 transition-colors hover:bg-neutral-800 hover:text-white"
