@@ -25,7 +25,7 @@ Icke-tekniska småföretagare (som Jesper). De ska kunna logga in, ändra text o
 - SEO-metadata per sida (title, description, og-bild)
 - Bilduppladdning (Vercel Blob)
 - Innehålls-API per sajt (API-nyckel) + on-demand revalidation mot kundsajten
-- Integration i Jjbygg-repot på branch `cms-integration` (preview-deploy — merge till produktion gör Oskar manuellt)
+- Integration i Jjbygg-repot på branch `cms-integration` (preview-deploy). När preview är verifierad felfri får runnern merga till main och verifiera skarpt på jjbyggboden.se (Oskars direktiv 2026-08-15).
 
 **Ingår inte:**
 - Betalning/Stripe, Slack/Gmail-integrationer, e-postutskick
@@ -64,7 +64,7 @@ Prototypen är klar när alla dessa är sanna:
 
 ## Autonomiläge
 
-`autonomt` — välj rimligaste alternativet och anteckna antagandet i STATUS.json. Undantag: pusha ALDRIG till `main` i oskarostlind/Jjbygg — endast branchen `cms-integration`.
+`autonomt` — välj rimligaste alternativet och anteckna antagandet i STATUS.json. Jjbygg: bygg och testa på branchen `cms-integration` (preview). Merge till main är tillåten först när preview-deployen är verifierad felfri i livetest — och verifiera därefter produktionen direkt.
 
 ## Deadline
 
