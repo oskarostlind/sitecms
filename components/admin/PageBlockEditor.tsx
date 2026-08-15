@@ -120,9 +120,9 @@ export default function PageBlockEditor({
             key={group.key}
             className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm"
           >
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="font-medium text-neutral-900">{group.title}</h2>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 {status === "saved" && (
                   <span className="text-sm text-emerald-600">Sparat ✓</span>
                 )}

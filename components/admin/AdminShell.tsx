@@ -249,8 +249,8 @@ export default function AdminShell({
       )}
 
       {/* Innehåll */}
-      <main className="min-w-0 flex-1 bg-neutral-50">
-        <div className="mx-auto max-w-5xl px-4 py-6 md:px-8 md:py-10">
+      <main className="min-w-0 flex-1 overflow-x-hidden bg-neutral-50">
+        <div className="mx-auto max-w-5xl p-4 md:p-8">
           {children}
         </div>
       </main>

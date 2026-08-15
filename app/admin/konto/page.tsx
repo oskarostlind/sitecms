@@ -37,7 +37,7 @@ export default async function AccountPage({
         </p>
       </div>
 
-      <div className="rounded-2xl border border-neutral-200 bg-white p-6">
+      <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
         <h2 className="text-sm font-medium text-neutral-900">Kontoinformation</h2>
         <dl className="mt-3 space-y-2 text-sm">
           <div className="flex justify-between gap-4">
@@ -55,7 +55,7 @@ export default async function AccountPage({
         </dl>
       </div>
 
-      <div className="rounded-2xl border border-neutral-200 bg-white p-6">
+      <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
         <h2 className="text-sm font-medium text-neutral-900">Byt lösenord</h2>
         <p className="mt-1 text-sm text-neutral-500">
           Ange ditt nuvarande lösenord och ditt nya lösenord (minst 10 tecken).

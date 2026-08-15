@@ -54,7 +54,7 @@ export default async function NewSitePage({
           </a>
         </div>
       ) : (
-        <div className="rounded-2xl border border-neutral-200 bg-white p-6">
+        <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
           {errorMessage ? (
             <p role="alert" className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
               {errorMessage}

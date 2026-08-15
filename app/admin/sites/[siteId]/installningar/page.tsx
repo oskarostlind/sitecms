@@ -91,7 +91,7 @@ export default async function SiteSettingsPage({
         </div>
       ) : null}
 
-      <div className="rounded-2xl border border-neutral-200 bg-white p-6">
+      <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
         <h2 className="text-sm font-medium text-neutral-900">Grundinställningar</h2>
 
         {errorMessage ? (
@@ -150,7 +150,7 @@ export default async function SiteSettingsPage({
         </form>
       </div>
 
-      <div className="rounded-2xl border border-neutral-200 bg-white p-6">
+      <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
         <h2 className="text-sm font-medium text-neutral-900">Revalidate-hemlighet</h2>
         <p className="mt-1 text-sm text-neutral-500">
           {site.revalidateSecret
@@ -167,7 +167,7 @@ export default async function SiteSettingsPage({
         </form>
       </div>
 
-      <div className="rounded-2xl border border-neutral-200 bg-white p-6">
+      <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
         <h2 className="text-sm font-medium text-neutral-900">API-nycklar</h2>
         <p className="mt-1 text-sm text-neutral-500">
           Varje nyckel ger full läs-/skrivåtkomst till sajtens innehåll via API:et. Om du tar bort en nyckel
@@ -178,7 +178,8 @@ export default async function SiteSettingsPage({
           <p className="mt-4 text-sm text-neutral-500">Inga API-nycklar ännu.</p>
         ) : (
           <div className="mt-4 overflow-hidden rounded-xl border border-neutral-200">
-            <table className="w-full text-left text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px] text-left text-sm">
               <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
                 <tr>
                   <th className="px-4 py-2 font-medium">Namn</th>
@@ -190,8 +191,8 @@ export default async function SiteSettingsPage({
               <tbody className="divide-y divide-neutral-200">
                 {keys.map((k) => (
                   <tr key={k.id}>
-                    <td className="px-4 py-3 text-neutral-900">{k.name}</td>
-                    <td className="px-4 py-3 font-mono text-neutral-500">{maskKey(k.key)}</td>
+                    <td className="max-w-[180px] truncate px-4 py-3 text-neutral-900" title={k.name}>{k.name}</td>
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-neutral-500">{maskKey(k.key)}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-neutral-500">{formatDate(k.createdAt)}</td>
                     <td className="px-4 py-3 text-right">
                       <form action={deleteApiKey.bind(null, siteId, k.id)}>
@@ -207,6 +208,7 @@ export default async function SiteSettingsPage({
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         )}
 

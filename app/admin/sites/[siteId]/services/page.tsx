@@ -37,7 +37,7 @@ export default async function ServicesPage({
       ) : (
         <div className="space-y-4">
           {rows.map((service, index) => (
-            <div key={service.id} className="rounded-2xl border border-neutral-200 bg-white p-5">
+            <div key={service.id} className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
               <form action={updateService.bind(null, siteId, service.id)} className="grid gap-4 sm:grid-cols-2">
                 <div className="sm:col-span-2">
                   <label className="block text-sm font-medium text-neutral-700">Titel</label>

@@ -33,11 +33,11 @@ export default async function EditPostPage({
         </p>
       </div>
 
-      <div className="rounded-2xl border border-neutral-200 bg-white p-6">
+      <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
         <PostForm siteId={siteId} action={savePost} post={post} />
       </div>
 
-      <div className="rounded-2xl border border-red-100 bg-white p-6">
+      <div className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm">
         <h2 className="text-sm font-medium text-neutral-900">Ta bort inlägg</h2>
         <p className="mt-1 text-sm text-neutral-500">Detta går inte att ångra.</p>
         <form action={deletePost.bind(null, siteId, post.id)} className="mt-3">

@@ -110,8 +110,14 @@ export default async function UsersPage({
         />
       ) : null}
 
+      {userRows.length === 0 ? (
+        <div className="rounded-2xl border border-neutral-200 bg-white p-8 text-center text-sm text-neutral-500">
+          Inga användare hittades ännu.
+        </div>
+      ) : (
       <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white">
-        <table className="w-full text-left text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[720px] text-left text-sm">
           <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
             <tr>
               <th className="px-5 py-3 font-medium">Namn</th>
@@ -133,7 +139,7 @@ export default async function UsersPage({
                     {row.name}
                     {isSelf ? <span className="ml-2 text-xs text-neutral-400">(du)</span> : null}
                   </td>
-                  <td className="px-5 py-3 text-neutral-700">{row.email}</td>
+                  <td className="max-w-[220px] break-all px-5 py-3 text-neutral-700">{row.email}</td>
                   <td className="px-5 py-3 text-neutral-500">{ROLE_LABELS[row.role]}</td>
                   <td className="px-5 py-3 text-neutral-500">
                     {row.sites.length === 0 ? "—" : row.sites.map((s) => s.name).join(", ")}
@@ -172,9 +178,11 @@ export default async function UsersPage({
             })}
           </tbody>
         </table>
+        </div>
       </div>
+      )}
 
-      <div className="rounded-2xl border border-neutral-200 bg-white p-6">
+      <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
         <h2 className="text-sm font-medium text-neutral-900">Ny kundanvändare</h2>
         <p className="mt-1 text-sm text-neutral-500">
           Skapar en användare med rollen "Kund" och genererar ett tillfälligt lösenord som visas en gång.

@@ -55,7 +55,8 @@ export default async function GlobalActivityPage() {
         </div>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white">
-          <table className="w-full text-left text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[720px] text-left text-sm">
             <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
               <tr>
                 <th className="px-5 py-3 font-medium">Tid</th>
@@ -70,7 +71,7 @@ export default async function GlobalActivityPage() {
                   <td className="whitespace-nowrap px-5 py-3 text-neutral-500">
                     {formatDate(row.createdAt)}
                   </td>
-                  <td className="whitespace-nowrap px-5 py-3 text-neutral-700">
+                  <td className="max-w-[200px] truncate px-5 py-3 text-neutral-700" title={row.userEmail}>
                     {row.userEmail}
                   </td>
                   <td className="whitespace-nowrap px-5 py-3 text-neutral-500">
@@ -83,6 +84,7 @@ export default async function GlobalActivityPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>

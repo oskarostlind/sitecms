@@ -37,7 +37,7 @@ export default async function SeoListPage({
               <Link
                 key={entry.id}
                 href={`/admin/sites/${siteId}/seo/${entry.id}`}
-                className="block rounded-2xl border border-neutral-200 bg-white p-5 hover:bg-neutral-50"
+                className="block rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm hover:bg-neutral-50"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="font-medium text-neutral-900">{entry.pageSlug}</p>
@@ -62,7 +62,7 @@ export default async function SeoListPage({
         </div>
       )}
 
-      <div className="rounded-2xl border border-dashed border-neutral-300 bg-white p-5">
+      <div className="rounded-2xl border border-dashed border-neutral-300 bg-white p-5 shadow-sm">
         <h2 className="text-sm font-medium text-neutral-900">Lägg till SEO för fler sidor</h2>
         <p className="mt-1 text-sm text-neutral-500">
           Ange sidans slug, t.ex. &quot;om-oss&quot; eller &quot;kontakt&quot;.

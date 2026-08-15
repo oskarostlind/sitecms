@@ -33,7 +33,7 @@ export default async function EditSeoPage({
         </p>
       </div>
 
-      <div className="rounded-2xl border border-neutral-200 bg-white p-6">
+      <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
         <form action={updateSeoMeta.bind(null, siteId, entry.id)} className="space-y-5">
           <CharCounterField
             id="title"
@@ -74,7 +74,7 @@ export default async function EditSeoPage({
         </form>
       </div>
 
-      <div className="rounded-2xl border border-red-100 bg-white p-6">
+      <div className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm">
         <h2 className="text-sm font-medium text-neutral-900">Ta bort SEO-post</h2>
         <p className="mt-1 text-sm text-neutral-500">Detta går inte att ångra.</p>
         <form action={deleteSeoMeta.bind(null, siteId, entry.id)} className="mt-3">

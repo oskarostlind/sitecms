@@ -18,7 +18,7 @@ export default async function NewPostPage({
           Fyll i informationen nedan och klicka på Spara.
         </p>
       </div>
-      <div className="rounded-2xl border border-neutral-200 bg-white p-6">
+      <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
         <PostForm siteId={siteId} action={savePost} post={null} />
       </div>
     </div>
