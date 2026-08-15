@@ -1,26 +1,68 @@
 {
   "project": "sitecms",
-  "updated": "2026-08-15T18:55:00Z",
+  "updated": "2026-08-15T21:30:00Z",
   "phase": "polish",
   "progress": 93,
   "deploy_url": "https://sitecms-oskar-ostlinds-projects.vercel.app",
   "repo_url": "https://github.com/oskarostlind/sitecms",
-  "last_run_summary": "Browser-E2E i prod av alla adminfunktioner (10/10 PASS) inkl. skarp redigering på JJ Bygg synlig på jjbyggboden.se efter 2 s och återställd (live 1 s). E2E-kriteriet uppfyllt. Enda kvarvarande kriterium: Google OAuth-env (kräver Oskar).",
+  "last_run_summary": "Verifieringskörning: prod-deploy READY, jjbyggboden.se renderar CMS-innehåll korrekt, login-sidan OK. Google OAuth-env saknas fortfarande — inget byggbart arbete; allt kvarvarande kräver Oskar.",
   "criteria": [
-    { "text": "Adminpanelen deployad på Vercel, senaste deploy grön", "met": true },
-    { "text": "Inloggning med roller: admin ser alla sajter, kund endast sin", "met": true },
-    { "text": "Kund kan redigera texter/bilder, inlägg, tjänster & priser, SEO", "met": true },
-    { "text": "Bilduppladdning fungerar (Vercel Blob)", "met": true },
-    { "text": "Innehålls-API levererar allt innehåll per sajt via API-nyckel", "met": true },
-    { "text": "Jjbygg cms-integration-branch hämtar innehåll live, ändring syns < 60 s", "met": true },
-    { "text": "Inga layoutbrott 375–1440 px", "met": true },
-    { "text": "Användare kan byta sitt eget lösenord", "met": true },
-    { "text": "Logga in med Google fungerar", "met": false },
-    { "text": "Admin kan hantera sajter och användare via panelen", "met": true },
-    { "text": "Mediabibliotek per sajt", "met": true },
-    { "text": "Inlägg exponeras via API och renderas på kundsajt (beslut)", "met": true },
-    { "text": "Aktivitetslogg (audit)", "met": true },
-    { "text": "E2E-bevis i webbläsare (prod) för varje funktion", "met": true }
+    {
+      "text": "Adminpanelen deployad på Vercel, senaste deploy grön",
+      "met": true
+    },
+    {
+      "text": "Inloggning med roller: admin ser alla sajter, kund endast sin",
+      "met": true
+    },
+    {
+      "text": "Kund kan redigera texter/bilder, inlägg, tjänster & priser, SEO",
+      "met": true
+    },
+    {
+      "text": "Bilduppladdning fungerar (Vercel Blob)",
+      "met": true
+    },
+    {
+      "text": "Innehålls-API levererar allt innehåll per sajt via API-nyckel",
+      "met": true
+    },
+    {
+      "text": "Jjbygg cms-integration-branch hämtar innehåll live, ändring syns < 60 s",
+      "met": true
+    },
+    {
+      "text": "Inga layoutbrott 375–1440 px",
+      "met": true
+    },
+    {
+      "text": "Användare kan byta sitt eget lösenord",
+      "met": true
+    },
+    {
+      "text": "Logga in med Google fungerar",
+      "met": false
+    },
+    {
+      "text": "Admin kan hantera sajter och användare via panelen",
+      "met": true
+    },
+    {
+      "text": "Mediabibliotek per sajt",
+      "met": true
+    },
+    {
+      "text": "Inlägg exponeras via API och renderas på kundsajt (beslut)",
+      "met": true
+    },
+    {
+      "text": "Aktivitetslogg (audit)",
+      "met": true
+    },
+    {
+      "text": "E2E-bevis i webbläsare (prod) för varje funktion",
+      "met": true
+    }
   ],
   "next_up": [
     "Google OAuth-env i Vercel (kräver Oskar) — sista kriteriet; knappen aktiveras automatiskt, därefter phase=done",
@@ -45,5 +87,5 @@
     "Run 7: run 4:s kvarlämnade bevisfil e2e.png råkade raderas av media-UI-testet (klickade sista kortet). Ofarligt — starkare browser-bevis finns nu; testsajten e2e-test är åter tom i media.",
     "Run 7, sandbox-läxor till framtida körningar: (1) /sessions-disken kan vara full — jobba i /tmp och sätt npm_config_cache=/tmp/.npm TMPDIR=/tmp. (2) ESM-import av playwright HÄNGER i sandboxen — använd require() i .cjs. (3) Chromium saknar libXdamage: curl .deb från archive.ubuntu.com, dpkg -x, LD_LIBRARY_PATH. (4) Bakgrundsprocesser dör när bash-anropet slutar (~180 s tak per anrop) — dela långa körningar i faser (scripts/e2e-admin-browser.cjs PHASE=A|B|C)."
   ],
-  "runs": 7
+  "runs": 8
 }
