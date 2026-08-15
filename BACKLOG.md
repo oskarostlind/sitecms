@@ -8,12 +8,14 @@ Skriv gärna in egna punkter här mellan körningarna — det är det enklaste s
 
 - [ ] Egen domän för panelen (t.ex. cms.jjbyggboden.se) — läggs till i Vercel-projektet sitecms under Domains, uppdatera ev. AUTH-redirects (kräver Oskar)
 - [ ] Google OAuth: env-variabler GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET behöver skapas i Google Cloud Console (redirect-URI: https://sitecms-oskar-ostlinds-projects.vercel.app/api/auth/callback/google) — koden är på plats, knappen aktiveras automatiskt (kräver Oskar)
-- [ ] Browser-E2E i prod av kund-redigeringsflödet som Jesper (redigera block, spara, se ändring live på jjbyggboden.se) — kräver Oskars login i Chrome eller Google OAuth-env
+- [ ] Browser-E2E i prod av admin-funktionerna (sajter, användare, media-UI, aktivitet) samt som Jesper med effekt på jjbyggboden.se — kräver Oskars login i Chrome eller Google OAuth-env (kundflödet är redan browser-verifierat med syntetiskt konto, se Klart)
 
 - [ ] Beslut (Oskar): koppla timringskurs-sajten till sitecms content-API — repot kör idag en egen Sanity Studio, så bytet är ett aktivt val, inte bara en integration
 - [ ] Skapa kundkonto för Ola Andersson (info@timringskurs.nu) via panelens användarhantering när sajtkopplingen är beslutad
 
 ## Klart
+
+- [x] Browser-E2E i prod av kund-redigeringsflödet (run 6: headless Chromium mot prod med syntetiskt kundkonto e2e-test, session via auth-API — 8/8 PASS: login, tenant-isolering, blockredigering sparad+persistent, inlägg skapat+publicerat och verifierat i publika API:t, tjänstepris, SEO-titel, lösenordsbyte med gammalt-nekas/nytt-funkar, 375px utan horisontell overflow)
 
 <!-- runnern flyttar hit avbockade punkter -->
 - [x] Site 2: timringskurs upplagd som sajt (run 5: sajt "Norrhed Skog", 3 sidor/17 block, 6 kurser som tjänster, SEO per sida, API-nyckel; innehåll seedat från oskarostlind/timringskurs, verifierat via content-API i prod)

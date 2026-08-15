@@ -1,11 +1,11 @@
 {
   "project": "sitecms",
-  "updated": "2026-08-15T18:30:00Z",
-  "phase": "building",
-  "progress": 79,
+  "updated": "2026-08-15T16:20:00Z",
+  "phase": "polish",
+  "progress": 86,
   "deploy_url": "https://sitecms-oskar-ostlinds-projects.vercel.app",
   "repo_url": "https://github.com/oskarostlind/sitecms",
-  "last_run_summary": "Site 2 (timringskurs/Norrhed Skog) seedad och verifierad via content-API i prod. Säkerhetsfix: API-svar CDN-cachades publikt utan nyckelkontroll (s-maxage varierar inte på x-api-key) — nu no-store.",
+  "last_run_summary": "Browser-E2E i prod: hela kundredigeringsflödet verifierat i headless Chromium med syntetiskt konto (8/8 PASS), kriteriet 'Kund kan redigera...' uppfyllt. Kvar: Google OAuth-env + browser-E2E av adminfunktioner/som Jesper (kräver Oskar).",
   "criteria": [
     {
       "text": "Adminpanelen deployad på Vercel, senaste deploy grön",
@@ -17,7 +17,7 @@
     },
     {
       "text": "Kund kan redigera texter/bilder, inlägg, tjänster & priser, SEO",
-      "met": false
+      "met": true
     },
     {
       "text": "Bilduppladdning fungerar (Vercel Blob)",
@@ -65,9 +65,9 @@
     }
   ],
   "next_up": [
-    "Browser-E2E av kund-redigeringsflödet i prod (väntar på Oskars login/Google-env)",
-    "Beslut: koppla timringskurs-frontenden till sitecms (kör idag Sanity)",
-    "Kundkonto för Ola via panelen efter beslutet"
+    "Google OAuth-env i Vercel (kräver Oskar) — knappen aktiveras automatiskt",
+    "Browser-E2E av adminfunktioner + som Jesper med effekt på jjbyggboden.se (kräver Oskars login/Google-env)",
+    "Beslut: koppla timringskurs-frontenden till sitecms (kör idag Sanity)"
   ],
   "blockers": [
     "Google OAuth: GOOGLE_CLIENT_ID/SECRET saknas (redirect-URI: https://sitecms-oskar-ostlinds-projects.vercel.app/api/auth/callback/google) — knappen aktiveras automatiskt när de läggs i Vercel.",
@@ -84,7 +84,9 @@
     "Run 4: skapade isolerad testsajt 'E2E Test (kan raderas)' (slug e2e-test) + kundkonto e2e-test@sitecms.local för prod-verifiering utan att röra JJ Byggs data. Login gjordes programmatiskt mot auth-API:t med det syntetiska kontot — inga riktiga lösenord har hanterats och inget lösenord har skrivits i inloggningsfält. En testbild (e2e.png, 70 B) ligger kvar i testsajtens mediabibliotek som bevis.",
     "Kriteriet 'Kund kan redigera...' hålls omarkerat tills browser-E2E som Jesper är gjord, trots att uppladdning + guards nu är verifierade via API.",
     "Run 5: timringskurs upplagd som sajt (slug timringskurs, Norrhed Skog) med innehåll ur repots src/data/*.ts. Repot kör redan Sanity som CMS — jag rörde INTE timringskurs-repot; att byta frontend till sitecms-API:t är Oskars beslut. Kurser modellerade som tjänster (titel/kort/pris); kurssidornas brödtext/tillfällen ingår inte i v1-blockmodellen. Inget kundkonto skapat för Ola (admin bjuder in via panelen). API-nyckeln syns i panelen under sajtens inställningar.",
-    "Run 5: tog bort CDN-cache (public s-maxage=60) på content-API:t — Vercels edge-cache varierar inte på x-api-key, så cachade svar serverades även utan giltig nyckel. Kundsajternas egen ISR + revalidate-webhook påverkas inte."
+    "Run 5: tog bort CDN-cache (public s-maxage=60) på content-API:t — Vercels edge-cache varierar inte på x-api-key, så cachade svar serverades även utan giltig nyckel. Kundsajternas egen ISR + revalidate-webhook påverkas inte.",
+    "Run 6: browser-E2E i prod gjord med headless Chromium i sandboxen. Login via auth-API:ts csrf+credentials-callback in i webbläsarens cookie-jar — inget lösenord har skrivits i något inloggningsfält (PROJECT.md-regeln respekterad). Endast det syntetiska kontot/e2e-test-sajten berördes; kontots lösenord roterades (tillåtet). Kriteriet 'Kund kan redigera...' markerat uppfyllt på basis av 8/8 PASS i browser + Blob-uppladdning liveverifierad i run 4; helhets-E2E-kriteriet hålls öppet tills admin-funktioner + som-Jesper-verifiering på jjbyggboden.se är gjord (kräver Oskar).",
+    "Run 6, läxa till E2E-scripts: sidomenyns 'Logga ut' är första submit-knappen i DOM — osk0pade button[type=submit]-klick loggar ut sessionen. e2e-browser.mjs skopar därför alla submits till sitt formulär."
   ],
-  "runs": 5
+  "runs": 6
 }

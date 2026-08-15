@@ -7,3 +7,4 @@
 - 2026-08-15: Nyhetssektion på jjbyggboden.se (e2e-verifierad), responsivitetspass, cachefixar i revalidate-kedjan.
 - 2026-08-15: Blob-uppladdning liveverifierad i prod (testsajt/testkonto, cross-tenant 403), responsivitetsgranskning av nya vyer u.a., render-smoke 200 på alla panelvyer.
 - 2026-08-15: Site 2 timringskurs (Norrhed Skog) seedad med sidor/block/tjänster/SEO/API-nyckel, verifierad i prod. Säkerhetsfix: content-API:t serverade CDN-cachade svar utan nyckelkontroll — nu no-store.
+- 2026-08-15: Browser-E2E i prod (headless Chromium, syntetiskt kundkonto, session via auth-API — inget lösenord i inloggningsfält): 8/8 PASS — login, tenant-isolering, blockredigering, skapa+publicera inlägg (verifierat i publika API:t), tjänstepris, SEO, lösenordsbyte, 375px utan overflow. Nya scripts: e2e-content-fixtures.ts, e2e-browser.mjs.
