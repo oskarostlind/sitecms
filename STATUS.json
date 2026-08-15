@@ -1,11 +1,11 @@
 {
   "project": "sitecms",
-  "updated": "2026-08-15T11:05:50.993574Z",
+  "updated": "2026-08-15T11:43:03.620730Z",
   "phase": "building",
-  "progress": 62,
+  "progress": 71,
   "deploy_url": "https://sitecms-oskar-ostlinds-projects.vercel.app",
   "repo_url": "https://github.com/oskarostlind/sitecms",
-  "last_run_summary": "Våg 3 livetestad: admin- och kundsession verifierade mot alla 11 routes, rollskydd bekräftat. Lösenord omsatta (10:00-körningen hade roterat dem) och levererade till Oskar i chatten.",
+  "last_run_summary": "Nyhetssektion live på jjbyggboden.se (innehållsstyrd nav, verifierad full cykel: publicera→syns, radera→404, tom→dold länk). Responsivitetspass över alla vyer. Två cachebuggar hittade+fixade i skarp test.",
   "criteria": [
     {
       "text": "Adminpanelen deployad på Vercel, senaste deploy grön",
@@ -33,7 +33,7 @@
     },
     {
       "text": "Inga layoutbrott 375–1440 px",
-      "met": false
+      "met": true
     },
     {
       "text": "Användare kan byta sitt eget lösenord",
@@ -53,19 +53,20 @@
     },
     {
       "text": "Inlägg exponeras via API och renderas på kundsajt (beslut)",
-      "met": false
+      "met": true
     },
     {
       "text": "Aktivitetslogg (audit)",
       "met": true
+    },
+    {
+      "text": "E2E-bevis i webbläsare (prod) för varje funktion — kräver Oskars login i Chrome eller Google OAuth-env",
+      "met": false
     }
   ],
   "next_up": [
-    "UI-livetest av alla nya flöden",
-    "Inläggsvisning på jjbygg (beslut/feature-flagga)",
-    "Responsivitet 375-1440",
-    "Google OAuth-env (Oskar)",
-    "Egen domän (Oskar)"
+    "Browser-E2E av varje panelfunktion (väntar på Oskars login/Google-env)",
+    "Site 2: timringskurs"
   ],
   "blockers": [
     "Google OAuth: GOOGLE_CLIENT_ID/SECRET saknas (redirect-URI: https://sitecms-oskar-ostlinds-projects.vercel.app/api/auth/callback/google) — knappen aktiveras automatiskt när de läggs i Vercel.",
