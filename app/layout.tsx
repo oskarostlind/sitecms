@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "sitecms",
-  description: "Redigera din hemsida — enkelt och tryggt.",
+  title: "sitecms — redigera din hemsida enkelt och tryggt",
+  description:
+    "Sitecms ger småföretag och hantverkare full kontroll över sin hemsida: texter, bilder, inlägg, tjänster och priser — allt från en enkel panel.",
 };
 
 export default function RootLayout({

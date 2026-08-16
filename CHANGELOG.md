@@ -15,3 +15,4 @@
 - 2026-08-16 (run 11): Verification pass 4 — prod READY, tenant APIs 401 w/o key, jjbyggboden.se OK, Google provider still absent. Re-paused the scheduled task (run 10 pause had not stuck).
 - 2026-08-16: Google OAuth uppsatt (OAuth-klient + Vercel-env + prod redeploy, inloggningsflöde verifierat live). 14/14 kriterier uppfyllda — projektet stängt (done).
 - 2026-08-16 (run 13): Final verification pass — deploy READY, login 200, content API 401 w/o key, jjbyggboden.se serving CMS content. Project confirmed done; scheduled task disabled.
+- 2026-08-16: Riktig publik startsida (hero, funktioner, "så funkar det", målgrupp, CTA, footer) ersätter platshållaren på "/". Endast app/page.tsx + app/layout.tsx (metadata) ändrade — login/panel/API orörda. Build grönt lokalt (dummy env).
