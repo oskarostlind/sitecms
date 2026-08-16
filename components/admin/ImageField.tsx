@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { formatMaxUploadSize } from "@/lib/actions/upload";
 
 /**
@@ -37,6 +37,18 @@ export default function ImageField({
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Vilken bildadress som inte gick att visa. Jämförs mot nuvarande värde så
+  // att en ny bild alltid får ett försök till.
+  const [brokenSrc, setBrokenSrc] = useState<string | null>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  // Bilden renderas på servern och kan hinna misslyckas innan React kopplat på
+  // onError. Därför kontrolleras laddningsstatus även direkt efter montering.
+  useEffect(() => {
+    const el = imgRef.current;
+    if (!el || !value) return;
+    if (el.complete && el.naturalWidth === 0) setBrokenSrc(value);
+  }, [value]);
 
   async function upload(file: File) {
     setUploading(true);
@@ -82,6 +94,10 @@ export default function ImageField({
   }
 
   const missingAlt = Boolean(value) && alt.trim().length === 0;
+  // Äldre innehåll kan peka på en fil som ligger i kundens egen sajt
+  // (t.ex. "/hero/bild.jpg"). Den adressen finns inte i panelen, så bilden
+  // går inte att visa här — säg det rakt ut i stället för en trasig ikon.
+  const broken = Boolean(value) && brokenSrc === value;
 
   return (
     <div>
@@ -96,9 +112,28 @@ export default function ImageField({
           dragOver ? "border-neutral-500 bg-neutral-100" : "border-neutral-300 bg-neutral-50"
         }`}
       >
-        {value ? (
+        {value && broken ? (
+          <div className="flex h-44 w-full flex-col items-center justify-center gap-1.5 px-4 text-center">
+            <span className="text-sm font-medium text-neutral-600">
+              Bilden kan inte visas här
+            </span>
+            <span className="text-xs text-neutral-500">
+              Den ligger på din sajt, inte i mediabiblioteket. Ladda upp den
+              här så visas den — och kan bytas härifrån i fortsättningen.
+            </span>
+            <code className="mt-1 max-w-full truncate rounded bg-white px-2 py-1 text-xs text-neutral-500">
+              {value}
+            </code>
+          </div>
+        ) : value ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={value} alt={alt} className="h-44 w-full bg-neutral-100 object-cover" />
+          <img
+            ref={imgRef}
+            src={value}
+            alt={alt}
+            onError={() => setBrokenSrc(value)}
+            className="h-44 w-full bg-neutral-100 object-cover"
+          />
         ) : (
           <button
             type="button"
