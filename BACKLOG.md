@@ -6,8 +6,9 @@ Skriv gärna in egna punkter här mellan körningarna — det är det enklaste s
 
 ## Att göra
 
-- [ ] Kundsajterna måste rendera richtext-block som HTML: content-API:t levererar nu `html` per richtext-block (och `bodyHtml` per inlägg). Jjbygg (branch `cms-integration`) läser fortfarande bara `value`, dvs. rå markdown — om Jesper fetmarkerar ett ord i t.ex. ett FAQ-svar visas `**så här**` bokstavligt på jjbyggboden.se. Byt till `html` (dangerouslySetInnerHTML) med `value` som fallback. HTML:en är genererad av lib/markdown.ts och innehåller bara en fast taggmängd av escapad text.
-- [ ] Alt-text på befintliga bilder: kolumnerna finns och fälten är på plats, men de tre bilder som redan ligger i CMS:et (jjbygg hero, timringskurs hero + porträtt) saknar beskrivning. Kundsajterna bör dessutom använda `alt` från API:t i stället för hårdkodad text.
+- [ ] Skriv alt-texter för de tre bilder som ligger i CMS:et (jjbygg hero, timringskurs hero + porträtt) — fälten finns nu i panelen men är tomma. Kräver att någon beskriver bilderna.
+- [ ] timringskurs-sajten läser fortfarande `value` för richtext-block (kör Sanity idag, se beslutspunkten nedan). Samma byte som gjordes i Jjbygg behövs den dagen sajten kopplas till sitecms.
+- [ ] Vercel-projektet jjbygg saknar CMS_API_URL/CMS_API_KEY i Preview-miljön — preview-deployer visar därför statiskt reservinnehåll i stället för CMS-innehåll, vilket gör dem oanvändbara för att granska CMS-ändringar. Lägg till variablerna under Settings → Environment Variables → Preview (kräver Oskar).
 - [ ] Egen domän för panelen (t.ex. cms.jjbyggboden.se) — läggs till i Vercel-projektet sitecms under Domains, uppdatera ev. AUTH-redirects (kräver Oskar)
 - [ ] Google OAuth: env-variabler GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET behöver skapas i Google Cloud Console (redirect-URI: https://sitecms-oskar-ostlinds-projects.vercel.app/api/auth/callback/google) — koden är på plats, knappen aktiveras automatiskt (kräver Oskar)
 - [ ] Beslut (Oskar): koppla timringskurs-sajten till sitecms content-API — repot kör idag en egen Sanity Studio, så bytet är ett aktivt val, inte bara en integration
@@ -15,6 +16,7 @@ Skriv gärna in egna punkter här mellan körningarna — det är det enklaste s
 
 ## Klart
 
+- [x] Jjbygg renderar kundens formatering och alt-texter: sajten läser `html` per richtext-block och `bodyHtml` per inlägg (med `value` som fallback), FAQ-svar och hero-underrubrik visar fet/kursiv/listor/länkar, bilder använder `alt` från API:t, och JSON-LD håller ren text. Verifierat skarpt 2026-08-16: fetmarkering i panelen syntes på jjbyggboden.se efter 2 s och var borta 1 s efter Ångra; innehållet återställt byte-identiskt.
 - [x] WYSIWYG-editor för brödtext och richtext-block (tiptap), markdown behålls som lagringsformat via lib/markdown.ts — kunden ser aldrig markdown-syntax
 - [x] Omslagsbild på inlägg: uppladdare med förhandsvisning och dra-och-släpp i stället för URL-fält
 - [x] Alt-text på bilder (block + omslagsbild), med förklarande hjälptext och varning när beskrivning saknas; exponerad i content-API:t

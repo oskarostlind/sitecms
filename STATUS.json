@@ -1,11 +1,11 @@
 {
   "project": "sitecms",
-  "updated": "2026-08-16T20:00:00Z",
+  "updated": "2026-08-16T21:30:00Z",
   "phase": "polish",
   "progress": 100,
   "deploy_url": "https://sitecms-zeta.vercel.app",
   "repo_url": "https://github.com/oskarostlind/sitecms",
-  "last_run_summary": "Redigeringsupplevelsen lyft mot Sanity-nivå: WYSIWYG-editor (tiptap) för brödtext och richtext-block med markdown kvar som lagringsformat, uppladdare för omslagsbild på inlägg, alt-text på alla bilder, ångra-funktion byggd på aktivitetsloggen och förhandsgranskning av inlägg. Schemaändringar: blocks.alt, posts.cover_image_alt, audit_logs.undo_data/undone_at (additiva, körda mot Neon). Verifierat lokalt mot Neon med Playwright: 26/26 PASS. Kvarstår: kundsajterna läser fortfarande `value` i stället för `html` för richtext-block — se BACKLOG.",
+  "last_run_summary": "Redigeringsupplevelsen lyft mot Sanity-nivå: WYSIWYG-editor (tiptap) för brödtext och richtext-block med markdown kvar som lagringsformat, uppladdare för omslagsbild på inlägg, alt-text på alla bilder, ångra-funktion byggd på aktivitetsloggen och förhandsgranskning av inlägg. Schemaändringar: blocks.alt, posts.cover_image_alt, audit_logs.undo_data/undone_at (additiva, körda mot Neon). Verifierat lokalt mot Neon med Playwright: 26/26 PASS. Kvarstår: kundsajterna läser fortfarande `value` i stället för `html` för richtext-block — se BACKLOG. Uppföljning samma dag: Jjbygg (main) renderar nu html/alt från API:t — verifierat skarpt på jjbyggboden.se (fetmarkering syns efter 2 s, borta 1 s efter Ångra, innehållet återställt).",
   "criteria": [
     {
       "text": "Adminpanelen deployad på Vercel, senaste deploy grön",
@@ -76,7 +76,7 @@
     }
   ],
   "next_up": [
-    "Jjbygg (branch cms-integration): rendera richtext-block via API-fältet `html` i stället för rå markdown i `value` — annars syns ** bokstavligt när kunden fetmarkerar text.",
+    "Vercel-projektet jjbygg saknar CMS_API_URL/CMS_API_KEY i Preview-miljön — preview-deployer visar statiskt reservinnehåll och duger inte för att granska CMS-ändringar (kräver Oskar).",
     "Fyll i alt-text för de tre befintliga bilderna (jjbygg hero, timringskurs hero + porträtt) och låt kundsajterna använda `alt` från API:t.",
     "Homepage-polish (ej blockerande, men lyft av Oskar 2026-08-16): favicon + Open Graph-bild saknas helt (404 på /favicon.ico och /opengraph-image) — sajten har ingen ikon i webbläsarflik/delningskort.",
     "Homepage-polish: inga riktiga bilder/skärmdumpar av panelen på startsidan, och inget socialt bevis (t.ex. 'används av JJ Bygg' eller kundcitat) — ren text just nu.",
@@ -101,7 +101,8 @@
     "Run 11: fjärde no-op-verifieringen i rad. Bekräftade att run 10:s paus av tasken inte registrerats (enabled=true, cron */2h) och pausade den igen. Allt kvarvarande kräver Oskar (Google OAuth-env, domän, timringskurs-beslut).",
     "KORRIGERING 2026-08-16: run 12 och run 13 (STATUS-historik) stängde projektet som 'done' (progress 100, alla 14 kriterier 'met') efter vad som verkar ha varit timeouts/ofullständig verifiering. Detta var FEL på två punkter: (1) den publika startsidan på '/' var fortfarande ren platshållartext ('sitecms' + tomma grå fält), inte en färdig produkt — nu åtgärdat och deployat; (2) 'Logga in med Google fungerar' var markerad met=true men Google-login ger redirect_uri_mismatch på sitecms-zeta.vercel.app (den URL Oskar faktiskt använder) eftersom bara sitecms-oskar-ostlinds-projects.vercel.app är registrerad som redirect-URI i Google Cloud Console. Verifierat konkret via curl mot /api/auth/signin/google + Googles svar på båda domänerna. Phase satt tillbaka till 'polish', progress till 90. Framtida körningar: verifiera ALLTID kritiska kriterier (särskilt OAuth och publika sidor) mot den faktiska produktions-URL:en (sitecms-zeta.vercel.app) innan projektet stängs som 'done' — stäng aldrig efter en timeout utan fullständig verifiering.",
     "2026-08-16 samma dag: Oskar la till redirect-URI:n i Google Cloud Console. Omverifierat konkret (curl mot /api/auth/signin/google -> Google visar normal inloggningssida på sitecms-zeta.vercel.app, ingen mismatch). Båda tillagda kriterierna nu met=true. Phase -> done, progress -> 100. Kvarvarande punkter (favicon/OG-bild saknas — 404 verifierat, socialt bevis/produktbilder på startsidan, egen domän, timringskurs-beslut) flyttade till next_up som icke-blockerande polish/beslut, inte till blockers — inget av dem hindrar produkten från att vara en fungerande, komplett pilot.",
-    "2026-08-16 (redigeringsvågen): markdown behölls som lagringsformat i stället för att införa ett strukturerat dokumentformat (Portable Text). Skälet: befintligt innehåll, seed-skript och kundsajter fortsätter fungera utan migrering. Priset är att editorns verktygsrad är begränsad till det markdown-bryggan kan läsa tillbaka (fet, kursiv, h2/h3, listor, citat, länk) — lägg aldrig till en knapp utan att uppdatera lib/markdown.ts. Bilduppladdning kunde inte testas lokalt (Vercel Blob saknas utanför prod); alt-textflödet testades genom att sätta bild-URL:en direkt i databasen. Testsajten wysiwyg-test och kontot e2e-editor@sitecms.local raderades efteråt."
+    "2026-08-16 (redigeringsvågen): markdown behölls som lagringsformat i stället för att införa ett strukturerat dokumentformat (Portable Text). Skälet: befintligt innehåll, seed-skript och kundsajter fortsätter fungera utan migrering. Priset är att editorns verktygsrad är begränsad till det markdown-bryggan kan läsa tillbaka (fet, kursiv, h2/h3, listor, citat, länk) — lägg aldrig till en knapp utan att uppdatera lib/markdown.ts. Bilduppladdning kunde inte testas lokalt (Vercel Blob saknas utanför prod); alt-textflödet testades genom att sätta bild-URL:en direkt i databasen. Testsajten wysiwyg-test och kontot e2e-editor@sitecms.local raderades efteråt.",
+    "2026-08-16: Jjbygg-fixen gjordes på branchen cms-richtext-html och mergades till main efter Oskars uttryckliga ja (runner-skillen förbjuder main-push i det repot; PROJECT.md tillåter merge efter verifierad granskning). Preview-deployen kunde inte visa CMS-innehåll eftersom Preview-miljön saknar CMS-variablerna, så verifieringen gjordes i tre steg i stället: stub av content-API:t (17/17 PASS), lokal körning mot skarpa CMS:et (identisk rendering, pixeljämförd FAQ), och skarpt live-test på jjbyggboden.se med omedelbar ångring."
   ],
   "runs": 13
 }
