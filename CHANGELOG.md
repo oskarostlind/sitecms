@@ -11,3 +11,4 @@
 - 2026-08-15 (run 7): Admin browser-E2E i prod, 10/10 PASS inkl. live-redigering på jjbyggboden.se (synlig 2 s, återställd). E2E-kriteriet uppfyllt — 13/14 kriterier klara, endast Google OAuth-env återstår (Oskar). Syntetiskt admin-konto + testsajt raderade efter körningen.
 - 2026-08-15 (run 8): Verification-only run — prod deploy READY, jjbyggboden.se serving CMS content, login page healthy. Google OAuth env still missing; all remaining work blocked on Oskar.
 - 2026-08-16 (run 9): Verification-only run 2 — prod READY, all 3 tenant content APIs healthy (200 w/ key, 401 w/o), jjbyggboden.se serving CMS content, no Google OAuth env yet. No buildable work; recommended pausing the scheduled task until env is added.
+- 2026-08-16 (run 10): Verification pass 3 — prod READY, all tenant APIs auth-protected, jjbyggboden.se OK. Restored STATUS.json (committed empty by run 9). Paused the scheduled task pending Google OAuth env from Oskar.
