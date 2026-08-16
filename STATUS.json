@@ -1,11 +1,11 @@
 {
   "project": "sitecms",
-  "updated": "2026-08-16T15:25:00Z",
+  "updated": "2026-08-16T20:30:00Z",
   "phase": "done",
   "progress": 100,
   "deploy_url": "https://sitecms-oskar-ostlinds-projects.vercel.app",
   "repo_url": "https://github.com/oskarostlind/sitecms",
-  "last_run_summary": "Google OAuth uppsatt (klient + Vercel-env GOOGLE_CLIENT_ID/SECRET, prod redeploy grön, inloggningsflödet verifierat live). Alla 14 kriterier uppfyllda — projektet klart.",
+  "last_run_summary": "Slutverifiering: deploy READY, login 200, content-API 401 utan nyckel, jjbyggboden.se serverar CMS-innehall. 14/14 kriterier star sig. Scheduled task avstangd.",
   "criteria": [
     {
       "text": "Adminpanelen deployad på Vercel, senaste deploy grön",
@@ -88,5 +88,5 @@
     "Run 10: pausade scheduled task build-sitecms (3:e no-op-körningen i rad; allt återstående kräver Oskar). Återaktivera tasken när GOOGLE_CLIENT_ID/SECRET är inlagda i Vercel, så verifierar nästa körning Google-login och stänger projektet.",
     "Run 11: fjärde no-op-verifieringen i rad. Bekräftade att run 10:s paus av tasken inte registrerats (enabled=true, cron */2h) och pausade den igen. Allt kvarvarande kräver Oskar (Google OAuth-env, domän, timringskurs-beslut)."
   ],
-  "runs": 12
+  "runs": 13
 }
