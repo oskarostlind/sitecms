@@ -9,10 +9,29 @@ import { requireSiteAccess } from "@/lib/guard";
 import { triggerSiteRevalidation } from "@/lib/revalidate";
 import { slugify } from "@/components/content/slugify";
 import { logActivity } from "@/lib/audit";
+import type { PostSnapshot } from "@/lib/undo-data";
 
 function readString(formData: FormData, key: string): string {
   const value = formData.get(key);
   return typeof value === "string" ? value.trim() : "";
+}
+
+type PostRow = typeof posts.$inferSelect;
+
+/** Gör om en inläggsrad till en JSON-vänlig ögonblicksbild för ångra-funktionen. */
+function snapshotPost(row: PostRow): PostSnapshot {
+  return {
+    id: row.id,
+    siteId: row.siteId,
+    slug: row.slug,
+    title: row.title,
+    excerpt: row.excerpt,
+    body: row.body,
+    coverImage: row.coverImage,
+    coverImageAlt: row.coverImageAlt,
+    published: row.published,
+    publishedAt: row.publishedAt ? new Date(row.publishedAt).toISOString() : null,
+  };
 }
 
 /** Finds a slug that is free for this site, appending -2, -3, ... on collision. */
@@ -52,8 +71,11 @@ export async function savePost(formData: FormData): Promise<void> {
   const slug = await uniqueSlug(siteId, baseSlug, postId || undefined);
 
   const excerpt = readString(formData, "excerpt") || null;
-  const body = readString(formData, "body") || null;
+  // Formulärposter normaliserar radbrytningar till CRLF; markdown lagras med
+  // rena radbrytningar så att texten ser likadan ut oavsett var den skrevs.
+  const body = readString(formData, "body").replace(/\r\n?/g, "\n") || null;
   const coverImage = readString(formData, "coverImage") || null;
+  const coverImageAlt = readString(formData, "coverImageAlt") || null;
   const published = formData.get("published") === "on";
 
   let postIdForRevalidate = postId;
@@ -61,7 +83,7 @@ export async function savePost(formData: FormData): Promise<void> {
 
   if (postId) {
     const [existing] = await db
-      .select({ published: posts.published, publishedAt: posts.publishedAt })
+      .select()
       .from(posts)
       .where(and(eq(posts.id, postId), eq(posts.siteId, siteId)))
       .limit(1);
@@ -80,6 +102,7 @@ export async function savePost(formData: FormData): Promise<void> {
         excerpt,
         body,
         coverImage,
+        coverImageAlt,
         published,
         publishedAt: published && !existing.publishedAt ? new Date() : existing.publishedAt,
         updatedAt: new Date(),
@@ -94,6 +117,9 @@ export async function savePost(formData: FormData): Promise<void> {
       detail: justPublished
         ? `Publicerade inlägget "${title}"`
         : `Uppdaterade inlägget "${title}"`,
+      // Hela inlägget som det såg ut innan, så att en felredigering (eller en
+      // publicering som inte var tänkt) går att ta tillbaka.
+      undoData: { kind: "post.update", post: snapshotPost(existing) },
     });
   } else {
     const [created] = await db
@@ -105,6 +131,7 @@ export async function savePost(formData: FormData): Promise<void> {
         excerpt,
         body,
         coverImage,
+        coverImageAlt,
         published,
         publishedAt: published ? new Date() : null,
       })
@@ -137,7 +164,7 @@ export async function deletePost(siteId: string, postId: string): Promise<void> 
   const user = await requireSiteAccess(siteId);
 
   const [existing] = await db
-    .select({ title: posts.title })
+    .select()
     .from(posts)
     .where(and(eq(posts.id, postId), eq(posts.siteId, siteId)))
     .limit(1);
@@ -151,6 +178,9 @@ export async function deletePost(siteId: string, postId: string): Promise<void> 
       siteId,
       action: "posts.delete",
       detail: `Tog bort inlägget "${existing.title}"`,
+      // Hela raden sparas i loggen så att ett felaktigt borttaget inlägg går
+      // att lägga tillbaka från aktivitetsloggen.
+      undoData: { kind: "post.delete", post: snapshotPost(existing) },
     });
   }
 

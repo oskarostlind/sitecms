@@ -1,7 +1,7 @@
 /**
  * Delade konstanter för bilduppladdning. Används av både API-routen
  * (app/api/upload/route.ts) och klientkomponenten som initierar uppladdning
- * (components/admin/ImageBlockField.tsx) så att gränserna aldrig kan glida
+ * (components/admin/ImageField.tsx) så att gränserna aldrig kan glida
  * isär mellan klient och server.
  */
 

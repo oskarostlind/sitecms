@@ -6,6 +6,8 @@ Skriv gärna in egna punkter här mellan körningarna — det är det enklaste s
 
 ## Att göra
 
+- [ ] Kundsajterna måste rendera richtext-block som HTML: content-API:t levererar nu `html` per richtext-block (och `bodyHtml` per inlägg). Jjbygg (branch `cms-integration`) läser fortfarande bara `value`, dvs. rå markdown — om Jesper fetmarkerar ett ord i t.ex. ett FAQ-svar visas `**så här**` bokstavligt på jjbyggboden.se. Byt till `html` (dangerouslySetInnerHTML) med `value` som fallback. HTML:en är genererad av lib/markdown.ts och innehåller bara en fast taggmängd av escapad text.
+- [ ] Alt-text på befintliga bilder: kolumnerna finns och fälten är på plats, men de tre bilder som redan ligger i CMS:et (jjbygg hero, timringskurs hero + porträtt) saknar beskrivning. Kundsajterna bör dessutom använda `alt` från API:t i stället för hårdkodad text.
 - [ ] Egen domän för panelen (t.ex. cms.jjbyggboden.se) — läggs till i Vercel-projektet sitecms under Domains, uppdatera ev. AUTH-redirects (kräver Oskar)
 - [ ] Google OAuth: env-variabler GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET behöver skapas i Google Cloud Console (redirect-URI: https://sitecms-oskar-ostlinds-projects.vercel.app/api/auth/callback/google) — koden är på plats, knappen aktiveras automatiskt (kräver Oskar)
 - [ ] Beslut (Oskar): koppla timringskurs-sajten till sitecms content-API — repot kör idag en egen Sanity Studio, så bytet är ett aktivt val, inte bara en integration
@@ -13,6 +15,11 @@ Skriv gärna in egna punkter här mellan körningarna — det är det enklaste s
 
 ## Klart
 
+- [x] WYSIWYG-editor för brödtext och richtext-block (tiptap), markdown behålls som lagringsformat via lib/markdown.ts — kunden ser aldrig markdown-syntax
+- [x] Omslagsbild på inlägg: uppladdare med förhandsvisning och dra-och-släpp i stället för URL-fält
+- [x] Alt-text på bilder (block + omslagsbild), med förklarande hjälptext och varning när beskrivning saknas; exponerad i content-API:t
+- [x] Ångra senaste ändringen: ögonblicksbild i aktivitetsloggen för blockredigering, inläggsändring och inläggsborttagning — ångras i sparraden eller från aktivitetsloggen
+- [x] Förhandsgranskning av inlägg innan sparning
 - [x] Browser-E2E i prod av admin-funktionerna (run 7: 10/10 PASS med tillfälligt syntetiskt admin-konto, raderat efteråt — sajt skapad via panelen, användare skapad+borttagen, media upp/ner via UI, aktivitetslogg, 375px, samt skarp blockredigering på JJ Bygg synlig på jjbyggboden.se efter 2 s och återställd)
 - [x] Browser-E2E i prod av kund-redigeringsflödet (run 6: headless Chromium mot prod med syntetiskt kundkonto e2e-test, session via auth-API — 8/8 PASS: login, tenant-isolering, blockredigering sparad+persistent, inlägg skapat+publicerat och verifierat i publika API:t, tjänstepris, SEO-titel, lösenordsbyte med gammalt-nekas/nytt-funkar, 375px utan horisontell overflow)
 

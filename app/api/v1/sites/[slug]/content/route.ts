@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { db, blocks, pages, seoMeta, services } from "@/lib/db";
 import { authenticateSite, CONTENT_CACHE_HEADERS } from "@/app/api/v1/_lib/auth";
+import { markdownToHtml } from "@/lib/markdown";
 
 /**
  * GET /api/v1/sites/[slug]/content
@@ -9,6 +10,13 @@ import { authenticateSite, CONTENT_CACHE_HEADERS } from "@/app/api/v1/_lib/auth"
  * Everything a customer site needs to build/render itself in one call: site
  * info, every page with its ordered blocks, visible services (ordered), and
  * all SEO metadata. Requires a valid "x-api-key" header for the site.
+ *
+ * Blocks carry two extra fields alongside the existing `value`, both additive
+ * so existing consumers keep working unchanged:
+ *   alt   image blocks: the customer's description of the picture
+ *   html  richtext blocks: `value` rendered from markdown, ready to drop into
+ *         the page (formatting written in the editor shows up as formatting
+ *         instead of literal ** characters)
  */
 export async function GET(
   request: Request,
@@ -61,6 +69,8 @@ export async function GET(
         key: block.key,
         type: block.type,
         value: block.value,
+        alt: block.type === "image" ? block.alt : null,
+        html: block.type === "richtext" ? markdownToHtml(block.value) : null,
       })),
     })),
     services: siteServices.map((service) => ({

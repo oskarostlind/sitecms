@@ -4,10 +4,12 @@ import {
   text,
   boolean,
   integer,
+  jsonb,
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
+import type { UndoData } from "@/lib/undo-data";
 
 /**
  * Multi-tenant CMS schema.
@@ -93,6 +95,9 @@ export const blocks = pgTable("blocks", {
   type: text("type", { enum: blockTypeEnumValues }).notNull().default("text"),
   // For type 'image' this holds the media URL; otherwise plain/rich text content.
   value: text("value"),
+  // Alt text for type 'image': what the picture shows, for screen readers and
+  // search engines. Null/empty means the image is decorative.
+  alt: text("alt"),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -111,6 +116,8 @@ export const posts = pgTable("posts", {
   excerpt: text("excerpt"),
   body: text("body"), // markdown
   coverImage: text("cover_image"),
+  // Alt text for the cover image (accessibility + SEO).
+  coverImageAlt: text("cover_image_alt"),
   published: boolean("published").notNull().default(false),
   publishedAt: timestamp("published_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -190,6 +197,11 @@ export const auditLogs = pgTable("audit_logs", {
   action: text("action").notNull(),
   // Human-readable (Swedish) summary shown in the activity log UI.
   detail: text("detail"),
+  // Snapshot of the previous state, captured before the change was written.
+  // Present only on entries that can be undone (see lib/undo-data.ts).
+  undoData: jsonb("undo_data").$type<UndoData>(),
+  // Set when the entry has been undone, so it can only be undone once.
+  undoneAt: timestamp("undone_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -38,6 +38,7 @@ export default async function PageEditorPage({
       key: block.key,
       type: block.type,
       value: block.value ?? "",
+      alt: block.alt ?? "",
       sortOrder: block.sortOrder,
     };
     if (!groupsMap.has(prefix)) groupsMap.set(prefix, []);

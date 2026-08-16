@@ -8,6 +8,8 @@ export type BlockDTO = {
   key: string;
   type: BlockRow["type"];
   value: string;
+  /** Alt-text för bildblock; "" för övriga typer. */
+  alt: string;
   sortOrder: number;
 };
 

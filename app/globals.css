@@ -1,1 +1,114 @@
 @import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   Rich text
+   Tailwinds preflight nollställer all typografi, så editorn (.rte-content) och
+   förhandsgranskningen (.rte-preview) behöver egna regler för att rubriker,
+   listor och citat ska se ut som de gör på kundens sajt. Samma regler för båda
+   — det kunden ser när hen skriver ska vara det hen får.
+--------------------------------------------------------------------------- */
+
+.rte-content,
+.rte-preview {
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  color: var(--color-neutral-900);
+  word-break: break-word;
+}
+
+.rte-content > * + *,
+.rte-preview > * + * {
+  margin-top: 0.75rem;
+}
+
+.rte-content h2,
+.rte-preview h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  margin-top: 1.5rem;
+}
+
+.rte-content h3,
+.rte-preview h3 {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.35;
+  margin-top: 1.25rem;
+}
+
+.rte-content > h2:first-child,
+.rte-content > h3:first-child,
+.rte-preview > h2:first-child,
+.rte-preview > h3:first-child {
+  margin-top: 0;
+}
+
+.rte-content ul,
+.rte-preview ul,
+.rte-content ol,
+.rte-preview ol {
+  padding-left: 1.5rem;
+}
+
+.rte-content ul,
+.rte-preview ul {
+  list-style: disc;
+}
+
+.rte-content ol,
+.rte-preview ol {
+  list-style: decimal;
+}
+
+.rte-content li,
+.rte-preview li {
+  margin: 0.15rem 0;
+}
+
+.rte-content li > ul,
+.rte-preview li > ul,
+.rte-content li > ol,
+.rte-preview li > ol {
+  margin-top: 0.15rem;
+}
+
+.rte-content li > p,
+.rte-preview li > p {
+  margin: 0;
+}
+
+.rte-content blockquote,
+.rte-preview blockquote {
+  border-left: 3px solid var(--color-neutral-300);
+  padding-left: 0.875rem;
+  color: var(--color-neutral-600);
+  font-style: italic;
+}
+
+.rte-content a,
+.rte-preview a {
+  color: var(--color-neutral-900);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.rte-content strong,
+.rte-preview strong {
+  font-weight: 600;
+}
+
+.rte-content hr,
+.rte-preview hr {
+  border-top: 1px solid var(--color-neutral-200);
+}
+
+/* Platshållartext i tom editor (tiptap Placeholder-tillägget). */
+.rte-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--color-neutral-400);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}

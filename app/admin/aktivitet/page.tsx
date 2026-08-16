@@ -3,6 +3,8 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { auditLogs, sites } from "@/lib/db/schema";
 import { requireUser } from "@/lib/guard";
+import { isUndoData } from "@/lib/undo-data";
+import UndoActivityButton from "@/components/admin/UndoActivityButton";
 
 const MAX_ROWS = 100;
 
@@ -32,6 +34,8 @@ export default async function GlobalActivityPage() {
       userEmail: auditLogs.userEmail,
       action: auditLogs.action,
       detail: auditLogs.detail,
+      undoData: auditLogs.undoData,
+      undoneAt: auditLogs.undoneAt,
       siteId: auditLogs.siteId,
       siteName: sites.name,
     })
@@ -56,13 +60,14 @@ export default async function GlobalActivityPage() {
       ) : (
         <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white">
           <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-left text-sm">
+          <table className="w-full min-w-[840px] text-left text-sm">
             <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
               <tr>
                 <th className="px-5 py-3 font-medium">Tid</th>
                 <th className="px-5 py-3 font-medium">Användare</th>
                 <th className="px-5 py-3 font-medium">Sajt</th>
                 <th className="px-5 py-3 font-medium">Händelse</th>
+                <th className="px-5 py-3 font-medium">Åtgärd</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-200">
@@ -79,6 +84,15 @@ export default async function GlobalActivityPage() {
                   </td>
                   <td className="px-5 py-3 text-neutral-900">
                     {row.detail || row.action}
+                  </td>
+                  <td className="whitespace-nowrap px-5 py-3">
+                    {row.undoneAt ? (
+                      <span className="text-neutral-400">Ångrad</span>
+                    ) : isUndoData(row.undoData) ? (
+                      <UndoActivityButton logId={row.id} />
+                    ) : (
+                      <span className="text-neutral-300">—</span>
+                    )}
                   </td>
                 </tr>
               ))}

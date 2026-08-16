@@ -39,10 +39,20 @@ export default async function EditPostPage({
 
       <div className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm">
         <h2 className="text-sm font-medium text-neutral-900">Ta bort inlägg</h2>
-        <p className="mt-1 text-sm text-neutral-500">Detta går inte att ångra.</p>
+        <p className="mt-1 text-sm text-neutral-500">
+          Inlägget försvinner från sajten direkt. Ångrar du dig kan du lägga
+          tillbaka det från{" "}
+          <a
+            href={`/admin/sites/${siteId}/aktivitet`}
+            className="underline hover:text-neutral-800"
+          >
+            aktivitetsloggen
+          </a>
+          .
+        </p>
         <form action={deletePost.bind(null, siteId, post.id)} className="mt-3">
           <ConfirmButton
-            confirmText="Ta bort inlägget? Detta går inte att ångra."
+            confirmText="Ta bort inlägget? Du kan lägga tillbaka det från aktivitetsloggen efteråt."
             className="rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
           >
             Ta bort inlägg

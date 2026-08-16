@@ -1,5 +1,7 @@
 # Changelog
 
+- 2026-08-16: Redigeringsupplevelse i Sanity-klass. (1) WYSIWYG-editor (tiptap) för inläggens brödtext och richtext-block — markera text, klicka Fet/Rubrik/lista/länk; ingen markdown-syntax syns för kunden. Innehållet lagras fortfarande som markdown (ny brygga lib/markdown.ts, 20 regressionstest via `npm run test:markdown`), så befintligt innehåll och kundsajter är oförändrade. (2) Omslagsbild på inlägg är nu en uppladdare (dra-och-släpp + filväljare) i stället för ett URL-fält — samma komponent som sidblocken (components/admin/ImageField.tsx). (3) Alt-text på alla bilder (nya kolumner blocks.alt, posts.cover_image_alt) och exponerad i content-API:t. (4) Ångra: varje blockredigering, inläggsändring och inläggsborttagning sparar en ögonblicksbild i aktivitetsloggen (audit_logs.undo_data/undone_at) och kan återställas — direkt i sparraden efter en sparning eller från aktivitetsloggen. (5) Förhandsgranskning av inlägg innan sparning. API:t har additiva fält: `alt` + `html` på block, `coverImageAlt` + `bodyHtml` på inlägg. Verifierat lokalt mot Neon med Playwright: 26/26 PASS (inkl. ångra av borttaget inlägg och 375px utan overflow).
+
 - 2026-08-15: Scaffold Next.js 15 + Tailwind, Vercel-projekt kopplat, produktion grön.
 - 2026-08-15: Auth (roller), adminpanel med blockredigerare, posts/services/SEO, publikt content-API, Neon+Blob provisionerade, Jjbygg live på CMS i produktion (verifierad revalidering).
 - 2026-08-15: Lösenordsbyte + villkorad Google-login, utökad definition of done till full CMS.

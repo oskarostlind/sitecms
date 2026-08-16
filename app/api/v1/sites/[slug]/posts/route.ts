@@ -26,6 +26,7 @@ export async function GET(
       title: posts.title,
       excerpt: posts.excerpt,
       coverImage: posts.coverImage,
+      coverImageAlt: posts.coverImageAlt,
       publishedAt: posts.publishedAt,
     })
     .from(posts)
