@@ -12,3 +12,4 @@
 - 2026-08-15 (run 8): Verification-only run — prod deploy READY, jjbyggboden.se serving CMS content, login page healthy. Google OAuth env still missing; all remaining work blocked on Oskar.
 - 2026-08-16 (run 9): Verification-only run 2 — prod READY, all 3 tenant content APIs healthy (200 w/ key, 401 w/o), jjbyggboden.se serving CMS content, no Google OAuth env yet. No buildable work; recommended pausing the scheduled task until env is added.
 - 2026-08-16 (run 10): Verification pass 3 — prod READY, all tenant APIs auth-protected, jjbyggboden.se OK. Restored STATUS.json (committed empty by run 9). Paused the scheduled task pending Google OAuth env from Oskar.
+- 2026-08-16 (run 11): Verification pass 4 — prod READY, tenant APIs 401 w/o key, jjbyggboden.se OK, Google provider still absent. Re-paused the scheduled task (run 10 pause had not stuck).

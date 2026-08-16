@@ -1,11 +1,11 @@
 {
   "project": "sitecms",
-  "updated": "2026-08-16T00:00:00Z",
+  "updated": "2026-08-16T02:10:00Z",
   "phase": "polish",
   "progress": 93,
   "deploy_url": "https://sitecms-oskar-ostlinds-projects.vercel.app",
   "repo_url": "https://github.com/oskarostlind/sitecms",
-  "last_run_summary": "Verifieringskörning 3: prod READY, alla 3 tenant-API:er 401 utan nyckel, jjbyggboden.se OK. Återställde STATUS.json som run 9 råkade committa tom. Pausade den schemalagda tasken — allt kvarvarande (Google OAuth-env, domän, timringskurs-beslut) kräver Oskar.",
+  "last_run_summary": "Verifieringskörning 4: prod READY, alla tenant-API:er 401 utan nyckel, jjbyggboden.se OK, Google-provider fortfarande ej i prod. Run 10:s taskpaus hade inte tagit — pausade build-sitecms igen via scheduled-tasks-API:t.",
   "criteria": [
     {
       "text": "Adminpanelen deployad på Vercel, senaste deploy grön",
@@ -73,7 +73,7 @@
     "Google OAuth: GOOGLE_CLIENT_ID/SECRET saknas (redirect-URI: https://sitecms-oskar-ostlinds-projects.vercel.app/api/auth/callback/google) — enda kvarvarande kriteriet. Koden är klar, knappen aktiveras automatiskt när env-variablerna läggs i Vercel.",
     "Egen domän för panelen (t.ex. cms.jjbyggboden.se) — kräver Oskars beslut i Vercel → Domains.",
     "Beslut om timringskurs-frontend (Sanity → sitecms) + kundkonto för Ola väntar på Oskar.",
-    "Scheduled task pausad i väntan på Google OAuth-env. Återaktivera för slutverifiering när env finns."
+    "Scheduled task build-sitecms pausad (run 11 — run 10:s paus tog inte, tasken körde varannan timme). Återaktivera när GOOGLE_CLIENT_ID/SECRET finns i Vercel så stänger nästa körning projektet."
   ],
   "assumptions": [
     "Commits görs som oskarostlind (noreply-mail) — Vercel blockerar okända författare",
@@ -88,7 +88,8 @@
     "Run 7: run 4:s kvarlämnade bevisfil e2e.png råkade raderas av media-UI-testet (klickade sista kortet). Ofarligt — starkare browser-bevis finns nu; testsajten e2e-test är åter tom i media.",
     "Run 7, sandbox-läxor till framtida körningar: (1) /sessions-disken kan vara full — jobba i /tmp och sätt npm_config_cache=/tmp/.npm TMPDIR=/tmp. (2) ESM-import av playwright HÄNGER i sandboxen — använd require() i .cjs. (3) Chromium saknar libXdamage: curl .deb från archive.ubuntu.com, dpkg -x, LD_LIBRARY_PATH. (4) Bakgrundsprocesser dör när bash-anropet slutar (~180 s tak per anrop) — dela långa körningar i faser (scripts/e2e-admin-browser.cjs PHASE=A|B|C).",
     "Run 10: STATUS.json i HEAD var tom (0 byte, trolig skrivmiss i run 9) — återställd från HEAD~1 och uppdaterad.",
-    "Run 10: pausade scheduled task build-sitecms (3:e no-op-körningen i rad; allt återstående kräver Oskar). Återaktivera tasken när GOOGLE_CLIENT_ID/SECRET är inlagda i Vercel, så verifierar nästa körning Google-login och stänger projektet."
+    "Run 10: pausade scheduled task build-sitecms (3:e no-op-körningen i rad; allt återstående kräver Oskar). Återaktivera tasken när GOOGLE_CLIENT_ID/SECRET är inlagda i Vercel, så verifierar nästa körning Google-login och stänger projektet.",
+    "Run 11: fjärde no-op-verifieringen i rad. Bekräftade att run 10:s paus av tasken inte registrerats (enabled=true, cron */2h) och pausade den igen. Allt kvarvarande kräver Oskar (Google OAuth-env, domän, timringskurs-beslut)."
   ],
-  "runs": 10
+  "runs": 11
 }
