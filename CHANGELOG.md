@@ -16,3 +16,4 @@
 - 2026-08-16: Google OAuth uppsatt (OAuth-klient + Vercel-env + prod redeploy, inloggningsflöde verifierat live). 14/14 kriterier uppfyllda — projektet stängt (done).
 - 2026-08-16 (run 13): Final verification pass — deploy READY, login 200, content API 401 w/o key, jjbyggboden.se serving CMS content. Project confirmed done; scheduled task disabled.
 - 2026-08-16: Riktig publik startsida (hero, funktioner, "så funkar det", målgrupp, CTA, footer) ersätter platshållaren på "/". Endast app/page.tsx + app/layout.tsx (metadata) ändrade — login/panel/API orörda. Build grönt lokalt (dummy env).
+- 2026-08-16: STATUS.json-korrigering — projektet var felaktigt stängt som "done" (run 12–13, sannolikt timeout-orsakad). Phase → "polish", progress 100 → 90. Nytt kriterium för publik startsida (nu uppfyllt) och nytt kriterium för att OAuth-redirect-URI:n måste matcha den faktiska panel-URL:en (INTE uppfyllt — se nedan). "Logga in med Google fungerar" satt till ej uppfyllt.
