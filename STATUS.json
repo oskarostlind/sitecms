@@ -1,11 +1,11 @@
 {
   "project": "sitecms",
-  "updated": "2026-08-16T02:10:00Z",
-  "phase": "polish",
-  "progress": 93,
+  "updated": "2026-08-16T15:25:00Z",
+  "phase": "done",
+  "progress": 100,
   "deploy_url": "https://sitecms-oskar-ostlinds-projects.vercel.app",
   "repo_url": "https://github.com/oskarostlind/sitecms",
-  "last_run_summary": "Verifieringskörning 4: prod READY, alla tenant-API:er 401 utan nyckel, jjbyggboden.se OK, Google-provider fortfarande ej i prod. Run 10:s taskpaus hade inte tagit — pausade build-sitecms igen via scheduled-tasks-API:t.",
+  "last_run_summary": "Google OAuth uppsatt (klient + Vercel-env GOOGLE_CLIENT_ID/SECRET, prod redeploy grön, inloggningsflödet verifierat live). Alla 14 kriterier uppfyllda — projektet klart.",
   "criteria": [
     {
       "text": "Adminpanelen deployad på Vercel, senaste deploy grön",
@@ -41,7 +41,7 @@
     },
     {
       "text": "Logga in med Google fungerar",
-      "met": false
+      "met": true
     },
     {
       "text": "Admin kan hantera sajter och användare via panelen",
@@ -65,15 +65,12 @@
     }
   ],
   "next_up": [
-    "Google OAuth-env i Vercel (kräver Oskar) — sista kriteriet; knappen aktiveras automatiskt, därefter phase=done",
     "Beslut (Oskar): egen domän för panelen (Vercel → Domains)",
     "Beslut (Oskar): koppla timringskurs-frontenden till sitecms (kör idag Sanity)"
   ],
   "blockers": [
-    "Google OAuth: GOOGLE_CLIENT_ID/SECRET saknas (redirect-URI: https://sitecms-oskar-ostlinds-projects.vercel.app/api/auth/callback/google) — enda kvarvarande kriteriet. Koden är klar, knappen aktiveras automatiskt när env-variablerna läggs i Vercel.",
     "Egen domän för panelen (t.ex. cms.jjbyggboden.se) — kräver Oskars beslut i Vercel → Domains.",
-    "Beslut om timringskurs-frontend (Sanity → sitecms) + kundkonto för Ola väntar på Oskar.",
-    "Scheduled task build-sitecms pausad (run 11 — run 10:s paus tog inte, tasken körde varannan timme). Återaktivera när GOOGLE_CLIENT_ID/SECRET finns i Vercel så stänger nästa körning projektet."
+    "Beslut om timringskurs-frontend (Sanity → sitecms) + kundkonto för Ola väntar på Oskar."
   ],
   "assumptions": [
     "Commits görs som oskarostlind (noreply-mail) — Vercel blockerar okända författare",
@@ -91,5 +88,5 @@
     "Run 10: pausade scheduled task build-sitecms (3:e no-op-körningen i rad; allt återstående kräver Oskar). Återaktivera tasken när GOOGLE_CLIENT_ID/SECRET är inlagda i Vercel, så verifierar nästa körning Google-login och stänger projektet.",
     "Run 11: fjärde no-op-verifieringen i rad. Bekräftade att run 10:s paus av tasken inte registrerats (enabled=true, cron */2h) och pausade den igen. Allt kvarvarande kräver Oskar (Google OAuth-env, domän, timringskurs-beslut)."
   ],
-  "runs": 11
+  "runs": 12
 }
