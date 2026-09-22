@@ -221,7 +221,8 @@ async function insertMissingBlocks(siteId: string, pageId: string, seeds: BlockS
 async function main() {
   const [site] = await db
     .insert(sites)
-    .values({ name: "Gällivare Traktor AB", slug: "gellivare-traktor", domain: "gellivaretraktor.se" })
+    // Domänen sätts först vid lansering — tills dess körs sajten på Vercels adress.
+    .values({ name: "Gällivare Traktor AB", slug: "gellivare-traktor", domain: null })
     .onConflictDoUpdate({ target: sites.slug, set: { updatedAt: new Date() } })
     .returning();
   console.log(`Site: ${site.name} (${site.id})`);
