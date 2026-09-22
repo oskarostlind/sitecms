@@ -128,14 +128,18 @@ export async function updateSiteSettings(siteId: string, formData: FormData): Pr
   const name = readString(formData, "name");
   const domain = readString(formData, "domain") || null;
   const revalidateUrl = readString(formData, "revalidateUrl") || null;
+  const notifyEmail = readString(formData, "notifyEmail") || null;
 
   if (!name) {
     redirect(`/admin/sites/${siteId}/installningar?error=missing`);
   }
+  if (notifyEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(notifyEmail)) {
+    redirect(`/admin/sites/${siteId}/installningar?error=notify-email`);
+  }
 
   await db
     .update(sites)
-    .set({ name, domain, revalidateUrl, updatedAt: new Date() })
+    .set({ name, domain, revalidateUrl, notifyEmail, updatedAt: new Date() })
     .where(eq(sites.id, siteId));
 
   await logActivity({

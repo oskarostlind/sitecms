@@ -16,6 +16,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Sidor", segment: "pages" },
   { label: "Inlägg", segment: "posts" },
   { label: "Tjänster & priser", segment: "services" },
+  { label: "Förfrågningar", segment: "forfragningar" },
   { label: "SEO", segment: "seo" },
   { label: "Media", segment: "media" },
   { label: "Aktivitet", segment: "aktivitet" },

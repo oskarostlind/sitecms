@@ -14,6 +14,7 @@ import { AdminRevealSecret } from "@/components/admin/AdminRevealSecret";
 
 const ERROR_MESSAGES: Record<string, string> = {
   missing: "Fyll i ett namn för sajten.",
+  "notify-email": "E-postadressen för förfrågningar ser inte giltig ut.",
 };
 
 function formatDate(date: Date | string) {
@@ -139,6 +140,22 @@ export default async function SiteSettingsPage({
             />
             <p className="mt-1 text-xs text-neutral-500">
               Anropas med hemligheten nedan varje gång innehåll sparas, så kundens sajt kan hämta nytt innehåll direkt.
+            </p>
+          </div>
+          <div>
+            <label htmlFor="notifyEmail" className="block text-sm font-medium text-neutral-700">
+              E-post för offertförfrågningar
+            </label>
+            <input
+              id="notifyEmail"
+              name="notifyEmail"
+              type="email"
+              defaultValue={site.notifyEmail ?? ""}
+              placeholder="offert@kundensajt.se"
+              className={inputClassName}
+            />
+            <p className="mt-1 text-xs text-neutral-500">
+              Nya förfrågningar från sajtens formulär mejlas hit (svara-till = kunden). Lämna tomt för att bara spara dem under Förfrågningar.
             </p>
           </div>
           <button

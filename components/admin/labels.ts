@@ -10,6 +10,15 @@ const GROUP_TITLES: Record<string, string> = {
   cta: "Uppmaning (CTA)",
   footer: "Sidfot & kontaktuppgifter",
   faq: "Vanliga frågor",
+  services: "Tjänster – rubrik",
+  fleet: "Maskinpark",
+  about: "Om oss",
+  contact: "Kontaktuppgifter",
+  company: "Företagsuppgifter",
+  offert: "Offertsidan",
+  tack: "Tack-sidan",
+  privacy: "Integritetspolicy",
+  recruit: "Rekrytering",
 };
 
 const FIELD_LABELS: Record<string, string> = {
@@ -48,16 +57,55 @@ function humanizeSuffix(suffix: string): string {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1).toLowerCase();
 }
 
+/** Svenska namn på vanliga fältsuffix (t.ex. "title" i "about.title"). */
+const SUFFIX_LABELS: Record<string, string> = {
+  title: "Rubrik",
+  subtitle: "Underrubrik",
+  intro: "Ingress",
+  text: "Text",
+  body: "Text",
+  image: "Bild",
+  button: "Knapptext",
+  phone: "Telefon",
+  email: "E-post",
+  address: "Besöksadress",
+  postal: "Postadress",
+  hours: "Öppettider",
+  person: "Kontaktperson",
+  mapQuery: "Adress för karta",
+  name: "Namn",
+  orgnr: "Organisationsnummer",
+  founded: "Grundat år",
+};
+
+/** Numrerade fält: "item3" → "Punkt 3", "q2" → "Fråga 2" osv. */
+const NUMBERED_LABELS: Record<string, string> = {
+  item: "Punkt",
+  text: "Text",
+  count: "Antal",
+  trust: "Förtroendepunkt",
+  q: "Fråga",
+  a: "Svar",
+};
+
 export function fieldLabel(key: string): string {
   if (FIELD_LABELS[key]) return FIELD_LABELS[key];
   const dotIndex = key.indexOf(".");
   const suffix = dotIndex >= 0 ? key.slice(dotIndex + 1) : key;
+  if (SUFFIX_LABELS[suffix]) return SUFFIX_LABELS[suffix];
+  const numbered = suffix.match(/^([a-zA-Z]+)(\d+)$/);
+  if (numbered && NUMBERED_LABELS[numbered[1]]) {
+    return `${NUMBERED_LABELS[numbered[1]]} ${numbered[2]}`;
+  }
   return humanizeSuffix(suffix);
 }
 
 /** Sorteringsordning för kända grupper; okända grupper hamnar sist, i den
  * ordning de påträffas. */
-const GROUP_ORDER = ["hero", "why", "cta", "faq", "footer"];
+const GROUP_ORDER = [
+  "hero", "services", "fleet", "about", "why", "faq", "cta", "contact", "company",
+  "recruit", "offert", "tack", "privacy", "footer",
+];
 
 export function groupSortIndex(prefix: string): number {
   const idx = GROUP_ORDER.indexOf(prefix);

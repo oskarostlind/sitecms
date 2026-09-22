@@ -7,6 +7,7 @@ import {
   jsonb,
   timestamp,
   uniqueIndex,
+  index,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import type { UndoData } from "@/lib/undo-data";
@@ -28,6 +29,9 @@ export const sites = pgTable("sites", {
   // Optional ISR/on-demand revalidation webhook for the site's frontend.
   revalidateUrl: text("revalidate_url"),
   revalidateSecret: text("revalidate_secret"),
+  // Where new quote requests (offertförfrågningar) are e-mailed. Null = the
+  // request is only stored and listed in the panel.
+  notifyEmail: text("notify_email"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
@@ -206,6 +210,41 @@ export const auditLogs = pgTable("audit_logs", {
 });
 
 // ---------------------------------------------------------------------------
+// quote_requests (offertförfrågningar from a customer site's form)
+// ---------------------------------------------------------------------------
+export const quoteStatusValues = ["ny", "besvarad", "arkiverad"] as const;
+export type QuoteStatus = (typeof quoteStatusValues)[number];
+
+export const quoteEmailStatusValues = ["sent", "failed", "skipped"] as const;
+export type QuoteEmailStatus = (typeof quoteEmailStatusValues)[number];
+
+export const quoteRequests = pgTable("quote_requests", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+  status: text("status", { enum: quoteStatusValues }).notNull().default("ny"),
+  name: text("name").notNull(),
+  company: text("company"),
+  phone: text("phone").notNull(),
+  email: text("email").notNull(),
+  jobType: text("job_type").notNull(),
+  machine: text("machine"),
+  location: text("location"),
+  // ISO date (YYYY-MM-DD) the customer would like to start, if given.
+  desiredStart: text("desired_start"),
+  description: text("description").notNull(),
+  consent: boolean("consent").notNull().default(false),
+  // Salted SHA-256 of the sender's IP — used for rate limiting only.
+  ipHash: text("ip_hash"),
+  // Outcome of the notification e-mails; the request is stored regardless.
+  emailStatus: text("email_status", { enum: quoteEmailStatusValues }).notNull().default("skipped"),
+  emailError: text("email_error"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("quote_requests_site_created_idx").on(table.siteId, table.createdAt),
+]);
+
+// ---------------------------------------------------------------------------
 // relations
 // ---------------------------------------------------------------------------
 export const sitesRelations = relations(sites, ({ many }) => ({
@@ -218,6 +257,7 @@ export const sitesRelations = relations(sites, ({ many }) => ({
   media: many(media),
   apiKeys: many(apiKeys),
   auditLogs: many(auditLogs),
+  quoteRequests: many(quoteRequests),
 }));
 
 export const usersRelations = relations(users, ({ many }) => ({
@@ -261,4 +301,8 @@ export const apiKeysRelations = relations(apiKeys, ({ one }) => ({
 
 export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
   site: one(sites, { fields: [auditLogs.siteId], references: [sites.id] }),
+}));
+
+export const quoteRequestsRelations = relations(quoteRequests, ({ one }) => ({
+  site: one(sites, { fields: [quoteRequests.siteId], references: [sites.id] }),
 }));
