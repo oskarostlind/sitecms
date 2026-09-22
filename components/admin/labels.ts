@@ -19,12 +19,17 @@ const GROUP_TITLES: Record<string, string> = {
   tack: "Tack-sidan",
   privacy: "Integritetspolicy",
   recruit: "Rekrytering",
+  memberships: "Medlemskap",
 };
 
 const FIELD_LABELS: Record<string, string> = {
   "hero.title": "Rubrik",
   "hero.subtitle": "Underrubrik",
   "hero.image": "Bild",
+  "contact.phone": "Telefon",
+  "memberships.item1": "Medlemskap 1",
+  "memberships.item2": "Medlemskap 2",
+  "memberships.item3": "Medlemskap 3",
   "why.item1": "Punkt 1",
   "why.item2": "Punkt 2",
   "why.item3": "Punkt 3",
@@ -59,6 +64,9 @@ function humanizeSuffix(suffix: string): string {
 
 /** Svenska namn på vanliga fältsuffix (t.ex. "title" i "about.title"). */
 const SUFFIX_LABELS: Record<string, string> = {
+  phoneLabel: "Telefon – vad numret avser",
+  phoneAlt: "Telefon 2",
+  phoneAltLabel: "Telefon 2 – vad numret avser",
   title: "Rubrik",
   subtitle: "Underrubrik",
   intro: "Ingress",
@@ -81,6 +89,10 @@ const SUFFIX_LABELS: Record<string, string> = {
 /** Numrerade fält: "item3" → "Punkt 3", "q2" → "Fråga 2" osv. */
 const NUMBERED_LABELS: Record<string, string> = {
   item: "Punkt",
+  name: "Kontaktperson",
+  role: "Roll",
+  phone: "Telefon",
+  email: "E-post",
   text: "Text",
   count: "Antal",
   trust: "Förtroendepunkt",

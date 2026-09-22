@@ -51,11 +51,11 @@ const HOME: BlockSeed[] = [
   { key: "fleet.count2", type: "text", value: "5" },
   { key: "fleet.item3", type: "text", value: "Höglyftare" },
   { key: "fleet.count3", type: "text", value: "3" },
-  { key: "fleet.item4", type: "text", value: "" },
-  { key: "fleet.count4", type: "text", value: "" },
-  { key: "fleet.item5", type: "text", value: "" },
-  { key: "fleet.count5", type: "text", value: "" },
-  { key: "fleet.item6", type: "text", value: "" },
+  { key: "fleet.item4", type: "text", value: "Traktorgrävare" },
+  { key: "fleet.count4", type: "text", value: "3" },
+  { key: "fleet.item5", type: "text", value: "Lastbil" },
+  { key: "fleet.count5", type: "text", value: "1" },
+  { key: "fleet.item6", type: "text", value: "Spårgående maskiner" },
   { key: "fleet.count6", type: "text", value: "" },
 
   { key: "about.title", type: "text", value: "Från två traktorer till en hel maskinpark" },
@@ -63,7 +63,7 @@ const HOME: BlockSeed[] = [
     key: "about.text",
     type: "richtext",
     value:
-      "Gällivare Traktor startades 1958 av Valter Johansson – med två traktorer och två anställda. Jobbet då var traktorkörning åt kommunen och ortens byggfirmor.\n\nI dag driver tredje generationen företaget vidare, med erfarna medarbetare och en maskinpark som klarar allt från mindre markjobb till stora entreprenader. Vi har vuxit med Gällivare, och vi känner både marken och klimatet här uppe.",
+      "Gällivare Traktor startades 1958 av Valter Johansson – med två traktorer och två anställda. Jobbet då var traktorkörning åt kommunen och ortens byggfirmor.\n\nI dag driver tredje generationen företaget vidare, med erfarna medarbetare och en maskinpark som klarar allt från mindre markjobb till stora entreprenader.\n\nVi har en välutrustad egen verkstad och maskinerna står i varmgarage – därför kan vi vara på plats snabbt även de kalla dagarna. Vi har vuxit med Gällivare, och vi känner både marken och klimatet här uppe.",
   },
   { key: "about.image", type: "image", value: "" },
 
@@ -105,22 +105,53 @@ const HOME: BlockSeed[] = [
   { key: "cta.button", type: "text", value: "Begär offert" },
 
   { key: "contact.title", type: "text", value: "Kontakt" },
-  // Motstridiga/okända uppgifter — fylls i av kunden i panelen.
-  { key: "contact.phone", type: "text", value: "" },
+  { key: "contact.phone", type: "text", value: "0970-55 300" },
+  { key: "contact.phoneLabel", type: "text", value: "Kontor" },
+  { key: "contact.phoneAlt", type: "text", value: "0970-15 300" },
+  { key: "contact.phoneAltLabel", type: "text", value: "Garage" },
+  // Ingen allmän e-postadress finns — kontaktpersonernas adresser används i stället.
   { key: "contact.email", type: "text", value: "" },
-  { key: "contact.address", type: "text", value: "" },
-  { key: "contact.postal", type: "text", value: "" },
+  { key: "contact.address", type: "text", value: "Ågatan 12" },
+  { key: "contact.postal", type: "text", value: "982 34 Gällivare" },
+  // Öppettider är ännu inte bekräftade — tomt fält döljs på sajten.
   { key: "contact.hours", type: "richtext", value: "" },
-  { key: "contact.person", type: "text", value: "" },
   { key: "contact.mapQuery", type: "text", value: "" },
+
+  // Kontaktpersoner (tomt namn = dold). Roller är inte bekräftade.
+  { key: "contact.name1", type: "text", value: "Jonas Johansson" },
+  { key: "contact.role1", type: "text", value: "" },
+  { key: "contact.phone1", type: "text", value: "070-559 95 95" },
+  { key: "contact.email1", type: "text", value: "Jonas@gellivaretraktor.se" },
+  { key: "contact.name2", type: "text", value: "Markus Johansson" },
+  { key: "contact.role2", type: "text", value: "" },
+  { key: "contact.phone2", type: "text", value: "070-600 99 30" },
+  { key: "contact.email2", type: "text", value: "Markus@gellivaretraktor.se" },
+  { key: "contact.name3", type: "text", value: "Kenth Johansson" },
+  { key: "contact.role3", type: "text", value: "" },
+  { key: "contact.phone3", type: "text", value: "070-595 30 01" },
+  { key: "contact.email3", type: "text", value: "" },
+  { key: "contact.name4", type: "text", value: "" },
+  { key: "contact.role4", type: "text", value: "" },
+  { key: "contact.phone4", type: "text", value: "" },
+  { key: "contact.email4", type: "text", value: "" },
+
+  // Medlemskap (källa: företagets egen sida)
+  { key: "memberships.item1", type: "text", value: "BDX" },
+  { key: "memberships.item2", type: "text", value: "Maskinentreprenörerna" },
+  { key: "memberships.item3", type: "text", value: "" },
 
   { key: "company.name", type: "text", value: "Gällivare Traktor AB" },
   { key: "company.orgnr", type: "text", value: "556099-6158" },
   { key: "company.founded", type: "text", value: "1958" },
 
-  // Rekryteringsannons från gamla sajten — tom tills kunden beslutat.
-  { key: "recruit.title", type: "text", value: "" },
-  { key: "recruit.text", type: "richtext", value: "" },
+  // Rekryteringsannons från företagets nuvarande startsida. Töm fälten för att dölja sektionen.
+  { key: "recruit.title", type: "text", value: "Vi söker medarbetare" },
+  {
+    key: "recruit.text",
+    type: "richtext",
+    value:
+      "Vi söker hjullastarförare/grävmaskinist, lastbilschaufför med CE-behörighet och TSA-förare för grävlastare och grävmaskin.\n\nHör av dig till Jonas eller Markus – kontaktuppgifter finns under Kontakt.",
+  },
 ];
 
 const OFFERT: BlockSeed[] = [
@@ -205,15 +236,32 @@ async function upsertPage(siteId: string, slug: string, title: string, sortOrder
   return page;
 }
 
+/**
+ * SEED_OVERWRITE=1 skriver även över befintliga block med värdena här.
+ * Använd bara när innehållet ska återställas till seed-läget — annars
+ * försvinner ändringar som gjorts i panelen.
+ */
+const OVERWRITE = process.env.SEED_OVERWRITE === "1";
+
+/** Block som ersatts av nyare nycklar; tas bort om de är tomma. */
+const OBSOLETE_KEYS = ["contact.person"];
+
 async function insertMissingBlocks(siteId: string, pageId: string, seeds: BlockSeed[]) {
   let added = 0;
   for (const [i, b] of seeds.entries()) {
-    const res = await db
-      .insert(blocks)
-      .values({ pageId, siteId, key: b.key, type: b.type, value: b.value, sortOrder: i })
-      .onConflictDoNothing({ target: [blocks.pageId, blocks.key] })
-      .returning({ id: blocks.id });
+    const values = { pageId, siteId, key: b.key, type: b.type, value: b.value, sortOrder: i };
+    const query = db.insert(blocks).values(values);
+    const res = await (OVERWRITE
+      ? query.onConflictDoUpdate({
+          target: [blocks.pageId, blocks.key],
+          set: { type: b.type, value: b.value, sortOrder: i, updatedAt: new Date() },
+        })
+      : query.onConflictDoNothing({ target: [blocks.pageId, blocks.key] })
+    ).returning({ id: blocks.id });
     added += res.length;
+  }
+  for (const key of OBSOLETE_KEYS) {
+    await db.delete(blocks).where(and(eq(blocks.pageId, pageId), eq(blocks.key, key), eq(blocks.value, "")));
   }
   return added;
 }
