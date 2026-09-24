@@ -1,5 +1,5 @@
 import { asc, eq } from "drizzle-orm";
-import { Users as UsersIcon } from "lucide-react";
+import { KeyRound, Trash2, Users as UsersIcon } from "lucide-react";
 import { db } from "@/lib/db";
 import { memberships, sites, users } from "@/lib/db/schema";
 import { requireAdmin } from "@/lib/admin-guard";
@@ -162,14 +162,18 @@ export default async function UsersPage({
                     )}
                   </Td>
                   <Td>
-                    <div className="flex flex-nowrap justify-end gap-2 whitespace-nowrap">
+                    <div className="flex flex-nowrap justify-end gap-1.5 whitespace-nowrap">
                       <form action={resetPasswordAction.bind(null, row.id)}>
                         <ConfirmButton
                           variant="secondary"
                           size="sm"
+                          className="px-2.5"
+                          icon={<KeyRound />}
+                          aria-label={`Återställ lösenord för ${row.name}`}
+                          title="Återställ lösenord"
                           confirmText={`Återställ lösenordet för ${row.name}? Ett nytt tillfälligt lösenord genereras.`}
                         >
-                          Återställ lösenord
+                          <span className="sr-only">Återställ lösenord</span>
                         </ConfirmButton>
                       </form>
                       {canDelete ? (
@@ -177,9 +181,13 @@ export default async function UsersPage({
                           <ConfirmButton
                             variant="danger"
                             size="sm"
+                            className="px-2.5"
+                            icon={<Trash2 />}
+                            aria-label={`Ta bort ${row.name}`}
+                            title="Ta bort"
                             confirmText={`Ta bort användaren ${row.name}? Detta går inte att ångra.`}
                           >
-                            Ta bort
+                            <span className="sr-only">Ta bort</span>
                           </ConfirmButton>
                         </form>
                       ) : (
@@ -187,10 +195,13 @@ export default async function UsersPage({
                           type="button"
                           variant="danger"
                           size="sm"
+                          className="px-2.5"
+                          icon={<Trash2 />}
                           disabled
+                          aria-label="Ta bort"
                           title={isSelf ? "Du kan inte ta bort dig själv" : "Sista administratören kan inte tas bort"}
                         >
-                          Ta bort
+                          <span className="sr-only">Ta bort</span>
                         </Button>
                       )}
                     </div>
