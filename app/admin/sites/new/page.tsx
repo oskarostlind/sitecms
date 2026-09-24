@@ -2,6 +2,7 @@ import { requireAdmin } from "@/lib/admin-guard";
 import { createSite } from "@/lib/actions/sites";
 import { AdminSiteForm } from "@/components/admin/AdminSiteForm";
 import { AdminRevealSecret } from "@/components/admin/AdminRevealSecret";
+import { Alert, ButtonLink, Card, CardContent, PageHeader } from "@/components/ui";
 
 const ERROR_MESSAGES: Record<string, string> = {
   missing: "Fyll i ett namn för sajten.",
@@ -26,19 +27,18 @@ export default async function NewSitePage({
   const showReveal = created === "1" && siteId && siteName && key;
 
   return (
-    <div className="max-w-2xl space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Ny sajt</h1>
-        <p className="mt-1 text-sm text-neutral-500">
-          Skapar sajten, en förstasida ("Startsida") och en API-nyckel.
-        </p>
-      </div>
+    <div className="max-w-2xl">
+      <PageHeader
+        breadcrumbs={[{ label: "Dina sajter", href: "/admin" }, { label: "Ny sajt" }]}
+        title="Ny sajt"
+        description='Skapar sajten, en förstasida ("Startsida") och en API-nyckel.'
+      />
 
       {showReveal ? (
         <div className="space-y-4">
-          <div className="rounded-2xl border border-green-200 bg-green-50 p-5 text-sm text-green-800">
+          <Alert tone="success">
             Sajten <span className="font-medium">{siteName}</span> har skapats.
-          </div>
+          </Alert>
 
           <AdminRevealSecret
             title="API-nyckel"
@@ -46,22 +46,21 @@ export default async function NewSitePage({
             value={key!}
           />
 
-          <a
-            href={`/admin/sites/${siteId}/installningar`}
-            className="inline-block rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
-          >
+          <ButtonLink href={`/admin/sites/${siteId}/installningar`} variant="secondary">
             Gå till sajtens inställningar
-          </a>
+          </ButtonLink>
         </div>
       ) : (
-        <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
-          {errorMessage ? (
-            <p role="alert" className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
-              {errorMessage}
-            </p>
-          ) : null}
-          <AdminSiteForm action={createSite} />
-        </div>
+        <Card>
+          <CardContent>
+            {errorMessage ? (
+              <Alert tone="danger" className="mb-4">
+                {errorMessage}
+              </Alert>
+            ) : null}
+            <AdminSiteForm action={createSite} />
+          </CardContent>
+        </Card>
       )}
     </div>
   );

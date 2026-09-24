@@ -1,10 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Eye, PenLine } from "lucide-react";
 import { slugify } from "./slugify";
 import ImageField from "@/components/admin/ImageField";
 import RichTextEditor from "@/components/admin/RichTextEditor";
 import { markdownToHtml } from "@/lib/markdown";
+import { formatDate } from "@/lib/format";
+import { cn } from "@/lib/cn";
+import {
+  Badge,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Checkbox,
+  Field,
+  Input,
+  SubmitButton,
+  Tab,
+  TabList,
+  TabPanel,
+  Tabs,
+  Textarea,
+  fieldIds,
+} from "@/components/ui";
 
 type PostFormPost = {
   id: string;
@@ -15,6 +36,7 @@ type PostFormPost = {
   coverImage: string | null;
   coverImageAlt: string | null;
   published: boolean;
+  publishedAt?: Date | string | null;
 };
 
 type PostFormProps = {
@@ -35,6 +57,9 @@ type PostFormProps = {
  *
  * Fliken "Förhandsgranska" visar inlägget som det kommer att se ut, så att man
  * kan kontrollera innan man sparar — sparning går direkt ut på kundens sajt.
+ *
+ * Formuläret har exakt en submit-knapp ("Spara"); E2E-skripten klickar på
+ * `form:has(input[name=title]) button[type=submit]`.
  */
 export function PostForm({ siteId, action, post = null }: PostFormProps) {
   const [title, setTitle] = useState(post?.title ?? "");
@@ -45,20 +70,52 @@ export function PostForm({ siteId, action, post = null }: PostFormProps) {
   const [coverImage, setCoverImage] = useState(post?.coverImage ?? "");
   const [coverImageAlt, setCoverImageAlt] = useState(post?.coverImageAlt ?? "");
   const [published, setPublished] = useState(post?.published ?? false);
-  const [previewing, setPreviewing] = useState(false);
+  const [tab, setTab] = useState<"write" | "preview">("write");
 
-  const inputClassName =
-    "mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none";
+  // Utgångsläget att jämföra mot för "Osparade ändringar".
+  const initial = useRef({
+    title: post?.title ?? "",
+    slug: post?.slug ?? "",
+    excerpt: post?.excerpt ?? "",
+    body: post?.body ?? "",
+    coverImage: post?.coverImage ?? "",
+    coverImageAlt: post?.coverImageAlt ?? "",
+    published: post?.published ?? false,
+  });
+  const submitting = useRef(false);
 
-  const tabClassName = (active: boolean) =>
-    `rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-      active
-        ? "bg-white text-neutral-900 shadow-sm"
-        : "text-neutral-500 hover:text-neutral-800"
-    }`;
+  const start = initial.current;
+  const dirty =
+    title !== start.title ||
+    slug !== start.slug ||
+    excerpt !== start.excerpt ||
+    body !== start.body ||
+    coverImage !== start.coverImage ||
+    coverImageAlt !== start.coverImageAlt ||
+    published !== start.published;
+
+  // Varna innan man lämnar sidan med osparade ändringar.
+  useEffect(() => {
+    if (!dirty) return;
+    const handler = (event: BeforeUnloadEvent) => {
+      if (submitting.current) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [dirty]);
+
+  const slugHint = fieldIds("slug").hintId;
+  const excerptHint = fieldIds("excerpt").hintId;
 
   return (
-    <form action={action} className="space-y-5">
+    <form
+      action={action}
+      onSubmit={() => {
+        submitting.current = true;
+      }}
+    >
       <input type="hidden" name="siteId" value={siteId} />
       {post ? <input type="hidden" name="postId" value={post.id} /> : null}
       {/* Fälten nedan styrs av editorn/bildfältet och skickas med som dolda fält. */}
@@ -66,170 +123,193 @@ export function PostForm({ siteId, action, post = null }: PostFormProps) {
       <input type="hidden" name="coverImage" value={coverImage} />
       <input type="hidden" name="coverImageAlt" value={coverImageAlt} />
 
-      <div className="flex items-center gap-1 rounded-xl bg-neutral-100 p-1">
-        <button
-          type="button"
-          onClick={() => setPreviewing(false)}
-          className={tabClassName(!previewing)}
-        >
-          Skriv
-        </button>
-        <button
-          type="button"
-          onClick={() => setPreviewing(true)}
-          className={tabClassName(previewing)}
-        >
-          Förhandsgranska
-        </button>
-      </div>
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+        {/* Huvudkolumn: text */}
+        <Card className="min-w-0">
+          <CardContent className="pt-3 sm:pt-4">
+            <Tabs value={tab} onValueChange={(next) => setTab(next === "preview" ? "preview" : "write")}>
+              <TabList aria-label="Redigera eller förhandsgranska">
+                <Tab value="write">
+                  <PenLine aria-hidden className="size-4" />
+                  Skriv
+                </Tab>
+                <Tab value="preview">
+                  <Eye aria-hidden className="size-4" />
+                  Förhandsgranska
+                </Tab>
+              </TabList>
 
-      <div className={previewing ? "hidden" : "space-y-5"}>
-        <div>
-          <label htmlFor="title" className="block text-sm font-medium text-neutral-700">
-            Titel
-          </label>
-          <input
-            id="title"
-            name="title"
-            type="text"
-            required
-            value={title}
-            onChange={(event) => {
-              const nextTitle = event.target.value;
-              setTitle(nextTitle);
-              if (!slugTouched) {
-                setSlug(slugify(nextTitle));
+              {/* keepMounted: fälten måste finnas kvar i formuläret även när förhandsgranskningen visas. */}
+              <TabPanel value="write" keepMounted className="space-y-5 pt-5">
+                <Field htmlFor="title" label="Titel" required>
+                  <Input
+                    id="title"
+                    name="title"
+                    type="text"
+                    required
+                    value={title}
+                    onChange={(event) => {
+                      const nextTitle = event.target.value;
+                      setTitle(nextTitle);
+                      if (!slugTouched) {
+                        setSlug(slugify(nextTitle));
+                      }
+                    }}
+                    placeholder="T.ex. Så väljer du rätt altandäck"
+                  />
+                </Field>
+
+                <Field
+                  htmlFor="slug"
+                  label="Webbadress"
+                  hint="Skapas automatiskt från titeln, men du kan ändra den. Använd små bokstäver och bindestreck."
+                >
+                  <div className="flex items-stretch">
+                    <span
+                      aria-hidden
+                      className="inline-flex items-center rounded-l-lg border border-r-0 border-neutral-300 bg-neutral-50 px-3 font-mono text-sm text-neutral-500"
+                    >
+                      …/
+                    </span>
+                    <Input
+                      id="slug"
+                      name="slug"
+                      type="text"
+                      value={slug}
+                      onChange={(event) => {
+                        setSlug(event.target.value);
+                        setSlugTouched(true);
+                      }}
+                      placeholder="genereras-fran-titeln"
+                      aria-describedby={slugHint}
+                      className="rounded-l-none font-mono"
+                    />
+                  </div>
+                </Field>
+
+                <Field
+                  htmlFor="excerpt"
+                  label="Utdrag"
+                  hint="En eller två meningar som visas i listor och när inlägget delas."
+                >
+                  <Textarea
+                    id="excerpt"
+                    name="excerpt"
+                    rows={2}
+                    value={excerpt}
+                    onChange={(event) => setExcerpt(event.target.value)}
+                    placeholder="Kort sammanfattning av inlägget"
+                    aria-describedby={excerptHint}
+                  />
+                </Field>
+
+                <div className="space-y-1.5">
+                  <span className="block text-sm font-medium text-neutral-800">Brödtext</span>
+                  <RichTextEditor
+                    value={body}
+                    onChange={setBody}
+                    ariaLabel="Brödtext"
+                    placeholder="Skriv inlägget här. Markera text och klicka på Fet eller Rubrik för att formatera."
+                    minHeight={260}
+                  />
+                </div>
+              </TabPanel>
+
+              <TabPanel value="preview" className="pt-5">
+                <p className="mb-4 text-xs font-medium uppercase tracking-wide text-neutral-500">
+                  Så här kommer inlägget att se ut
+                </p>
+
+                {coverImage && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={coverImage}
+                    alt={coverImageAlt}
+                    className="mb-5 h-56 w-full rounded-xl bg-neutral-100 object-cover"
+                  />
+                )}
+
+                <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
+                  {title || "Namnlöst inlägg"}
+                </h1>
+
+                {excerpt.trim() && <p className="mt-2 text-base text-neutral-600">{excerpt}</p>}
+
+                {body.trim() ? (
+                  <div className="rte-preview mt-5" dangerouslySetInnerHTML={{ __html: markdownToHtml(body) }} />
+                ) : (
+                  <p className="mt-5 text-sm text-neutral-500">Inlägget har ingen brödtext ännu.</p>
+                )}
+              </TabPanel>
+            </Tabs>
+          </CardContent>
+        </Card>
+
+        {/* Sidokolumn: publicering + omslagsbild */}
+        <div className="space-y-6">
+          <Card>
+            <CardHeader
+              actions={
+                <Badge tone={published ? "success" : "neutral"} dot>
+                  {published ? "Publicerad" : "Utkast"}
+                </Badge>
               }
-            }}
-            placeholder="T.ex. Så väljer du rätt altandäck"
-            className={inputClassName}
-          />
-        </div>
+            >
+              <CardTitle>Publicering</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Checkbox
+                id="published"
+                name="published"
+                checked={published}
+                onChange={(event) => setPublished(event.target.checked)}
+                label="Publicerad"
+                description="Syns på den publika sajten när du sparar."
+              />
+              <p className="text-xs text-neutral-500">Opublicerade inlägg syns bara här i panelen.</p>
+              {post?.publishedAt ? (
+                <p className="text-xs text-neutral-500">Publicerad {formatDate(post.publishedAt)}</p>
+              ) : null}
+            </CardContent>
+          </Card>
 
-        <div>
-          <label htmlFor="slug" className="block text-sm font-medium text-neutral-700">
-            Webbadress (URL-slug)
-          </label>
-          <input
-            id="slug"
-            name="slug"
-            type="text"
-            value={slug}
-            onChange={(event) => {
-              setSlug(event.target.value);
-              setSlugTouched(true);
-            }}
-            placeholder="genereras automatiskt från titeln"
-            className={`${inputClassName} font-mono`}
-          />
-          <p className="mt-1 text-xs text-neutral-500">
-            Genereras automatiskt från titeln men kan ändras här.
-          </p>
-        </div>
-
-        <div>
-          <label htmlFor="excerpt" className="block text-sm font-medium text-neutral-700">
-            Utdrag
-          </label>
-          <textarea
-            id="excerpt"
-            name="excerpt"
-            rows={2}
-            value={excerpt}
-            onChange={(event) => setExcerpt(event.target.value)}
-            placeholder="Kort sammanfattning som visas i listor"
-            className={inputClassName}
-          />
-        </div>
-
-        <div>
-          <span className="block text-sm font-medium text-neutral-700">Brödtext</span>
-          <div className="mt-1">
-            <RichTextEditor
-              value={body}
-              onChange={setBody}
-              ariaLabel="Brödtext"
-              placeholder="Skriv inlägget här. Markera text och klicka på Fet eller Rubrik för att formatera."
-              minHeight={260}
-            />
-          </div>
-        </div>
-
-        <div>
-          <span className="block text-sm font-medium text-neutral-700">Omslagsbild</span>
-          <div className="mt-1">
-            <ImageField
-              siteId={siteId}
-              value={coverImage}
-              alt={coverImageAlt}
-              onChange={(next) => {
-                setCoverImage(next.value);
-                setCoverImageAlt(next.alt);
-              }}
-            />
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Omslagsbild</CardTitle>
+              <CardDescription>Visas överst i inlägget och i listor.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ImageField
+                siteId={siteId}
+                value={coverImage}
+                alt={coverImageAlt}
+                onChange={(next) => {
+                  setCoverImage(next.value);
+                  setCoverImageAlt(next.alt);
+                }}
+              />
+            </CardContent>
+          </Card>
         </div>
       </div>
 
-      {previewing && (
-        <div className="rounded-2xl border border-neutral-200 bg-white p-5">
-          <p className="mb-4 text-xs uppercase tracking-wide text-neutral-400">
-            Så här kommer inlägget att se ut
+      {/* Sparrad – sticky inuti <main>, aldrig fixed över sidomenyn. */}
+      <div className="sticky bottom-0 z-10 -mx-4 mt-6 border-t border-neutral-200 bg-white/90 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 md:-mx-8 md:px-8">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p aria-live="polite" className="flex items-center gap-2 text-sm">
+            <span
+              aria-hidden
+              className={cn("size-2 rounded-full", dirty ? "bg-amber-500" : "bg-neutral-300")}
+            />
+            <span className={dirty ? "font-medium text-amber-800" : "text-neutral-500"}>
+              {dirty ? "Osparade ändringar" : "Inga osparade ändringar"}
+            </span>
+            {!published ? (
+              <span className="hidden text-neutral-500 sm:inline">· sparas som utkast</span>
+            ) : null}
           </p>
-
-          {coverImage && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={coverImage}
-              alt={coverImageAlt}
-              className="mb-5 h-56 w-full rounded-xl bg-neutral-100 object-cover"
-            />
-          )}
-
-          <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
-            {title || "Namnlöst inlägg"}
-          </h1>
-
-          {excerpt.trim() && (
-            <p className="mt-2 text-base text-neutral-600">{excerpt}</p>
-          )}
-
-          {body.trim() ? (
-            <div
-              className="rte-preview mt-5"
-              dangerouslySetInnerHTML={{ __html: markdownToHtml(body) }}
-            />
-          ) : (
-            <p className="mt-5 text-sm text-neutral-400">
-              Inlägget har ingen brödtext ännu.
-            </p>
-          )}
+          <SubmitButton pendingText="Sparar…">Spara</SubmitButton>
         </div>
-      )}
-
-      <label className="flex items-center gap-2 text-sm text-neutral-700">
-        <input
-          type="checkbox"
-          name="published"
-          checked={published}
-          onChange={(event) => setPublished(event.target.checked)}
-          className="h-4 w-4 rounded border-neutral-300"
-        />
-        Publicerad (syns på den publika sajten)
-      </label>
-
-      <div className="flex items-center gap-3 pt-2">
-        <button
-          type="submit"
-          className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
-        >
-          Spara
-        </button>
-        {!published && (
-          <span className="text-sm text-neutral-500">
-            Sparas som utkast — syns inte på sajten.
-          </span>
-        )}
       </div>
     </form>
   );

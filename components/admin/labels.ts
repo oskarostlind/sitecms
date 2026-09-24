@@ -35,6 +35,29 @@ const FIELD_LABELS: Record<string, string> = {
   "faq.a3": "Svar 3",
 };
 
+/** En mening under gruppens rubrik i editorn: vad sektionen är på sajten. */
+const GROUP_DESCRIPTIONS: Record<string, string> = {
+  hero: "Det första besökaren ser – rubrik, kort text och stor bild.",
+  why: "Tre korta anledningar att välja er.",
+  cta: "Uppmaningen längst ner på sidan.",
+  faq: "Vanliga frågor och svar.",
+  footer: "Kontaktuppgifter som visas i sidfoten.",
+};
+
+/** Korta hjälptexter under enskilda fält. Bara där de faktiskt hjälper. */
+const FIELD_HINTS: Record<string, string> = {
+  "hero.title": "Kort och tydlig – max ca 60 tecken.",
+  "hero.subtitle": "En eller två meningar om vad ni gör och för vem.",
+  "hero.image": "Välj en bred bild i liggande format – den visas stort överst på sidan.",
+  "why.item1": "En kort mening, t.ex. \"Fast pris – inga överraskningar\".",
+  "why.item2": "En kort mening.",
+  "why.item3": "En kort mening.",
+  "cta.title": "Uppmana besökaren att höra av sig, t.ex. \"Begär en kostnadsfri offert\".",
+  "footer.orgnr": "Skrivs som 556677-8899.",
+  "footer.phone": "Visas som klickbart nummer på mobilen.",
+  "footer.email": "Visas som klickbar länk på sajten.",
+};
+
 export function groupTitle(prefix: string): string {
   return (
     GROUP_TITLES[prefix] ??
@@ -46,6 +69,14 @@ function humanizeSuffix(suffix: string): string {
   // "contactName" -> "contact Name" -> "Contact name"
   const spaced = suffix.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/[_-]/g, " ");
   return spaced.charAt(0).toUpperCase() + spaced.slice(1).toLowerCase();
+}
+
+export function groupDescription(prefix: string): string | undefined {
+  return GROUP_DESCRIPTIONS[prefix];
+}
+
+export function fieldHint(key: string): string | undefined {
+  return FIELD_HINTS[key];
 }
 
 export function fieldLabel(key: string): string {

@@ -1,9 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Copy, ExternalLink, Image as ImageIcon, Trash2, Upload } from "lucide-react";
 import { deleteMedia } from "@/lib/actions/media";
 import { formatMaxUploadSize } from "@/lib/actions/upload";
+import { formatDateTime } from "@/lib/format";
+import { cn } from "@/lib/cn";
+import { Alert, Button, EmptyState, PageHeader, Spinner, useToast } from "@/components/ui";
 
 export type MediaItemDTO = {
   id: string;
@@ -20,15 +24,12 @@ function formatSize(bytes: number | null): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function formatDate(iso: string): string {
-  return new Intl.DateTimeFormat("sv-SE", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(iso));
-}
-
 function isImage(contentType: string | null): boolean {
   return !!contentType && contentType.startsWith("image/");
+}
+
+function isSvg(contentType: string | null): boolean {
+  return contentType === "image/svg+xml";
 }
 
 export default function MediaGrid({
@@ -39,18 +40,21 @@ export default function MediaGrid({
   items: MediaItemDTO[];
 }) {
   const router = useRouter();
+  const { toast } = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
+  const dragCounter = useRef(0);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
   const [localItems, setLocalItems] = useState(items);
 
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // gör det möjligt att välja samma fil igen
-    if (!file) return;
+  // Håll listan i synk med servern (t.ex. efter router.refresh() vid uppladdning).
+  useEffect(() => {
+    setLocalItems(items);
+  }, [items]);
 
+  async function uploadFile(file: File) {
     setUploading(true);
     setError(null);
 
@@ -70,6 +74,7 @@ export default function MediaGrid({
         return;
       }
 
+      toast({ title: "Uppladdad", tone: "success" });
       // API-routen returnerar bara { url }, inte hela media-raden. Hämta
       // fräscha props från servern så listan (id, storlek, datum m.m.)
       // stämmer med databasen.
@@ -79,6 +84,38 @@ export default function MediaGrid({
     } finally {
       setUploading(false);
     }
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // gör det möjligt att välja samma fil igen
+    if (file) void uploadFile(file);
+  }
+
+  function handleDragEnter(e: React.DragEvent<HTMLDivElement>) {
+    if (!e.dataTransfer?.types?.includes("Files")) return;
+    e.preventDefault();
+    dragCounter.current += 1;
+    setDragOver(true);
+  }
+
+  function handleDragOver(e: React.DragEvent<HTMLDivElement>) {
+    if (!e.dataTransfer?.types?.includes("Files")) return;
+    e.preventDefault();
+  }
+
+  function handleDragLeave(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    dragCounter.current = Math.max(0, dragCounter.current - 1);
+    if (dragCounter.current === 0) setDragOver(false);
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    dragCounter.current = 0;
+    setDragOver(false);
+    const file = e.dataTransfer?.files?.[0];
+    if (file) void uploadFile(file);
   }
 
   async function handleDelete(item: MediaItemDTO) {
@@ -108,8 +145,7 @@ export default function MediaGrid({
   async function handleCopyUrl(item: MediaItemDTO) {
     try {
       await navigator.clipboard.writeText(item.url);
-      setCopiedId(item.id);
-      setTimeout(() => setCopiedId((current) => (current === item.id ? null : current)), 2000);
+      toast({ title: "Länk kopierad", tone: "success" });
     } catch {
       setError("Kunde inte kopiera länken.");
     }
@@ -117,96 +153,122 @@ export default function MediaGrid({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Mediabibliotek</h1>
-          <p className="mt-1 text-sm text-neutral-500">
-            Bilder och filer som laddats upp till den här sajten.
-          </p>
+      <PageHeader
+        title="Mediabibliotek"
+        description={`Bilder som laddats upp till den här sajten. JPG, PNG, WEBP, GIF eller SVG – max ${formatMaxUploadSize()}.`}
+        actions={
+          <Button icon={<Upload />} loading={uploading} onClick={() => inputRef.current?.click()}>
+            Ladda upp fil
+          </Button>
+        }
+      />
+
+      <input ref={inputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+
+      {uploading ? (
+        <div className="flex items-center gap-2 text-sm text-neutral-600">
+          <Spinner />
+          Laddar upp…
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            disabled={uploading}
-            className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {uploading ? "Laddar upp…" : "Ladda upp fil"}
-          </button>
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFileChange}
-            className="hidden"
+      ) : null}
+
+      {error ? <Alert tone="danger">{error}</Alert> : null}
+
+      <div
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={cn(
+          "rounded-xl border-2 border-dashed p-3 transition-colors duration-150",
+          dragOver ? "border-brand-400 bg-brand-50" : "border-transparent",
+        )}
+      >
+        {localItems.length === 0 ? (
+          <EmptyState
+            icon={<ImageIcon />}
+            title="Inga filer ännu"
+            description="Dra in en bild här eller klicka på Ladda upp fil."
+            action={
+              <Button icon={<Upload />} onClick={() => inputRef.current?.click()}>
+                Ladda upp fil
+              </Button>
+            }
           />
-        </div>
-      </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            {localItems.map((item) => (
+              <div
+                key={item.id}
+                className="group relative overflow-hidden rounded-xl border border-neutral-200 bg-white"
+              >
+                <div className="aspect-square w-full overflow-hidden bg-neutral-100">
+                  {isImage(item.contentType) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={item.url}
+                      alt={item.filename}
+                      className={cn("h-full w-full", isSvg(item.contentType) ? "object-contain p-4" : "object-cover")}
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-xs text-neutral-400">
+                      Ingen förhandsvisning
+                    </div>
+                  )}
+                </div>
 
-      <p className="text-xs text-neutral-400">
-        JPG, PNG, WEBP, GIF eller SVG. Max {formatMaxUploadSize()}.
-      </p>
-
-      {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
-          {error}
-        </div>
-      )}
-
-      {localItems.length === 0 ? (
-        <div className="rounded-2xl border border-neutral-200 bg-white p-8 text-center text-sm text-neutral-500">
-          Inga filer ännu. Klicka på &quot;Ladda upp fil&quot; för att lägga till din första.
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {localItems.map((item) => (
-            <div
-              key={item.id}
-              className="overflow-hidden rounded-2xl border border-neutral-200 bg-white"
-            >
-              <div className="flex h-32 w-full items-center justify-center overflow-hidden bg-neutral-100">
-                {isImage(item.contentType) ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={item.url}
-                    alt={item.filename}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <span className="text-xs text-neutral-400">Ingen förhandsvisning</span>
-                )}
-              </div>
-
-              <div className="space-y-1 p-3">
-                <p className="truncate text-sm font-medium text-neutral-900" title={item.filename}>
-                  {item.filename}
-                </p>
-                <p className="text-xs text-neutral-500">
-                  {formatSize(item.size)} · {formatDate(item.createdAt)}
-                </p>
-
-                <div className="flex items-center gap-2 pt-1">
+                <div
+                  className={cn(
+                    "absolute inset-x-0 top-0 flex items-center justify-end gap-1 bg-gradient-to-b from-black/45 to-transparent p-2",
+                    "opacity-100 transition-opacity duration-150 md:opacity-0 md:focus-within:opacity-100 md:group-hover:opacity-100 md:group-focus-within:opacity-100",
+                  )}
+                >
                   <button
                     type="button"
                     onClick={() => handleCopyUrl(item)}
-                    className="rounded-lg border border-neutral-300 bg-white px-2.5 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
+                    aria-label="Kopiera länk"
+                    className="inline-flex size-7 items-center justify-center rounded-md bg-white/95 text-neutral-700 shadow-sm ring-1 ring-neutral-200 transition-colors duration-150 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50"
                   >
-                    {copiedId === item.id ? "Kopierat ✓" : "Kopiera URL"}
+                    <Copy aria-hidden className="size-4" />
                   </button>
+                  <a
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Öppna"
+                    className="inline-flex size-7 items-center justify-center rounded-md bg-white/95 text-neutral-700 shadow-sm ring-1 ring-neutral-200 transition-colors duration-150 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50"
+                  >
+                    <ExternalLink aria-hidden className="size-4" />
+                  </a>
                   <button
                     type="button"
                     onClick={() => handleDelete(item)}
                     disabled={deletingId === item.id}
-                    className="rounded-lg border border-red-200 bg-white px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    aria-label="Ta bort"
+                    className="inline-flex size-7 items-center justify-center rounded-md bg-white/95 text-red-600 shadow-sm ring-1 ring-red-200 transition-colors duration-150 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50 disabled:opacity-50"
                   >
-                    {deletingId === item.id ? "Tar bort…" : "Ta bort"}
+                    {deletingId === item.id ? (
+                      <Spinner size={14} />
+                    ) : (
+                      <Trash2 aria-hidden className="size-4" />
+                    )}
+                    <span className="sr-only">Ta bort</span>
                   </button>
                 </div>
+
+                <div className="space-y-0.5 p-2.5">
+                  <p className="truncate text-xs font-medium text-neutral-900" title={item.filename}>
+                    {item.filename}
+                  </p>
+                  <p className="text-[11px] text-neutral-500">
+                    {formatSize(item.size)} · {formatDateTime(item.createdAt)}
+                  </p>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,10 +1,12 @@
 import { notFound } from "next/navigation";
 import { and, eq } from "drizzle-orm";
+import { Trash2 } from "lucide-react";
 import { db, posts } from "@/lib/db";
 import { requireSiteAccess } from "@/lib/guard";
 import { savePost, deletePost } from "@/lib/actions/posts";
 import { PostForm } from "@/components/content/PostForm";
 import { ConfirmButton } from "@/components/content/ConfirmButton";
+import { PageHeader, buttonClassName } from "@/components/ui";
 
 export default async function EditPostPage({
   params,
@@ -25,40 +27,28 @@ export default async function EditPostPage({
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Redigera inlägg</h1>
-        <p className="mt-1 text-sm text-neutral-500">
-          Ändringar syns på sajten så snart du sparar.
-        </p>
-      </div>
-
-      <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
-        <PostForm siteId={siteId} action={savePost} post={post} />
-      </div>
-
-      <div className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm">
-        <h2 className="text-sm font-medium text-neutral-900">Ta bort inlägg</h2>
-        <p className="mt-1 text-sm text-neutral-500">
-          Inlägget försvinner från sajten direkt. Ångrar du dig kan du lägga
-          tillbaka det från{" "}
-          <a
-            href={`/admin/sites/${siteId}/aktivitet`}
-            className="underline hover:text-neutral-800"
-          >
-            aktivitetsloggen
-          </a>
-          .
-        </p>
-        <form action={deletePost.bind(null, siteId, post.id)} className="mt-3">
-          <ConfirmButton
-            confirmText="Ta bort inlägget? Du kan lägga tillbaka det från aktivitetsloggen efteråt."
-            className="rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
-          >
-            Ta bort inlägg
-          </ConfirmButton>
-        </form>
-      </div>
+    <div>
+      <PageHeader
+        title={post.title || "(Utan titel)"}
+        description="Ändringar syns på sajten så snart du sparar. Tar du bort inlägget kan du lägga tillbaka det från aktivitetsloggen."
+        breadcrumbs={[
+          { label: "Inlägg", href: `/admin/sites/${siteId}/posts` },
+          { label: post.title || "(Utan titel)" },
+        ]}
+        actions={
+          // Eget formulär, utanför inläggsformuläret (det ska bara ha en submit-knapp).
+          <form action={deletePost.bind(null, siteId, post.id)}>
+            <ConfirmButton
+              confirmText="Ta bort inlägget? Du kan lägga tillbaka det från aktivitetsloggen efteråt."
+              className={buttonClassName({ variant: "danger" })}
+            >
+              <Trash2 aria-hidden className="size-4" />
+              Ta bort
+            </ConfirmButton>
+          </form>
+        }
+      />
+      <PostForm siteId={siteId} action={savePost} post={post} />
     </div>
   );
 }

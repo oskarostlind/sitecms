@@ -1,4 +1,5 @@
 import { asc, eq } from "drizzle-orm";
+import { Users as UsersIcon } from "lucide-react";
 import { db } from "@/lib/db";
 import { memberships, sites, users } from "@/lib/db/schema";
 import { requireAdmin } from "@/lib/admin-guard";
@@ -6,6 +7,20 @@ import { createCustomerUser, deleteUserAction, resetPasswordAction } from "@/lib
 import { ConfirmButton } from "@/components/content/ConfirmButton";
 import { AdminRevealSecret } from "@/components/admin/AdminRevealSecret";
 import { AdminUserForm } from "@/components/admin/AdminUserForm";
+import {
+  Alert,
+  Avatar,
+  Badge,
+  Button,
+  EmptyState,
+  PageHeader,
+  Table,
+  Tbody,
+  Td,
+  Th,
+  Thead,
+  Tr,
+} from "@/components/ui";
 
 const ROLE_LABELS: Record<"admin" | "customer", string> = {
   admin: "Administratör",
@@ -83,73 +98,76 @@ export default async function UsersPage({
 
   return (
     <div className="max-w-4xl space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Användare</h1>
-        <p className="mt-1 text-sm text-neutral-500">
-          Alla användare i CMS:et och vilka sajter de har åtkomst till.
-        </p>
-      </div>
+      <PageHeader title="Användare" description="Alla användare i CMS:et och vilka sajter de har åtkomst till." />
 
-      {errorMessage ? (
-        <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
-          {errorMessage}
-        </p>
-      ) : null}
+      {errorMessage ? <Alert tone="danger">{errorMessage}</Alert> : null}
 
-      {deleted === "1" ? (
-        <div className="rounded-2xl border border-neutral-200 bg-white p-4 text-sm text-neutral-700">
-          Användaren togs bort.
-        </div>
-      ) : null}
+      {deleted === "1" ? <Alert tone="success">Användaren togs bort.</Alert> : null}
 
       {tempPassword ? (
-        <AdminRevealSecret
-          title={revealTitle}
-          description={`Ge det här lösenordet till ${revealName ?? "användaren"} (${revealEmail ?? ""}). De bör byta det direkt efter första inloggningen.`}
-          value={tempPassword}
-        />
+        <Alert tone="success" title={revealTitle}>
+          <p className="mb-2">
+            Ge det här lösenordet till {revealName ?? "användaren"} ({revealEmail ?? ""}). De bör byta det direkt
+            efter första inloggningen.
+          </p>
+          <AdminRevealSecret value={tempPassword} variant="inline" />
+        </Alert>
       ) : null}
 
       {userRows.length === 0 ? (
-        <div className="rounded-2xl border border-neutral-200 bg-white p-8 text-center text-sm text-neutral-500">
-          Inga användare hittades ännu.
-        </div>
+        <EmptyState icon={<UsersIcon />} title="Inga användare hittades ännu" description="Skapa en kundanvändare nedan." />
       ) : (
-      <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white">
-        <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] text-left text-sm">
-          <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
-            <tr>
-              <th className="px-5 py-3 font-medium">Namn</th>
-              <th className="px-5 py-3 font-medium">E-post</th>
-              <th className="px-5 py-3 font-medium">Roll</th>
-              <th className="px-5 py-3 font-medium">Sajter</th>
-              <th className="px-5 py-3" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-neutral-200">
+        <Table>
+          <Thead>
+            <Tr hover={false}>
+              <Th>Namn</Th>
+              <Th>E-post</Th>
+              <Th>Roll</Th>
+              <Th>Sajter</Th>
+              <Th>Åtgärder</Th>
+            </Tr>
+          </Thead>
+          <Tbody>
             {userRows.map((row) => {
               const isSelf = row.id === admin.id;
               const isLastAdmin = row.role === "admin" && adminCount <= 1;
               const canDelete = !isSelf && !isLastAdmin;
 
               return (
-                <tr key={row.id} className="align-top hover:bg-neutral-50">
-                  <td className="px-5 py-3 text-neutral-900">
-                    {row.name}
-                    {isSelf ? <span className="ml-2 text-xs text-neutral-400">(du)</span> : null}
-                  </td>
-                  <td className="max-w-[220px] break-all px-5 py-3 text-neutral-700">{row.email}</td>
-                  <td className="px-5 py-3 text-neutral-500">{ROLE_LABELS[row.role]}</td>
-                  <td className="px-5 py-3 text-neutral-500">
-                    {row.sites.length === 0 ? "—" : row.sites.map((s) => s.name).join(", ")}
-                  </td>
-                  <td className="px-5 py-3">
+                <Tr key={row.id}>
+                  <Td>
+                    <div className="flex items-center gap-2.5">
+                      <Avatar name={row.name || row.email} size={28} />
+                      <span className="text-neutral-900">
+                        {row.name}
+                        {isSelf ? <span className="ml-1.5 text-xs text-neutral-400">(du)</span> : null}
+                      </span>
+                    </div>
+                  </Td>
+                  <Td className="max-w-[220px] break-all text-neutral-700">{row.email}</Td>
+                  <Td>
+                    <Badge tone={row.role === "admin" ? "brand" : "neutral"}>{ROLE_LABELS[row.role]}</Badge>
+                  </Td>
+                  <Td>
+                    {row.sites.length === 0 ? (
+                      <span className="text-neutral-400">—</span>
+                    ) : (
+                      <div className="flex flex-wrap gap-1">
+                        {row.sites.map((s) => (
+                          <Badge key={s.id} tone="neutral">
+                            {s.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </Td>
+                  <Td>
                     <div className="flex flex-wrap justify-end gap-2">
                       <form action={resetPasswordAction.bind(null, row.id)}>
                         <ConfirmButton
+                          variant="secondary"
+                          size="sm"
                           confirmText={`Återställ lösenordet för ${row.name}? Ett nytt tillfälligt lösenord genereras.`}
-                          className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50"
                         >
                           Återställ lösenord
                         </ConfirmButton>
@@ -157,40 +175,34 @@ export default async function UsersPage({
                       {canDelete ? (
                         <form action={deleteUserAction.bind(null, row.id)}>
                           <ConfirmButton
+                            variant="danger"
+                            size="sm"
                             confirmText={`Ta bort användaren ${row.name}? Detta går inte att ångra.`}
-                            className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50"
                           >
                             Ta bort
                           </ConfirmButton>
                         </form>
                       ) : (
-                        <span
-                          className="rounded-lg border border-neutral-200 px-3 py-1.5 text-sm text-neutral-300"
+                        <Button
+                          type="button"
+                          variant="danger"
+                          size="sm"
+                          disabled
                           title={isSelf ? "Du kan inte ta bort dig själv" : "Sista administratören kan inte tas bort"}
                         >
                           Ta bort
-                        </span>
+                        </Button>
                       )}
                     </div>
-                  </td>
-                </tr>
+                  </Td>
+                </Tr>
               );
             })}
-          </tbody>
-        </table>
-        </div>
-      </div>
+          </Tbody>
+        </Table>
       )}
 
-      <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
-        <h2 className="text-sm font-medium text-neutral-900">Ny kundanvändare</h2>
-        <p className="mt-1 text-sm text-neutral-500">
-          Skapar en användare med rollen "Kund" och genererar ett tillfälligt lösenord som visas en gång.
-        </p>
-        <div className="mt-4">
-          <AdminUserForm action={createCustomerUser} sites={allSites} />
-        </div>
-      </div>
+      <AdminUserForm action={createCustomerUser} sites={allSites} />
     </div>
   );
 }

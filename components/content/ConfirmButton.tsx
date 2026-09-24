@@ -1,19 +1,36 @@
 "use client";
 
+import { Button, type ButtonProps } from "@/components/ui";
+
 type ConfirmButtonProps = {
   confirmText: string;
   children: React.ReactNode;
   className?: string;
+  /** Knapputseende – default "danger" (röd outline), matchar tidigare beteende. */
+  variant?: ButtonProps["variant"];
+  size?: ButtonProps["size"];
+  icon?: ButtonProps["icon"];
 };
 
 /**
- * A submit button that asks for confirmation before letting the surrounding
- * <form> (typically bound to a delete server action) actually submit.
+ * En submit-knapp (ui `Button`) som ber om bekräftelse innan den omgivande
+ * `<form>`-en (vanligtvis kopplad till en radera/destruktiv server action)
+ * faktiskt skickas.
  */
-export function ConfirmButton({ confirmText, children, className }: ConfirmButtonProps) {
+export function ConfirmButton({
+  confirmText,
+  children,
+  className,
+  variant = "danger",
+  size,
+  icon,
+}: ConfirmButtonProps) {
   return (
-    <button
+    <Button
       type="submit"
+      variant={variant}
+      size={size}
+      icon={icon}
       className={className}
       onClick={(event) => {
         if (!window.confirm(confirmText)) {
@@ -22,6 +39,6 @@ export function ConfirmButton({ confirmText, children, className }: ConfirmButto
       }}
     >
       {children}
-    </button>
+    </Button>
   );
 }

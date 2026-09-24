@@ -1,19 +1,56 @@
 import { redirect } from "next/navigation";
 import { desc, eq } from "drizzle-orm";
+import { History } from "lucide-react";
 import { db } from "@/lib/db";
 import { auditLogs, sites } from "@/lib/db/schema";
 import { requireUser } from "@/lib/guard";
 import { isUndoData } from "@/lib/undo-data";
+import { describeActivity } from "@/lib/audit-labels";
+import { formatDateTime, relativeTime } from "@/lib/format";
+import { Avatar, Badge, Card, EmptyState, PageHeader } from "@/components/ui";
 import UndoActivityButton from "@/components/admin/UndoActivityButton";
 
 const MAX_ROWS = 100;
+const TIME_ZONE = "Europe/Stockholm";
 
-function formatDate(date: Date | string) {
-  const d = typeof date === "string" ? new Date(date) : date;
-  return new Intl.DateTimeFormat("sv-SE", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(d);
+const dayKeyFormatter = new Intl.DateTimeFormat("en-CA", {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  timeZone: TIME_ZONE,
+});
+
+const dayLabelFormatter = new Intl.DateTimeFormat("sv-SE", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  timeZone: TIME_ZONE,
+});
+
+function dayKey(date: Date): string {
+  return dayKeyFormatter.format(date);
+}
+
+/** "I dag", "I går" eller ett fullt datum – räknat i svensk tid. */
+function dayLabel(date: Date, now: Date): string {
+  const key = dayKey(date);
+  if (key === dayKey(now)) return "I dag";
+  if (key === dayKey(new Date(now.getTime() - 24 * 60 * 60 * 1000))) return "I går";
+  return dayLabelFormatter.format(date);
+}
+
+function groupByDay<T extends { createdAt: Date }>(rows: T[], now: Date): { label: string; rows: T[] }[] {
+  const groups: { label: string; rows: T[] }[] = [];
+  for (const row of rows) {
+    const label = dayLabel(row.createdAt, now);
+    const last = groups[groups.length - 1];
+    if (last && last.label === label) {
+      last.rows.push(row);
+    } else {
+      groups.push({ label, rows: [row] });
+    }
+  }
+  return groups;
 }
 
 /**
@@ -44,62 +81,48 @@ export default async function GlobalActivityPage() {
     .orderBy(desc(auditLogs.createdAt))
     .limit(MAX_ROWS);
 
+  const now = new Date();
+  const groups = groupByDay(rows, now);
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Aktivitet – alla sajter</h1>
-        <p className="mt-1 text-sm text-neutral-500">
-          De {MAX_ROWS} senaste händelserna över samtliga sajter.
-        </p>
-      </div>
+    <div>
+      <PageHeader title="All aktivitet" description={`De ${MAX_ROWS} senaste händelserna över samtliga sajter.`} />
 
       {rows.length === 0 ? (
-        <div className="rounded-2xl border border-neutral-200 bg-white p-8 text-center text-sm text-neutral-500">
-          Ingen aktivitet registrerad ännu.
-        </div>
+        <EmptyState icon={<History />} title="Ingen aktivitet ännu" description="Händelser från alla sajter dyker upp här." />
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white">
-          <div className="overflow-x-auto">
-          <table className="w-full min-w-[840px] text-left text-sm">
-            <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
-              <tr>
-                <th className="px-5 py-3 font-medium">Tid</th>
-                <th className="px-5 py-3 font-medium">Användare</th>
-                <th className="px-5 py-3 font-medium">Sajt</th>
-                <th className="px-5 py-3 font-medium">Händelse</th>
-                <th className="px-5 py-3 font-medium">Åtgärd</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-200">
-              {rows.map((row) => (
-                <tr key={row.id} className="hover:bg-neutral-50">
-                  <td className="whitespace-nowrap px-5 py-3 text-neutral-500">
-                    {formatDate(row.createdAt)}
-                  </td>
-                  <td className="max-w-[200px] truncate px-5 py-3 text-neutral-700" title={row.userEmail}>
-                    {row.userEmail}
-                  </td>
-                  <td className="whitespace-nowrap px-5 py-3 text-neutral-500">
-                    {row.siteName ?? "—"}
-                  </td>
-                  <td className="px-5 py-3 text-neutral-900">
-                    {row.detail || row.action}
-                  </td>
-                  <td className="whitespace-nowrap px-5 py-3">
-                    {row.undoneAt ? (
-                      <span className="text-neutral-400">Ångrad</span>
-                    ) : isUndoData(row.undoData) ? (
-                      <UndoActivityButton logId={row.id} />
-                    ) : (
-                      <span className="text-neutral-300">—</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          </div>
-        </div>
+        <Card className="overflow-hidden">
+          {groups.map((group) => (
+            <div key={group.label}>
+              <div className="border-b border-neutral-200 bg-neutral-50 px-5 py-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                {group.label}
+              </div>
+              <ul className="divide-y divide-neutral-100">
+                {group.rows.map((row) => (
+                  <li key={row.id} className="flex items-start gap-3 px-5 py-4">
+                    <Avatar name={row.userEmail} size={32} className="mt-0.5" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-neutral-900">{describeActivity(row)}</p>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-neutral-500">
+                        <span className="truncate">{row.userEmail}</span>
+                        <span aria-hidden>·</span>
+                        <span title={formatDateTime(row.createdAt)}>{relativeTime(row.createdAt, now)}</span>
+                        {row.siteName ? <Badge tone="neutral">{row.siteName}</Badge> : null}
+                      </div>
+                    </div>
+                    <div className="shrink-0 pl-2">
+                      {row.undoneAt ? (
+                        <Badge tone="neutral">Ångrad</Badge>
+                      ) : isUndoData(row.undoData) ? (
+                        <UndoActivityButton logId={row.id} />
+                      ) : null}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </Card>
       )}
     </div>
   );

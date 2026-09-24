@@ -1,8 +1,22 @@
 import { asc, eq } from "drizzle-orm";
+import { ArrowDown, ArrowUp, Plus, Tags, Trash2 } from "lucide-react";
 import { db, services } from "@/lib/db";
 import { requireSiteAccess } from "@/lib/guard";
 import { createService, updateService, deleteService, moveService } from "@/lib/actions/services";
 import { ConfirmButton } from "@/components/content/ConfirmButton";
+import {
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+  EmptyState,
+  Input,
+  PageHeader,
+  SubmitButton,
+  buttonClassName,
+} from "@/components/ui";
+
+const labelClass = "mb-1 flex items-center gap-2 text-xs font-medium text-neutral-600";
 
 export default async function ServicesPage({
   params,
@@ -18,112 +32,141 @@ export default async function ServicesPage({
     .where(eq(services.siteId, siteId))
     .orderBy(asc(services.sortOrder));
 
-  const inputClassName =
-    "mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none";
+  const addServiceForm = (
+    <form action={createService.bind(null, siteId)}>
+      <SubmitButton icon={<Plus />} pendingText="Lägger till…">
+        Lägg till tjänst
+      </SubmitButton>
+    </form>
+  );
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Tjänster &amp; priser</h1>
-        <p className="mt-1 text-sm text-neutral-500">
-          Ordningen nedan styr hur tjänsterna visas på sajten. Dolda tjänster syns inte publikt.
-        </p>
-      </div>
+    <div>
+      <PageHeader
+        title="Tjänster & priser"
+        description="Ordningen nedan styr hur tjänsterna visas på sajten. Dolda tjänster syns inte publikt."
+        actions={rows.length > 0 ? addServiceForm : undefined}
+      />
 
       {rows.length === 0 ? (
-        <div className="rounded-2xl border border-neutral-200 bg-white p-8 text-center text-sm text-neutral-500">
-          Inga tjänster ännu. Lägg till din första nedan.
-        </div>
+        <EmptyState
+          icon={<Tags />}
+          title="Inga tjänster ännu"
+          description="Lägg till det du erbjuder, gärna med ett ungefärligt pris, så att kunderna ser det på sajten."
+          action={addServiceForm}
+        />
       ) : (
-        <div className="space-y-4">
-          {rows.map((service, index) => (
-            <div key={service.id} className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
-              <form action={updateService.bind(null, siteId, service.id)} className="grid gap-4 sm:grid-cols-2">
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-medium text-neutral-700">Titel</label>
-                  <input name="title" type="text" defaultValue={service.title} className={inputClassName} />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-medium text-neutral-700">Beskrivning</label>
-                  <input
-                    name="description"
-                    type="text"
-                    defaultValue={service.description ?? ""}
-                    className={inputClassName}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700">Pris</label>
-                  <input
-                    name="price"
-                    type="text"
-                    defaultValue={service.price ?? ""}
-                    placeholder="T.ex. Från 15 000 kr"
-                    className={inputClassName}
-                  />
-                </div>
-                <div className="flex items-end pb-2">
-                  <label className="flex items-center gap-2 text-sm text-neutral-700">
-                    <input
-                      type="checkbox"
-                      name="visible"
-                      defaultChecked={service.visible}
-                      className="h-4 w-4 rounded border-neutral-300"
-                    />
-                    Synlig på sajten
-                  </label>
-                </div>
-                <div className="sm:col-span-2">
-                  <button
-                    type="submit"
-                    className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+        <Card className="overflow-hidden">
+          <ul className="divide-y divide-neutral-200">
+            {rows.map((service, index) => {
+              const fieldId = (field: string) => `service-${service.id}-${field}`;
+              return (
+                <li
+                  key={service.id}
+                  className="flex flex-col gap-3 px-4 py-4 sm:px-5 xl:flex-row xl:items-end xl:gap-4"
+                >
+                  <span
+                    aria-hidden
+                    className="hidden w-5 shrink-0 pb-2.5 text-right text-sm tabular-nums text-neutral-400 xl:block"
                   >
-                    Spara
-                  </button>
-                </div>
-              </form>
+                    {index + 1}
+                  </span>
 
-              <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-neutral-100 pt-3">
-                <form action={moveService.bind(null, siteId, service.id, "up")}>
-                  <button
-                    type="submit"
-                    disabled={index === 0}
-                    className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  {/* Spar-formuläret: ett eget <form> per tjänst med title/description/price/visible + Spara. */}
+                  <form
+                    action={updateService.bind(null, siteId, service.id)}
+                    aria-label={`Tjänst ${index + 1}: ${service.title}`}
+                    className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 sm:items-end xl:grid-cols-[1fr_1fr_160px_auto]"
                   >
-                    Flytta upp
-                  </button>
-                </form>
-                <form action={moveService.bind(null, siteId, service.id, "down")}>
-                  <button
-                    type="submit"
-                    disabled={index === rows.length - 1}
-                    className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    Flytta ner
-                  </button>
-                </form>
-                <form action={deleteService.bind(null, siteId, service.id)} className="ml-auto">
-                  <ConfirmButton
-                    confirmText="Ta bort tjänsten? Detta går inte att ångra."
-                    className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50"
-                  >
-                    Ta bort
-                  </ConfirmButton>
-                </form>
-              </div>
-            </div>
-          ))}
-        </div>
+                    <div className="min-w-0">
+                      <label htmlFor={fieldId("title")} className={labelClass}>
+                        Titel
+                        {!service.visible ? <Badge tone="warning">Dold</Badge> : null}
+                      </label>
+                      <Input id={fieldId("title")} name="title" type="text" defaultValue={service.title} />
+                    </div>
+                    <div className="min-w-0">
+                      <label htmlFor={fieldId("description")} className={labelClass}>
+                        Beskrivning
+                      </label>
+                      <Input
+                        id={fieldId("description")}
+                        name="description"
+                        type="text"
+                        defaultValue={service.description ?? ""}
+                        placeholder="Kort om tjänsten"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <label htmlFor={fieldId("price")} className={labelClass}>
+                        Pris
+                      </label>
+                      <Input
+                        id={fieldId("price")}
+                        name="price"
+                        type="text"
+                        defaultValue={service.price ?? ""}
+                        placeholder="T.ex. Från 15 000 kr"
+                      />
+                    </div>
+                    <div className="flex h-10 items-center gap-3">
+                      <Checkbox
+                        id={fieldId("visible")}
+                        name="visible"
+                        defaultChecked={service.visible}
+                        label="Synlig"
+                      />
+                      <SubmitButton size="sm" pendingText="Sparar…">
+                        Spara
+                      </SubmitButton>
+                    </div>
+                  </form>
+
+                  {/* Flytta/ta bort är egna formulär bredvid spar-formuläret. */}
+                  <div className="flex items-center gap-1 xl:pb-1">
+                    <span aria-hidden className="mr-auto text-xs tabular-nums text-neutral-400 xl:hidden">
+                      #{index + 1}
+                    </span>
+                    <form action={moveService.bind(null, siteId, service.id, "up")}>
+                      <Button
+                        type="submit"
+                        variant="ghost"
+                        size="sm"
+                        className="px-2"
+                        disabled={index === 0}
+                        aria-label="Flytta upp"
+                        title="Flytta upp"
+                        icon={<ArrowUp />}
+                      />
+                    </form>
+                    <form action={moveService.bind(null, siteId, service.id, "down")}>
+                      <Button
+                        type="submit"
+                        variant="ghost"
+                        size="sm"
+                        className="px-2"
+                        disabled={index === rows.length - 1}
+                        aria-label="Flytta ner"
+                        title="Flytta ner"
+                        icon={<ArrowDown />}
+                      />
+                    </form>
+                    <form action={deleteService.bind(null, siteId, service.id)} className="ml-1">
+                      <ConfirmButton
+                        confirmText="Ta bort tjänsten? Detta går inte att ångra."
+                        className={buttonClassName({ variant: "danger", size: "sm" })}
+                      >
+                        <Trash2 aria-hidden className="size-4" />
+                        Ta bort
+                      </ConfirmButton>
+                    </form>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
       )}
-
-      <form action={createService.bind(null, siteId)}>
-        <button
-          type="submit"
-          className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
-        >
-          + Lägg till tjänst
-        </button>
-      </form>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Field, Input, Textarea, fieldIds } from "@/components/ui";
 
 type CharCounterFieldProps = {
   id: string;
@@ -10,12 +11,18 @@ type CharCounterFieldProps = {
   limit: number;
   multiline?: boolean;
   placeholder?: string;
+  /** Hjälptext under fältet (ersätts av en varning när texten blir för lång). */
+  hint?: React.ReactNode;
+  /** Kontrollerat värde – används när föräldern behöver texten (t.ex. live-förhandsvisning). */
+  value?: string;
+  onValueChange?: (value: string) => void;
 };
 
 /**
- * A text input/textarea with a live character counter. Turns red and shows a
- * warning once the value passes `limit` (used for SEO title/description,
- * where Google typically truncates around 60/160 characters).
+ * Textfält med live-räknare ("46/60"). Räknaren blir röd och en varning visas
+ * när texten passerar `limit` (SEO-titel/-beskrivning, där Google brukar klippa
+ * runt 60/160 tecken). Fungerar okontrollerat (`defaultValue`) eller
+ * kontrollerat (`value` + `onValueChange`).
  */
 export function CharCounterField({
   id,
@@ -25,54 +32,52 @@ export function CharCounterField({
   limit,
   multiline = false,
   placeholder,
+  hint,
+  value: controlledValue,
+  onValueChange,
 }: CharCounterFieldProps) {
-  const [value, setValue] = useState(defaultValue);
+  const [internal, setInternal] = useState(defaultValue);
+  const value = controlledValue ?? internal;
   const count = value.length;
   const over = count > limit;
+  const { hintId } = fieldIds(id);
 
-  const fieldClassName = [
-    "mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none",
-    over
-      ? "border-red-300 focus:border-red-400"
-      : "border-neutral-300 focus:border-neutral-500",
-  ].join(" ");
+  const handleChange = (next: string) => {
+    if (controlledValue === undefined) setInternal(next);
+    onValueChange?.(next);
+  };
+
+  const hintContent = over ? (
+    <span className="text-amber-700">
+      Texten är längre än rekommenderat ({limit} tecken) och kan klippas av i sökresultat.
+    </span>
+  ) : (
+    hint
+  );
 
   return (
-    <div>
-      <div className="flex items-baseline justify-between gap-2">
-        <label htmlFor={id} className="block text-sm font-medium text-neutral-700">
-          {label}
-        </label>
-        <span className={over ? "text-xs font-medium text-red-600" : "text-xs text-neutral-400"}>
-          {count}/{limit}
-        </span>
-      </div>
+    <Field htmlFor={id} label={label} hint={hintContent} count={`${count}/${limit}`} countOver={over}>
       {multiline ? (
-        <textarea
+        <Textarea
           id={id}
           name={name}
           rows={3}
           value={value}
-          onChange={(event) => setValue(event.target.value)}
+          onChange={(event) => handleChange(event.target.value)}
           placeholder={placeholder}
-          className={fieldClassName}
+          aria-describedby={hintContent ? hintId : undefined}
         />
       ) : (
-        <input
+        <Input
           id={id}
           name={name}
           type="text"
           value={value}
-          onChange={(event) => setValue(event.target.value)}
+          onChange={(event) => handleChange(event.target.value)}
           placeholder={placeholder}
-          className={fieldClassName}
+          aria-describedby={hintContent ? hintId : undefined}
         />
       )}
-      {over && (
-        <p className="mt-1 text-xs text-red-600">
-          Texten är längre än rekommenderat ({limit} tecken) och kan klippas av i sökresultat.
-        </p>
-      )}
-    </div>
+    </Field>
   );
 }

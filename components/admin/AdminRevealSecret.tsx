@@ -1,50 +1,70 @@
 "use client";
 
 import { useState } from "react";
+import { Copy, Eye, EyeOff } from "lucide-react";
+import { Button, useToast } from "@/components/ui";
 
 type AdminRevealSecretProps = {
-  title: string;
-  description: string;
   value: string;
+  title?: string;
+  description?: string;
+  /**
+   * "callout" (default): amber engångsruta med titel/beskrivning – för
+   * hemligheter som bara visas en gång direkt efter att de skapats.
+   * "inline": bara maskerat värde + Visa/Dölj + Kopiera, för att bäddas in
+   * i t.ex. en tabellcell (redan sparade API-nycklar m.m.).
+   */
+  variant?: "callout" | "inline";
 };
 
+const MASK = "••••••••";
+
 /**
- * One-time reveal box for a freshly generated secret (API key, revalidate
- * secret, temp password). The value only ever reaches the browser via the
- * server action's redirect query string — this component doesn't fetch or
- * store it anywhere else, and it's gone the moment the admin navigates away
- * or reloads without the query param.
+ * Visar en hemlighet (API-nyckel, revalidate-hemlighet, tillfälligt
+ * lösenord) maskerad som standard, med knappar för att visa/dölja och
+ * kopiera. Hämtar eller lagrar inget själv – värdet kommer alltid in via
+ * props (t.ex. en redirect-query-sträng eller en databasrad).
  */
-export function AdminRevealSecret({ title, description, value }: AdminRevealSecretProps) {
-  const [copied, setCopied] = useState(false);
+export function AdminRevealSecret({ value, title, description, variant = "callout" }: AdminRevealSecretProps) {
+  const [visible, setVisible] = useState(false);
+  const { toast } = useToast();
 
   async function handleCopy() {
     try {
       await navigator.clipboard.writeText(value);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      toast({ title: "Kopierad", tone: "success" });
     } catch {
-      // Clipboard API can fail (permissions, insecure context) — the value
-      // is still selectable/visible in the box below, so this is non-fatal.
+      toast({ title: "Kunde inte kopiera", tone: "danger" });
     }
   }
 
+  const controls = (
+    <div className="flex flex-wrap items-center gap-2">
+      <code className="break-all rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-xs text-neutral-900">
+        {visible ? value : MASK}
+      </code>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        icon={visible ? <EyeOff /> : <Eye />}
+        onClick={() => setVisible((v) => !v)}
+      >
+        {visible ? "Dölj" : "Visa"}
+      </Button>
+      <Button type="button" variant="ghost" size="sm" icon={<Copy />} onClick={handleCopy}>
+        Kopiera
+      </Button>
+    </div>
+  );
+
+  if (variant === "inline") return controls;
+
   return (
-    <div className="rounded-2xl border border-amber-300 bg-amber-50 p-5">
-      <h2 className="text-sm font-semibold text-amber-900">{title}</h2>
-      <p className="mt-1 text-sm text-amber-800">{description}</p>
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <code className="break-all rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-neutral-900">
-          {value}
-        </code>
-        <button
-          type="button"
-          onClick={handleCopy}
-          className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100"
-        >
-          {copied ? "Kopierad!" : "Kopiera"}
-        </button>
-      </div>
+    <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+      {title ? <p className="font-medium">{title}</p> : null}
+      {description ? <p className="mt-1 text-amber-800">{description}</p> : null}
+      <div className="mt-3">{controls}</div>
       <p className="mt-2 text-xs text-amber-700">
         Detta visas bara en gång. Spara värdet nu — det går inte att visa igen senare.
       </p>

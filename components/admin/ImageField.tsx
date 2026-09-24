@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { ImagePlus, TriangleAlert, Upload } from "lucide-react";
 import { formatMaxUploadSize } from "@/lib/actions/upload";
+import { Alert, Button, Field, Input, Spinner, fieldIds } from "@/components/ui";
+import { cn } from "@/lib/cn";
 
 /**
  * Bildfält: ladda upp från datorn eller telefonen, se bilden direkt, skriv en
@@ -98,9 +101,11 @@ export default function ImageField({
   // (t.ex. "/hero/bild.jpg"). Den adressen finns inte i panelen, så bilden
   // går inte att visa här — säg det rakt ut i stället för en trasig ikon.
   const broken = Boolean(value) && brokenSrc === value;
+  const { hintId } = fieldIds(altId);
+  const missingAltId = `${altId}-missing`;
 
   return (
-    <div>
+    <div className="space-y-3">
       <div
         onDragOver={(event) => {
           event.preventDefault();
@@ -108,22 +113,27 @@ export default function ImageField({
         }}
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
-        className={`overflow-hidden rounded-xl border border-dashed transition-colors ${
-          dragOver ? "border-neutral-500 bg-neutral-100" : "border-neutral-300 bg-neutral-50"
-        }`}
+        className={cn(
+          "relative overflow-hidden rounded-lg transition-colors duration-150",
+          value && !broken
+            ? cn("border bg-neutral-100", dragOver ? "border-brand-400 ring-2 ring-brand-500/30" : "border-neutral-200")
+            : cn(
+                "border-2 border-dashed",
+                dragOver ? "border-brand-400 bg-brand-50" : "border-neutral-300 bg-neutral-50",
+              ),
+        )}
       >
         {value && broken ? (
-          <div className="flex h-44 w-full flex-col items-center justify-center gap-1.5 px-4 text-center">
-            <span className="text-sm font-medium text-neutral-600">
-              Bilden kan inte visas här
-            </span>
-            <span className="text-xs text-neutral-500">
-              Den ligger på din sajt, inte i mediabiblioteket. Ladda upp den
-              här så visas den — och kan bytas härifrån i fortsättningen.
-            </span>
-            <code className="mt-1 max-w-full truncate rounded bg-white px-2 py-1 text-xs text-neutral-500">
-              {value}
-            </code>
+          <div className="p-3">
+            <Alert tone="info" title="Bilden kan inte visas här" className="bg-white">
+              <p>
+                Den ligger på din sajt, inte i mediabiblioteket. Ladda upp den här så visas den — och kan
+                bytas härifrån i fortsättningen.
+              </p>
+              <code className="mt-1.5 block max-w-full truncate rounded bg-white/70 px-2 py-1 font-mono text-xs text-neutral-600 ring-1 ring-brand-200">
+                {value}
+              </code>
+            </Alert>
           </div>
         ) : value ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -132,89 +142,99 @@ export default function ImageField({
             src={value}
             alt={alt}
             onError={() => setBrokenSrc(value)}
-            className="h-44 w-full bg-neutral-100 object-cover"
+            className="aspect-video w-full bg-neutral-100 object-cover"
           />
         ) : (
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
             disabled={uploading}
-            className="flex h-44 w-full flex-col items-center justify-center gap-1.5 text-sm text-neutral-500 hover:text-neutral-800 disabled:cursor-not-allowed"
+            className="flex aspect-video max-h-56 w-full flex-col items-center justify-center gap-2 px-4 text-sm text-neutral-600 transition-colors duration-150 hover:text-neutral-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500/50 disabled:cursor-not-allowed"
           >
-            <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-              <rect x="3" y="4" width="18" height="16" rx="2" />
-              <circle cx="8.5" cy="9.5" r="1.5" />
-              <path d="m4 17 4.5-4.5a2 2 0 0 1 2.8 0L16 17" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span className="font-medium">
-              {uploading ? "Laddar upp…" : "Välj en bild"}
+            <span
+              aria-hidden
+              className={cn(
+                "flex size-10 items-center justify-center rounded-full",
+                dragOver ? "bg-brand-100 text-brand-600" : "bg-white text-neutral-500 ring-1 ring-neutral-200",
+              )}
+            >
+              {uploading ? <Spinner size={20} /> : <ImagePlus className="size-5" />}
             </span>
-            <span className="text-xs text-neutral-400">
-              eller dra hit en fil från datorn
-            </span>
+            <span className="font-medium">{uploading ? "Laddar upp…" : "Välj en bild"}</span>
+            <span className="text-xs text-neutral-500">eller dra hit en fil från datorn</span>
           </button>
         )}
+
+        {/* Uppladdning pågår över en befintlig bild. */}
+        {uploading && value ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-white/70 backdrop-blur-[1px]">
+            <span className="flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 shadow-sm ring-1 ring-neutral-200">
+              <Spinner />
+              Laddar upp…
+            </span>
+          </div>
+        ) : null}
       </div>
 
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        <button
-          type="button"
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={uploading ? undefined : <Upload />}
+          loading={uploading}
           onClick={() => inputRef.current?.click()}
-          disabled={uploading}
-          className="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-800 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {uploading ? "Laddar upp…" : value ? "Byt bild" : "Ladda upp bild"}
-        </button>
+        </Button>
 
         {value && (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => onChange({ value: "", alt: "" })}
             disabled={uploading}
-            className="rounded-lg px-2 py-1.5 text-sm text-neutral-500 transition-colors hover:text-red-700 disabled:cursor-not-allowed"
+            className="text-neutral-600 hover:bg-red-50 hover:text-red-700"
           >
             Ta bort bild
-          </button>
+          </Button>
         )}
 
-        {error && <span className="text-sm text-red-600">{error}</span>}
+        <span className="text-xs text-neutral-500">
+          JPG, PNG, WEBP, GIF eller SVG. Max {formatMaxUploadSize()}.
+        </span>
       </div>
 
-      <p className="mt-1 text-xs text-neutral-400">
-        JPG, PNG, WEBP, GIF eller SVG. Max {formatMaxUploadSize()}.
-      </p>
+      {error && (
+        <Alert tone="danger" className="py-2">
+          {error}
+        </Alert>
+      )}
 
       {/* Beskrivningen hör till en bild — utan bild finns inget att beskriva. */}
-      <div className={value ? "mt-3" : "hidden"}>
-        <label htmlFor={altId} className="block text-sm font-medium text-neutral-700">
-          {altLabel}
-        </label>
-        <input
-          id={altId}
-          type="text"
-          value={alt}
-          onChange={(event) => onChange({ value, alt: event.target.value })}
-          placeholder={altPlaceholder}
-          className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
-        />
-        <p className="mt-1 text-xs text-neutral-500">
-          Beskriv kort vad bilden visar. Texten läses upp för besökare med
-          skärmläsare och hjälper Google att förstå bilden.
-        </p>
+      <div className={value ? undefined : "hidden"}>
+        <Field
+          htmlFor={altId}
+          label={altLabel}
+          hint="Beskriv kort vad bilden visar. Texten läses upp för besökare med skärmläsare och hjälper Google att förstå bilden."
+        >
+          <Input
+            id={altId}
+            type="text"
+            value={alt}
+            onChange={(event) => onChange({ value, alt: event.target.value })}
+            placeholder={altPlaceholder}
+            aria-describedby={missingAlt ? `${hintId} ${missingAltId}` : hintId}
+          />
+        </Field>
         {missingAlt && (
-          <p className="mt-1 text-xs text-amber-700">
+          <p id={missingAltId} className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-amber-700">
+            <TriangleAlert aria-hidden className="size-3.5 shrink-0" />
             Bilden saknar beskrivning.
           </p>
         )}
       </div>
 
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        onChange={handleFileChange}
-        className="hidden"
-      />
+      <input ref={inputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
     </div>
   );
 }

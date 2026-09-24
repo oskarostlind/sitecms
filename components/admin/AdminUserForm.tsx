@@ -1,4 +1,5 @@
 import type { Site } from "@/components/admin/types";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, Checkbox, Field, Input, SubmitButton } from "@/components/ui";
 
 type AdminUserFormProps = {
   action: (formData: FormData) => void;
@@ -12,61 +13,52 @@ type AdminUserFormProps = {
  * in lib/actions/users.ts.
  */
 export function AdminUserForm({ action, sites }: AdminUserFormProps) {
-  const inputClassName =
-    "mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none";
-
   return (
-    <form action={action} className="space-y-5">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label htmlFor="name" className="block text-sm font-medium text-neutral-700">
-            Namn
-          </label>
-          <input id="name" name="name" type="text" required placeholder="T.ex. Anna Andersson" className={inputClassName} />
-        </div>
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium text-neutral-700">
-            E-post
-          </label>
-          <input id="email" name="email" type="email" required placeholder="anna@exempel.se" className={inputClassName} />
-        </div>
-      </div>
-
-      <div>
-        <span className="block text-sm font-medium text-neutral-700">Sajt(er)</span>
-        {sites.length === 0 ? (
-          <p className="mt-1 text-sm text-neutral-500">
-            Det finns inga sajter ännu. Skapa en sajt innan du lägger till kundanvändare.
-          </p>
-        ) : (
-          <div className="mt-2 grid gap-2 sm:grid-cols-2">
-            {sites.map((site) => (
-              <label
-                key={site.id}
-                className="flex items-center gap-2 rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-700"
-              >
-                <input
-                  type="checkbox"
-                  name="siteIds"
-                  value={site.id}
-                  className="h-4 w-4 rounded border-neutral-300"
-                />
-                {site.name}
-              </label>
-            ))}
+    <Card>
+      <CardHeader>
+        <CardTitle>Ny kundanvändare</CardTitle>
+        <CardDescription>
+          Skapar en användare med rollen &quot;Kund&quot; och genererar ett tillfälligt lösenord som visas en gång.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form action={action} className="space-y-5">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field htmlFor="name" label="Namn" required>
+              <Input id="name" name="name" type="text" required placeholder="T.ex. Anna Andersson" />
+            </Field>
+            <Field htmlFor="email" label="E-post" required>
+              <Input id="email" name="email" type="email" required placeholder="anna@exempel.se" />
+            </Field>
           </div>
-        )}
-      </div>
 
-      <div className="flex items-center gap-3 pt-2">
-        <button
-          type="submit"
-          disabled={sites.length === 0}
-          className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          Skapa kundanvändare
-        </button>
-      </div>
-    </form>
+          <div className="space-y-2">
+            <span className="block text-sm font-medium text-neutral-800">Sajt(er)</span>
+            {sites.length === 0 ? (
+              <p className="text-sm text-neutral-500">
+                Det finns inga sajter ännu. Skapa en sajt innan du lägger till kundanvändare.
+              </p>
+            ) : (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {sites.map((site) => (
+                  <Checkbox
+                    key={site.id}
+                    id={`site-${site.id}`}
+                    name="siteIds"
+                    value={site.id}
+                    label={site.name}
+                    className="rounded-lg border border-neutral-200 px-3 py-2"
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          <SubmitButton disabled={sites.length === 0} pendingText="Skapar…">
+            Skapa kundanvändare
+          </SubmitButton>
+        </form>
+      </CardContent>
+    </Card>
   );
 }

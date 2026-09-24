@@ -5,6 +5,8 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Placeholder } from "@tiptap/extensions";
 import { markdownToHtml, richDocToMarkdown } from "@/lib/markdown";
+import { Button, Input } from "@/components/ui";
+import { cn } from "@/lib/cn";
 
 /**
  * WYSIWYG-editor för brödtext (inlägg och richtext-block).
@@ -54,13 +56,15 @@ function ToolbarButton({
       title={title}
       aria-label={title}
       aria-pressed={active}
-      className={`flex h-8 items-center justify-center rounded-md text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
-        wide ? "px-2.5" : "w-8"
-      } ${
+      className={cn(
+        "flex h-8 items-center justify-center rounded-md text-sm transition-colors duration-150",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50",
+        "disabled:cursor-not-allowed disabled:opacity-40",
+        wide ? "px-2.5" : "w-8",
         active
-          ? "bg-neutral-900 text-white"
-          : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
-      }`}
+          ? "bg-brand-50 text-brand-700 hover:bg-brand-100"
+          : "text-neutral-600 hover:bg-neutral-200/60 hover:text-neutral-900",
+      )}
     >
       {children}
     </button>
@@ -68,7 +72,7 @@ function ToolbarButton({
 }
 
 function Divider() {
-  return <span className="mx-1 h-5 w-px bg-neutral-200" aria-hidden="true" />;
+  return <span className="mx-1 h-5 w-px bg-neutral-300/70" aria-hidden="true" />;
 }
 
 export default function RichTextEditor({
@@ -177,7 +181,7 @@ export default function RichTextEditor({
     // att layouten inte hoppar när editorn monteras.
     return (
       <div
-        className="rounded-xl border border-neutral-200 bg-white"
+        className="rounded-lg border border-neutral-300 bg-white shadow-xs"
         style={{ minHeight: minHeight + 45 }}
       />
     );
@@ -198,8 +202,12 @@ export default function RichTextEditor({
   };
 
   return (
-    <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white focus-within:border-neutral-400 focus-within:ring-1 focus-within:ring-neutral-300">
-      <div className="flex flex-wrap items-center gap-0.5 border-b border-neutral-200 bg-neutral-50 px-2 py-1.5">
+    <div className="overflow-hidden rounded-lg border border-neutral-300 bg-white shadow-xs transition-colors duration-150 hover:border-neutral-400 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/30 focus-within:hover:border-brand-500">
+      <div
+        role="toolbar"
+        aria-label={ariaLabel ? `Formatering: ${ariaLabel}` : "Formatering"}
+        className="flex flex-wrap items-center gap-0.5 border-b border-neutral-200 bg-neutral-50 px-2 py-1.5"
+      >
         <ToolbarButton
           title="Fet text (Ctrl+B)"
           active={state.bold}
@@ -307,8 +315,9 @@ export default function RichTextEditor({
 
       {linkOpen && (
         <div className="flex flex-wrap items-center gap-2 border-b border-neutral-200 bg-white px-3 py-2">
-          <input
+          <Input
             type="text"
+            aria-label="Länkadress"
             autoFocus
             value={linkValue}
             onChange={(event) => setLinkValue(event.target.value)}
@@ -323,31 +332,19 @@ export default function RichTextEditor({
               }
             }}
             placeholder="jjbyggboden.se eller https://…"
-            className="min-w-0 flex-1 rounded-lg border border-neutral-300 px-3 py-1.5 text-sm focus:border-neutral-500 focus:outline-none"
+            className="h-8 min-w-0 flex-1 basis-48"
           />
-          <button
-            type="button"
-            onClick={applyLink}
-            className="rounded-lg bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-800"
-          >
+          <Button size="sm" onClick={applyLink}>
             Spara länk
-          </button>
+          </Button>
           {state.link && (
-            <button
-              type="button"
-              onClick={removeLink}
-              className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50"
-            >
+            <Button size="sm" variant="secondary" onClick={removeLink}>
               Ta bort länk
-            </button>
+            </Button>
           )}
-          <button
-            type="button"
-            onClick={() => setLinkOpen(false)}
-            className="rounded-lg px-2 py-1.5 text-sm text-neutral-500 hover:text-neutral-800"
-          >
+          <Button size="sm" variant="ghost" onClick={() => setLinkOpen(false)}>
             Avbryt
-          </button>
+          </Button>
         </div>
       )}
 

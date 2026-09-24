@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Undo2 } from "lucide-react";
+import { Button, useToast } from "@/components/ui";
 import { undoActivity } from "@/lib/actions/undo";
 
 /**
@@ -12,42 +14,31 @@ import { undoActivity } from "@/lib/actions/undo";
  */
 export default function UndoActivityButton({ logId }: { logId: string }) {
   const router = useRouter();
+  const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
-  const [working, setWorking] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  async function handleClick() {
+  function handleClick() {
     const confirmed = window.confirm(
       "Ångra den här ändringen? Innehållet återställs till hur det såg ut innan."
     );
     if (!confirmed) return;
 
-    setWorking(true);
-    setError(null);
-    const result = await undoActivity(logId);
-    setWorking(false);
+    startTransition(async () => {
+      const result = await undoActivity(logId);
 
-    if (!result.ok) {
-      setError(result.error);
-      return;
-    }
+      if (!result.ok) {
+        toast({ title: "Kunde inte ångra", description: result.error, tone: "danger" });
+        return;
+      }
 
-    startTransition(() => router.refresh());
+      toast({ title: "Ändringen ångrades", description: result.detail, tone: "success" });
+      router.refresh();
+    });
   }
 
-  const busy = working || isPending;
-
   return (
-    <div className="flex flex-col items-start gap-1">
-      <button
-        type="button"
-        onClick={handleClick}
-        disabled={busy}
-        className="rounded-lg border border-neutral-300 bg-white px-2.5 py-1 text-sm font-medium text-neutral-800 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {busy ? "Ångrar…" : "Ångra"}
-      </button>
-      {error && <span className="text-xs text-red-600">{error}</span>}
-    </div>
+    <Button variant="secondary" size="sm" icon={<Undo2 />} loading={isPending} onClick={handleClick}>
+      Ångra
+    </Button>
   );
 }

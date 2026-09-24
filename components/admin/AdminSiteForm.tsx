@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { slugify } from "@/components/content/slugify";
+import { Field, Input, SubmitButton } from "@/components/ui";
 
 type AdminSiteFormProps = {
   action: (formData: FormData) => void;
@@ -17,16 +18,10 @@ export function AdminSiteForm({ action }: AdminSiteFormProps) {
   const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
 
-  const inputClassName =
-    "mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none";
-
   return (
     <form action={action} className="space-y-5">
-      <div>
-        <label htmlFor="name" className="block text-sm font-medium text-neutral-700">
-          Namn
-        </label>
-        <input
+      <Field htmlFor="name" label="Namn" required>
+        <Input
           id="name"
           name="name"
           type="text"
@@ -40,15 +35,11 @@ export function AdminSiteForm({ action }: AdminSiteFormProps) {
             }
           }}
           placeholder="T.ex. Exempel Bygg AB"
-          className={inputClassName}
         />
-      </div>
+      </Field>
 
-      <div>
-        <label htmlFor="slug" className="block text-sm font-medium text-neutral-700">
-          Slug
-        </label>
-        <input
+      <Field htmlFor="slug" label="Slug" hint="Genereras automatiskt från namnet men kan ändras här. Måste vara unik.">
+        <Input
           id="slug"
           name="slug"
           type="text"
@@ -58,34 +49,15 @@ export function AdminSiteForm({ action }: AdminSiteFormProps) {
             setSlugTouched(true);
           }}
           placeholder="genereras automatiskt från namnet"
-          className={`${inputClassName} font-mono`}
+          className="font-mono"
         />
-        <p className="mt-1 text-xs text-neutral-500">
-          Genereras automatiskt från namnet men kan ändras här. Måste vara unik.
-        </p>
-      </div>
+      </Field>
 
-      <div>
-        <label htmlFor="domain" className="block text-sm font-medium text-neutral-700">
-          Domän
-        </label>
-        <input
-          id="domain"
-          name="domain"
-          type="text"
-          placeholder="T.ex. exempel.se"
-          className={inputClassName}
-        />
-      </div>
+      <Field htmlFor="domain" label="Domän" hint="T.ex. exempel.se – kan läggas till senare.">
+        <Input id="domain" name="domain" type="text" placeholder="T.ex. exempel.se" />
+      </Field>
 
-      <div className="flex items-center gap-3 pt-2">
-        <button
-          type="submit"
-          className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
-        >
-          Skapa sajt
-        </button>
-      </div>
+      <SubmitButton pendingText="Skapar…">Skapa sajt</SubmitButton>
     </form>
   );
 }

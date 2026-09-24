@@ -1,8 +1,31 @@
 import Link from "next/link";
-import { eq } from "drizzle-orm";
-import { db, seoMeta } from "@/lib/db";
+import { asc, eq } from "drizzle-orm";
+import { Plus, Search } from "lucide-react";
+import { db, seoMeta, sites } from "@/lib/db";
 import { requireSiteAccess } from "@/lib/guard";
 import { createSeoMeta } from "@/lib/actions/seo";
+import { displayDomain } from "@/lib/site-url";
+import { cn } from "@/lib/cn";
+import {
+  Badge,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  EmptyState,
+  Field,
+  Input,
+  PageHeader,
+  SubmitButton,
+} from "@/components/ui";
+
+const TITLE_LIMIT = 60;
+const DESCRIPTION_LIMIT = 160;
+
+function lengthTone(length: number, limit: number) {
+  return length > 0 && length <= limit ? "success" : "warning";
+}
 
 export default async function SeoListPage({
   params,
@@ -12,77 +35,109 @@ export default async function SeoListPage({
   const { siteId } = await params;
   await requireSiteAccess(siteId);
 
-  const rows = await db.select().from(seoMeta).where(eq(seoMeta.siteId, siteId));
+  const [rows, [site]] = await Promise.all([
+    db.select().from(seoMeta).where(eq(seoMeta.siteId, siteId)).orderBy(asc(seoMeta.pageSlug)),
+    db.select({ name: sites.name, domain: sites.domain }).from(sites).where(eq(sites.id, siteId)).limit(1),
+  ]);
+
+  const host = displayDomain(site?.domain) || "din-sajt.se";
+  const siteName = site?.name ?? "";
+  const initial = (siteName.trim()[0] ?? host[0] ?? "?").toUpperCase();
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">SEO</h1>
-        <p className="mt-1 text-sm text-neutral-500">
-          Titel och beskrivning som visas i Google för varje sida på sajten.
-        </p>
-      </div>
+      <PageHeader title="SEO" description="Titel och beskrivning som visas i Google för varje sida." />
 
       {rows.length === 0 ? (
-        <div className="rounded-2xl border border-neutral-200 bg-white p-8 text-center text-sm text-neutral-500">
-          Ingen SEO-information ännu. Lägg till en post nedan.
-        </div>
+        <EmptyState
+          icon={<Search />}
+          title="Ingen SEO-information ännu"
+          description="Lägg till en sida nedan för att styra hur den visas i Google."
+        />
       ) : (
-        <div className="space-y-3">
+        <ul className="space-y-3">
           {rows.map((entry) => {
-            const titleLength = entry.title?.length ?? 0;
-            const descriptionLength = entry.description?.length ?? 0;
+            const title = entry.title?.trim() ?? "";
+            const description = entry.description?.trim() ?? "";
+            const path = entry.pageSlug.replace(/^\/+/, "");
 
             return (
-              <Link
-                key={entry.id}
-                href={`/admin/sites/${siteId}/seo/${entry.id}`}
-                className="block rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm hover:bg-neutral-50"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="font-medium text-neutral-900">{entry.pageSlug}</p>
-                  <div className="flex gap-3 text-xs">
-                    <span className={titleLength > 60 ? "font-medium text-red-600" : "text-neutral-400"}>
-                      Titel {titleLength}/60
-                    </span>
-                    <span className={descriptionLength > 160 ? "font-medium text-red-600" : "text-neutral-400"}>
-                      Beskrivning {descriptionLength}/160
-                    </span>
-                  </div>
-                </div>
-                <p className="mt-1 truncate text-sm text-neutral-600">
-                  {entry.title || "Ingen titel angiven ännu"}
-                </p>
-                <p className="mt-0.5 truncate text-xs text-neutral-400">
-                  {entry.description || "Ingen beskrivning angiven ännu"}
-                </p>
-              </Link>
+              <li key={entry.id}>
+                <Link
+                  href={`/admin/sites/${siteId}/seo/${entry.id}`}
+                  className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50 focus-visible:ring-offset-2"
+                >
+                  <Card interactive className="flex flex-col gap-3 p-5 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-3">
+                        <span
+                          aria-hidden
+                          className="flex size-7 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-xs font-semibold text-neutral-600 ring-1 ring-neutral-200"
+                        >
+                          {initial}
+                        </span>
+                        <p className="min-w-0 truncate text-xs text-neutral-500">
+                          https://{host}
+                          {path ? ` › ${path}` : ""}
+                        </p>
+                      </div>
+                      <p
+                        className={cn(
+                          "mt-2 truncate text-base",
+                          title ? "text-brand-700" : "italic text-neutral-400",
+                        )}
+                      >
+                        {title || "Ingen titel angiven ännu"}
+                      </p>
+                      <p
+                        className={cn(
+                          "mt-0.5 line-clamp-2 text-sm",
+                          description ? "text-neutral-600" : "italic text-neutral-400",
+                        )}
+                      >
+                        {description || "Ingen beskrivning angiven ännu"}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 flex-wrap gap-2 sm:flex-col sm:items-end">
+                      <Badge tone={lengthTone(title.length, TITLE_LIMIT)}>
+                        Titel {title.length}/{TITLE_LIMIT}
+                      </Badge>
+                      <Badge tone={lengthTone(description.length, DESCRIPTION_LIMIT)}>
+                        Beskrivning {description.length}/{DESCRIPTION_LIMIT}
+                      </Badge>
+                    </div>
+                  </Card>
+                </Link>
+              </li>
             );
           })}
-        </div>
+        </ul>
       )}
 
-      <div className="rounded-2xl border border-dashed border-neutral-300 bg-white p-5 shadow-sm">
-        <h2 className="text-sm font-medium text-neutral-900">Lägg till SEO för fler sidor</h2>
-        <p className="mt-1 text-sm text-neutral-500">
-          Ange sidans slug, t.ex. &quot;om-oss&quot; eller &quot;kontakt&quot;.
-        </p>
-        <form action={createSeoMeta.bind(null, siteId)} className="mt-3 flex flex-wrap items-center gap-2">
-          <input
-            name="pageSlug"
-            type="text"
-            required
-            placeholder="sid-slug"
-            className="rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
-          />
-          <button
-            type="submit"
-            className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
-          >
-            Lägg till
-          </button>
-        </form>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Lägg till SEO för fler sidor</CardTitle>
+          <CardDescription>
+            Ange sidans adress utan snedstreck och domän, t.ex. &quot;om-oss&quot; eller &quot;kontakt&quot;.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form action={createSeoMeta.bind(null, siteId)} className="flex flex-wrap items-end gap-3">
+            <Field htmlFor="pageSlug" label="Sidans adress" className="min-w-0 flex-1 basis-60">
+              <Input
+                id="pageSlug"
+                name="pageSlug"
+                type="text"
+                required
+                placeholder="om-oss"
+              />
+            </Field>
+            <SubmitButton icon={<Plus />} pendingText="Lägger till…">
+              Lägg till
+            </SubmitButton>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }

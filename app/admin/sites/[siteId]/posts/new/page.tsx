@@ -1,6 +1,7 @@
 import { requireSiteAccess } from "@/lib/guard";
 import { savePost } from "@/lib/actions/posts";
 import { PostForm } from "@/components/content/PostForm";
+import { PageHeader } from "@/components/ui";
 
 export default async function NewPostPage({
   params,
@@ -11,16 +12,13 @@ export default async function NewPostPage({
   await requireSiteAccess(siteId);
 
   return (
-    <div className="max-w-2xl space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Nytt inlägg</h1>
-        <p className="mt-1 text-sm text-neutral-500">
-          Fyll i informationen nedan och klicka på Spara.
-        </p>
-      </div>
-      <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
-        <PostForm siteId={siteId} action={savePost} post={null} />
-      </div>
+    <div>
+      <PageHeader
+        title="Nytt inlägg"
+        description="Skriv inlägget och klicka på Spara. Det syns på sajten först när du bockar i Publicerad."
+        breadcrumbs={[{ label: "Inlägg", href: `/admin/sites/${siteId}/posts` }, { label: "Nytt inlägg" }]}
+      />
+      <PostForm siteId={siteId} action={savePost} post={null} />
     </div>
   );
 }

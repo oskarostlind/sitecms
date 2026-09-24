@@ -1,10 +1,12 @@
 import { notFound } from "next/navigation";
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { pages, blocks } from "@/lib/db/schema";
+import { pages, blocks, sites } from "@/lib/db/schema";
 import { requireSiteAccess } from "@/lib/guard";
 import PageBlockEditor from "@/components/admin/PageBlockEditor";
 import { groupSortIndex, groupTitle } from "@/components/admin/labels";
+import { ButtonLink, PageHeader } from "@/components/ui";
+import { siteUrl } from "@/lib/site-url";
 import type { BlockDTO, BlockGroupDTO } from "@/components/admin/types";
 
 export default async function PageEditorPage({
@@ -22,6 +24,13 @@ export default async function PageEditorPage({
     .limit(1);
 
   if (!page) notFound();
+
+  const [site] = await db
+    .select({ domain: sites.domain })
+    .from(sites)
+    .where(eq(sites.id, siteId))
+    .limit(1);
+  const siteDomain = site?.domain ?? null;
 
   const pageBlocks = await db
     .select()
@@ -53,22 +62,32 @@ export default async function PageEditorPage({
     }))
     .sort((a, b) => groupSortIndex(a.key) - groupSortIndex(b.key));
 
+  const baseUrl = siteUrl(siteDomain);
+  const pageUrl = baseUrl ? `${baseUrl}/${page.slug === "home" ? "" : page.slug}` : null;
+  const fieldCount = pageBlocks.length;
+
   return (
     <div>
-      <div className="mb-6">
-        <a
-          href={`/admin/sites/${siteId}/pages`}
-          className="text-sm text-neutral-500 hover:text-neutral-800"
-        >
-          ← Alla sidor
-        </a>
-        <h1 className="mt-2 text-xl font-semibold tracking-tight text-neutral-900">
-          {page.title}
-        </h1>
-        <p className="mt-1 text-sm text-neutral-500">/{page.slug}</p>
-      </div>
+      <PageHeader
+        breadcrumbs={[{ label: "Sidor", href: `/admin/sites/${siteId}/pages` }, { label: page.title }]}
+        title={page.title}
+        description={`/${page.slug} · ${fieldCount} fält`}
+        actions={
+          pageUrl ? (
+            <ButtonLink
+              href={pageUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              variant="secondary"
+            >
+              Visa sidan <span aria-hidden>↗</span>
+              <span className="sr-only">(öppnas i ny flik)</span>
+            </ButtonLink>
+          ) : null
+        }
+      />
 
-      <PageBlockEditor siteId={siteId} groups={groups} />
+      <PageBlockEditor siteId={siteId} groups={groups} siteDomain={siteDomain} pageSlug={page.slug} />
     </div>
   );
 }

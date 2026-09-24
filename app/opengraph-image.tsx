@@ -14,25 +14,43 @@ export default function OpengraphImage() {
           flexDirection: "column",
           alignItems: "flex-start",
           justifyContent: "center",
-          background: "#171717",
+          background: "#121f47",
           padding: "80px",
           fontFamily: "sans-serif",
         }}
       >
-        <div
-          style={{
-            fontSize: 76,
-            fontWeight: 700,
-            color: "white",
-            letterSpacing: -2,
-          }}
-        >
-          sitecms
+        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 64,
+              height: 64,
+              borderRadius: 16,
+              background: "#3a68e6",
+              color: "#fff",
+              fontSize: 40,
+              fontWeight: 700,
+            }}
+          >
+            s
+          </div>
+          <div
+            style={{
+              fontSize: 64,
+              fontWeight: 700,
+              color: "#fff",
+              letterSpacing: -2,
+            }}
+          >
+            sitecms
+          </div>
         </div>
         <div
           style={{
             fontSize: 32,
-            color: "#a3a3a3",
+            color: "#c0d3fb",
             marginTop: 28,
             maxWidth: 900,
           }}
