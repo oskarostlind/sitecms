@@ -61,27 +61,59 @@ export default async function ServicesPage({
             {rows.map((service, index) => {
               const fieldId = (field: string) => `service-${service.id}-${field}`;
               return (
-                <li
-                  key={service.id}
-                  className="flex flex-col gap-3 px-4 py-4 sm:px-5 xl:flex-row xl:items-end xl:gap-4"
-                >
-                  <span
-                    aria-hidden
-                    className="hidden w-5 shrink-0 pb-2.5 text-right text-sm tabular-nums text-neutral-400 xl:block"
-                  >
-                    {index + 1}
-                  </span>
+                <li key={service.id} className="px-4 py-4 sm:px-5">
+                  {/* Radhuvud: ordningsnummer + status till vänster, flytta/ta bort till höger. */}
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 text-sm text-neutral-500">
+                      <span className="tabular-nums">Tjänst {index + 1}</span>
+                      {!service.visible ? <Badge tone="warning">Dold</Badge> : null}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <form action={moveService.bind(null, siteId, service.id, "up")}>
+                        <Button
+                          type="submit"
+                          variant="ghost"
+                          size="sm"
+                          className="px-2"
+                          disabled={index === 0}
+                          aria-label="Flytta upp"
+                          title="Flytta upp"
+                          icon={<ArrowUp />}
+                        />
+                      </form>
+                      <form action={moveService.bind(null, siteId, service.id, "down")}>
+                        <Button
+                          type="submit"
+                          variant="ghost"
+                          size="sm"
+                          className="px-2"
+                          disabled={index === rows.length - 1}
+                          aria-label="Flytta ner"
+                          title="Flytta ner"
+                          icon={<ArrowDown />}
+                        />
+                      </form>
+                      <form action={deleteService.bind(null, siteId, service.id)} className="ml-1">
+                        <ConfirmButton
+                          confirmText="Ta bort tjänsten? Detta går inte att ångra."
+                          className={buttonClassName({ variant: "danger", size: "sm" })}
+                        >
+                          <Trash2 aria-hidden className="size-4" />
+                          Ta bort
+                        </ConfirmButton>
+                      </form>
+                    </div>
+                  </div>
 
                   {/* Spar-formuläret: ett eget <form> per tjänst med title/description/price/visible + Spara. */}
                   <form
                     action={updateService.bind(null, siteId, service.id)}
                     aria-label={`Tjänst ${index + 1}: ${service.title}`}
-                    className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 sm:items-end xl:grid-cols-[1fr_1fr_160px_auto]"
+                    className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1.5fr)_minmax(0,11rem)]"
                   >
                     <div className="min-w-0">
                       <label htmlFor={fieldId("title")} className={labelClass}>
                         Titel
-                        {!service.visible ? <Badge tone="warning">Dold</Badge> : null}
                       </label>
                       <Input id={fieldId("title")} name="title" type="text" defaultValue={service.title} />
                     </div>
@@ -109,58 +141,18 @@ export default async function ServicesPage({
                         placeholder="T.ex. Från 15 000 kr"
                       />
                     </div>
-                    <div className="flex h-10 items-center gap-3">
+                    <div className="flex items-center justify-between gap-3 sm:col-span-2 lg:col-span-3">
                       <Checkbox
                         id={fieldId("visible")}
                         name="visible"
                         defaultChecked={service.visible}
-                        label="Synlig"
+                        label="Synlig på sajten"
                       />
-                      <SubmitButton size="sm" pendingText="Sparar…">
+                      <SubmitButton size="sm">
                         Spara
                       </SubmitButton>
                     </div>
                   </form>
-
-                  {/* Flytta/ta bort är egna formulär bredvid spar-formuläret. */}
-                  <div className="flex items-center gap-1 xl:pb-1">
-                    <span aria-hidden className="mr-auto text-xs tabular-nums text-neutral-400 xl:hidden">
-                      #{index + 1}
-                    </span>
-                    <form action={moveService.bind(null, siteId, service.id, "up")}>
-                      <Button
-                        type="submit"
-                        variant="ghost"
-                        size="sm"
-                        className="px-2"
-                        disabled={index === 0}
-                        aria-label="Flytta upp"
-                        title="Flytta upp"
-                        icon={<ArrowUp />}
-                      />
-                    </form>
-                    <form action={moveService.bind(null, siteId, service.id, "down")}>
-                      <Button
-                        type="submit"
-                        variant="ghost"
-                        size="sm"
-                        className="px-2"
-                        disabled={index === rows.length - 1}
-                        aria-label="Flytta ner"
-                        title="Flytta ner"
-                        icon={<ArrowDown />}
-                      />
-                    </form>
-                    <form action={deleteService.bind(null, siteId, service.id)} className="ml-1">
-                      <ConfirmButton
-                        confirmText="Ta bort tjänsten? Detta går inte att ångra."
-                        className={buttonClassName({ variant: "danger", size: "sm" })}
-                      >
-                        <Trash2 aria-hidden className="size-4" />
-                        Ta bort
-                      </ConfirmButton>
-                    </form>
-                  </div>
                 </li>
               );
             })}

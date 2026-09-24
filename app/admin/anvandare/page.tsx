@@ -138,13 +138,13 @@ export default async function UsersPage({
                   <Td>
                     <div className="flex items-center gap-2.5">
                       <Avatar name={row.name || row.email} size={28} />
-                      <span className="text-neutral-900">
+                      <span className="whitespace-nowrap text-neutral-900">
                         {row.name}
                         {isSelf ? <span className="ml-1.5 text-xs text-neutral-400">(du)</span> : null}
                       </span>
                     </div>
                   </Td>
-                  <Td className="max-w-[220px] break-all text-neutral-700">{row.email}</Td>
+                  <Td className="whitespace-nowrap text-neutral-700">{row.email}</Td>
                   <Td>
                     <Badge tone={row.role === "admin" ? "brand" : "neutral"}>{ROLE_LABELS[row.role]}</Badge>
                   </Td>
@@ -162,7 +162,7 @@ export default async function UsersPage({
                     )}
                   </Td>
                   <Td>
-                    <div className="flex flex-wrap justify-end gap-2">
+                    <div className="flex flex-nowrap justify-end gap-2 whitespace-nowrap">
                       <form action={resetPasswordAction.bind(null, row.id)}>
                         <ConfirmButton
                           variant="secondary"
