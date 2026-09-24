@@ -10,6 +10,8 @@ type ConfirmButtonProps = {
   variant?: ButtonProps["variant"];
   size?: ButtonProps["size"];
   icon?: ButtonProps["icon"];
+  "aria-label"?: string;
+  title?: string;
 };
 
 /**
@@ -24,6 +26,7 @@ export function ConfirmButton({
   variant = "danger",
   size,
   icon,
+  ...rest
 }: ConfirmButtonProps) {
   return (
     <Button
@@ -32,6 +35,7 @@ export function ConfirmButton({
       size={size}
       icon={icon}
       className={className}
+      {...rest}
       onClick={(event) => {
         if (!window.confirm(confirmText)) {
           event.preventDefault();
