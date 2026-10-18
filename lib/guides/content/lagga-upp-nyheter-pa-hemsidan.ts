@@ -36,13 +36,12 @@ const guide: Guide = {
             ["Handlar om", "Något som har hänt eller ändrats hos dig", "Kunskap, tips eller svar på vanliga kundfrågor"],
             ["Exempel", "”Vi har öppet i mellandagarna”", "”Så tar du hand om nyslipade trägolv”"],
             ["Livslängd", "Kort, ofta veckor eller månader", "Lång, kan vara relevant i flera år"],
-            ["Längd", "Några stycken räcker", "Gärna längre och mer utförligt"],
             ["Passar när", "Du vill informera befintliga kunder", "Du vill bli hittad av nya kunder som söker svar"],
           ],
         },
         {
           type: "p",
-          text: "Har du bara ork för det ena: börja med nyheter. De kräver mindre tid och visar besökare att företaget är igång. Blogginlägg är en större investering men är det som oftare kan dra nya besökare via sök.",
+          text: "Har du bara ork för det ena: börja med nyheter. De kräver mindre tid. Blogginlägg är en större investering men kan oftare dra nya besökare via sök.",
         },
       ],
     },
@@ -164,9 +163,9 @@ const guide: Guide = {
         {
           type: "ul",
           items: [
-            "**Uppdatera** om innehållet fortfarande är relevant men någon detalj har ändrats, till exempel ett pris eller en kontaktperson. Skriv gärna ”Uppdaterad” och datum i texten.",
+            "**Uppdatera** om innehållet fortfarande är relevant men någon detalj har ändrats, till exempel ett pris eller en kontaktperson.",
             "**Avpublicera** det som är fel eller kan vilseleda: kampanjer som har gått ut, personal som har slutat, tjänster du inte längre erbjuder.",
-            "**Behåll** resten som arkiv. En gammal nyhet om att ni flyttade till nya lokaler skadar inte och visar att företaget har funnits ett tag.",
+            "**Behåll** resten som arkiv. En gammal nyhet om att ni flyttade till nya lokaler skadar inte.",
           ],
         },
         {

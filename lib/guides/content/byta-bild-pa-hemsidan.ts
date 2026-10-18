@@ -6,7 +6,7 @@ const guide: Guide = {
   title: "Byta bild på hemsidan: storlek, format, alt-text",
   h1: "Byta bild på hemsidan: rätt storlek, format och alt-text på fem minuter",
   description:
-    "Så byter du bild på hemsidan: välj en bild du får använda, skala till rätt pixelmått, komprimera gratis, skriv alt-text och undvik suddiga, beskurna bilder.",
+    "Så byter du bild på hemsidan: välj en bild du får använda, skala till rätt pixelmått, komprimera gratis, skriv alt-text och slipp suddiga bilder.",
   primaryQuery: "byta bild på hemsidan",
   published: "2026-10-18",
   modified: "2026-10-18",
