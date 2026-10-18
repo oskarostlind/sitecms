@@ -68,7 +68,7 @@ function StepTitle({ number, children }: { number: number; children: React.React
     <CardTitle className="flex items-center gap-3">
       <span
         aria-hidden
-        className="flex size-7 shrink-0 items-center justify-center rounded-full bg-brand-600 text-sm font-semibold text-white"
+        className="flex size-7 shrink-0 items-center justify-center rounded-full bg-brand-400 text-sm font-semibold text-brand-950"
       >
         {number}
       </span>
@@ -411,7 +411,7 @@ export default async function IntegrationPage({
               <SubHeading file={SNIPPET_FILES.config}>sajtens sidor och fält</SubHeading>
               <p className="text-sm text-neutral-500">
                 Deklarera vad kunden ska kunna redigera. Etiketterna och hjälptexterna syns i panelen.{" "}
-                <Link href="/docs#schema" className="text-brand-600 underline-offset-2 hover:text-brand-700 hover:underline">
+                <Link href="/docs#schema" className="text-brand-700 underline-offset-2 hover:text-brand-800 hover:underline">
                   Om formatet
                 </Link>
                 .
@@ -460,7 +460,7 @@ export default async function IntegrationPage({
               <SubHeading file={SNIPPET_FILES.config}>sajtens sidor och fält</SubHeading>
               <p className="text-sm text-neutral-500">
                 Deklarera vad kunden ska kunna redigera. Etiketterna och hjälptexterna syns i panelen.{" "}
-                <Link href="/docs#schema" className="text-brand-600 underline-offset-2 hover:text-brand-700 hover:underline">
+                <Link href="/docs#schema" className="text-brand-700 underline-offset-2 hover:text-brand-800 hover:underline">
                   Om formatet
                 </Link>
                 .

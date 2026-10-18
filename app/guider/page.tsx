@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { SpaceBreadcrumbs, SpaceHero } from "@/components/guides/GuideShell";
 import { JsonLd } from "@/components/JsonLd";
 import { guidesFor } from "@/lib/guides";
 import { formatGuideDate, readingMinutes } from "@/lib/guides/text";
@@ -33,7 +34,7 @@ export default function GuidesIndex() {
   const all = groups.flatMap((g) => g.guides);
 
   return (
-    <main className="px-4 pb-20 sm:px-6">
+    <main>
       <JsonLd
         nodes={[
           {
@@ -57,18 +58,21 @@ export default function GuidesIndex() {
           ]),
         ]}
       />
-      <div className="mx-auto max-w-6xl pt-12 sm:pt-16">
-        <p className="text-xs font-semibold uppercase tracking-wider text-brand-600">Guider</p>
-        <h1 className="mt-2 max-w-3xl text-balance text-3xl font-bold tracking-tight text-neutral-900 sm:text-5xl">
+      <SpaceHero planet="corner" innerClassName="pb-16 pt-10 sm:pb-24 sm:pt-14">
+        <SpaceBreadcrumbs items={[{ label: "sitecms", href: "/" }, { label: "Guider" }]} />
+        <p className="mt-8 text-xs font-semibold uppercase tracking-[0.18em] text-brand-400">Guider</p>
+        <h1 className="mt-3 max-w-3xl text-balance text-3xl font-extrabold tracking-[-0.02em] text-ink sm:text-5xl sm:leading-[1.05]">
           Sköt hemsidan själv – utan att vänta på någon
         </h1>
-        <p className="mt-4 max-w-2xl text-lg leading-relaxed text-neutral-600">
+        <p className="mt-5 max-w-2xl text-lg leading-relaxed text-ink-muted">
           Konkreta, svenska guider för de ändringar som faktiskt behöver göras: texter, bilder, priser, öppettider och
           nyheter. Och för utvecklare som vill lämna över redigeringen till kunden.
         </p>
+      </SpaceHero>
 
+      <div className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
         {groups.map((group) => (
-          <section key={group.id} id={group.id} aria-labelledby={`${group.id}-h`} className="mt-14 scroll-mt-24">
+          <section key={group.id} id={group.id} aria-labelledby={`${group.id}-h`} className="mt-14 scroll-mt-28">
             <h2 id={`${group.id}-h`} className="text-2xl font-semibold tracking-tight text-neutral-900">
               {group.title}
             </h2>
@@ -90,11 +94,11 @@ function GuideCard({ guide }: { guide: Guide }) {
     <li>
       <Link
         href={`/guider/${guide.slug}`}
-        className="group flex h-full flex-col rounded-xl border border-neutral-200 bg-white p-5 transition-colors hover:border-neutral-300"
+        className="group flex h-full flex-col rounded-2xl border border-neutral-200 bg-white p-5 shadow-[0_1px_2px_rgba(4,6,15,0.04)] transition-[border-color,box-shadow] duration-200 hover:border-brand-500/50 hover:shadow-[0_12px_32px_-16px_rgba(4,6,15,0.25)]"
       >
         <span className="font-semibold leading-snug text-neutral-900 group-hover:text-brand-700">{guide.h1}</span>
-        <span className="mt-2 line-clamp-3 flex-1 text-sm leading-relaxed text-neutral-500">{guide.description}</span>
-        <span className="mt-4 text-xs text-neutral-400">
+        <span className="mt-2 line-clamp-3 flex-1 text-sm leading-relaxed text-neutral-600">{guide.description}</span>
+        <span className="mt-4 text-xs text-neutral-500">
           {readingMinutes(guide)} min · uppdaterad {formatGuideDate(guide.modified)}
         </span>
       </Link>

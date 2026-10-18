@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { NOINDEX } from "@/lib/seo";
 import { MailCheck } from "lucide-react";
 import { forgotPasswordAction } from "@/lib/actions/auth";
-import { AuthLink, AuthShell } from "@/components/auth/AuthShell";
+import { AuthLink, AuthShell, authInputClassName } from "@/components/auth/AuthShell";
 import { Alert, Field, Input, SubmitButton } from "@/components/ui";
 
 export const metadata: Metadata = {
@@ -60,6 +60,7 @@ export default async function ForgotPage({
       <form action={forgotPasswordAction} className="space-y-4">
         <Field htmlFor="email" label="E-post">
           <Input
+            className={authInputClassName}
             id="email"
             name="email"
             type="email"
@@ -72,7 +73,7 @@ export default async function ForgotPage({
 
         {errorMessage ? <Alert tone="danger">{errorMessage}</Alert> : null}
 
-        <SubmitButton size="lg" className="w-full" pendingText="Skickar…">
+        <SubmitButton size="lg" className="w-full rounded-full!" pendingText="Skickar…">
           Skicka länk
         </SubmitButton>
       </form>

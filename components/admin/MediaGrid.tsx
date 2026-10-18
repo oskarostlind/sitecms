@@ -181,7 +181,7 @@ export default function MediaGrid({
         onDrop={handleDrop}
         className={cn(
           "rounded-xl border-2 border-dashed p-3 transition-colors duration-150",
-          dragOver ? "border-brand-400 bg-brand-50" : "border-transparent",
+          dragOver ? "border-brand-600 bg-brand-50" : "border-transparent",
         )}
       >
         {localItems.length === 0 ? (

@@ -116,10 +116,10 @@ export default function ImageField({
         className={cn(
           "relative overflow-hidden rounded-lg transition-colors duration-150",
           value && !broken
-            ? cn("border bg-neutral-100", dragOver ? "border-brand-400 ring-2 ring-brand-500/30" : "border-neutral-200")
+            ? cn("border bg-neutral-100", dragOver ? "border-brand-600 ring-2 ring-brand-500/30" : "border-neutral-200")
             : cn(
                 "border-2 border-dashed",
-                dragOver ? "border-brand-400 bg-brand-50" : "border-neutral-300 bg-neutral-50",
+                dragOver ? "border-brand-600 bg-brand-50" : "border-neutral-300 bg-neutral-50",
               ),
         )}
       >
@@ -155,7 +155,7 @@ export default function ImageField({
               aria-hidden
               className={cn(
                 "flex size-10 items-center justify-center rounded-full",
-                dragOver ? "bg-brand-100 text-brand-600" : "bg-white text-neutral-500 ring-1 ring-neutral-200",
+                dragOver ? "bg-brand-100 text-brand-700" : "bg-white text-neutral-500 ring-1 ring-neutral-200",
               )}
             >
               {uploading ? <Spinner size={20} /> : <ImagePlus className="size-5" />}

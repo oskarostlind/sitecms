@@ -5,17 +5,33 @@
 --------------------------------------------------------------------------- */
 
 @theme {
-  --color-brand-50: #eef4ff;
-  --color-brand-100: #dce7fd;
-  --color-brand-200: #c0d3fb;
-  --color-brand-300: #93b4f7;
-  --color-brand-400: #5f8cf0;
-  --color-brand-500: #3a68e6;
-  --color-brand-600: #2450d1;
-  --color-brand-700: #1d40ac;
-  --color-brand-800: #1b378b;
-  --color-brand-900: #1b3170;
-  --color-brand-950: #121f47;
+  /* Accent: mint (samma som landningssidan). 400 är mint-ytor med mörk text
+     (knappar), 600–800 är läsbar grön text och ikoner på ljus bakgrund. */
+  --color-brand-50: #ecfdf5;
+  --color-brand-100: #d3fbe7;
+  --color-brand-200: #aaf5d0;
+  --color-brand-300: #7cf5bb;
+  --color-brand-400: #5df0a8;
+  --color-brand-500: #2fd38a;
+  --color-brand-600: #0e8f5a;
+  --color-brand-700: #0a7149;
+  --color-brand-800: #08593a;
+  --color-brand-900: #06452e;
+  --color-brand-950: #032018;
+
+  /* Rymdnavy: landningens bakgrund, mörka ramar (header, hero, footer, sidomeny). */
+  --color-space-950: #04060f;
+  --color-space-900: #060a18;
+  --color-space-850: #0a1020;
+  --color-space-800: #0c1226;
+  --color-space-700: #141c38;
+  --color-space-600: #1f2a4d;
+  --color-space-500: #34416b;
+
+  /* Text på mörk bakgrund. */
+  --color-ink: #f3f6ff;
+  --color-ink-muted: #9aa6c4;
+  --color-ink-subtle: #6b7796;
 
   --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
@@ -175,4 +191,40 @@
   float: left;
   height: 0;
   pointer-events: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Rymd (components/brand/SpaceBackdrop.tsx) — landningens stjärnhimmel i CSS.
+--------------------------------------------------------------------------- */
+.sc-space-gradient {
+  background:
+    radial-gradient(120% 80% at 80% 110%, rgba(58, 108, 255, 0.28) 0%, transparent 55%),
+    radial-gradient(90% 60% at 10% -10%, rgba(93, 240, 168, 0.08) 0%, transparent 60%),
+    linear-gradient(180deg, #060a18 0%, #04060f 100%);
+}
+.sc-stars {
+  background-image:
+    radial-gradient(1px 1px at 12% 18%, rgba(207, 224, 255, 0.9), transparent 60%),
+    radial-gradient(1px 1px at 33% 72%, rgba(207, 224, 255, 0.7), transparent 60%),
+    radial-gradient(1.4px 1.4px at 58% 28%, rgba(207, 224, 255, 0.85), transparent 60%),
+    radial-gradient(1px 1px at 76% 64%, rgba(207, 224, 255, 0.6), transparent 60%),
+    radial-gradient(1.2px 1.2px at 88% 14%, rgba(207, 224, 255, 0.8), transparent 60%),
+    radial-gradient(1px 1px at 44% 46%, rgba(207, 224, 255, 0.5), transparent 60%),
+    radial-gradient(1px 1px at 6% 86%, rgba(207, 224, 255, 0.6), transparent 60%),
+    radial-gradient(1.3px 1.3px at 67% 92%, rgba(207, 224, 255, 0.7), transparent 60%);
+  background-size: 420px 300px;
+  opacity: 0.8;
+}
+.sc-stars--far {
+  background-size: 260px 220px;
+  background-position: 120px 60px;
+  opacity: 0.45;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sc-stars { animation: sc-twinkle 7s ease-in-out infinite alternate; }
+  .sc-stars--far { animation-duration: 11s; animation-delay: -3s; }
+}
+@keyframes sc-twinkle {
+  from { opacity: 0.35; }
+  to { opacity: 0.85; }
 }

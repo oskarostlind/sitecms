@@ -6,6 +6,7 @@ import SmoothScroll from "@/components/landing/SmoothScroll";
 import "./landing.css";
 import { JsonLd } from "@/components/JsonLd";
 import { organizationJsonLd, softwareJsonLd, websiteJsonLd } from "@/lib/seo";
+import { LogoMark } from "@/components/ui/Logo";
 
 export const metadata: Metadata = {
   title: { absolute: "sitecms – låt kunden redigera hemsidan själv" },
@@ -201,9 +202,7 @@ function NavLink({ href, className, children }: { href: string; className?: stri
 function Brand() {
   return (
     <a href="#top" className="brand" aria-label="sitecms – till toppen">
-      <span className="brand-mark" aria-hidden="true">
-        ▲
-      </span>
+      <LogoMark size={22} className="brand-mark" />
       sitecms
     </a>
   );

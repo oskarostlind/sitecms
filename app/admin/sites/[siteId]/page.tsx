@@ -193,7 +193,7 @@ export default async function SiteOverviewPage({ params }: { params: Promise<{ s
               href={url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex max-w-full items-center gap-1 rounded-md text-brand-600 underline-offset-2 hover:text-brand-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50 focus-visible:ring-offset-2"
+              className="inline-flex max-w-full items-center gap-1 rounded-md text-brand-700 underline-offset-2 hover:text-brand-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50 focus-visible:ring-offset-2"
             >
               <span className="truncate">{displayDomain(site.domain)}</span>
               <ExternalLink aria-hidden className="size-3.5 shrink-0" />
@@ -319,7 +319,7 @@ export default async function SiteOverviewPage({ params }: { params: Promise<{ s
           <CardFooter className="justify-start">
             <Link
               href={`${base}/aktivitet`}
-              className="inline-flex items-center gap-1 rounded-md text-sm font-medium text-brand-600 underline-offset-2 hover:text-brand-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50 focus-visible:ring-offset-2"
+              className="inline-flex items-center gap-1 rounded-md text-sm font-medium text-brand-700 underline-offset-2 hover:text-brand-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50 focus-visible:ring-offset-2"
             >
               Visa all aktivitet
               <ChevronRight aria-hidden className="size-4" />

@@ -45,6 +45,14 @@ type LayoutInput = {
 
 function layout({ preheader, heading, paragraphs, button, note, footer }: LayoutInput): string {
   const url = escapeHtml(button.url);
+  // Märket hämtas från samma värd som länken i mejlet (PNG — SVG stöds inte i Gmail/Outlook).
+  let origin = "https://sitecms.se";
+  try {
+    origin = new URL(button.url).origin;
+  } catch {
+    // behåll standard
+  }
+  const markUrl = escapeHtml(`${origin}/logo-mark.png`);
   const body = paragraphs
     .map(
       (p) =>
@@ -60,20 +68,20 @@ function layout({ preheader, heading, paragraphs, button, note, footer }: Layout
 <meta name="color-scheme" content="light">
 <title>${escapeHtml(heading)}</title>
 </head>
-<body style="margin:0;padding:0;background:#f5f6f8;">
+<body style="margin:0;padding:0;background:#eef1f6;">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(preheader)}</div>
 <div style="max-width:600px;margin:0 auto;padding:40px 20px;font-family:${FONT};">
-  <div style="margin:0 0 24px;font-size:18px;font-weight:700;letter-spacing:-0.01em;color:#121f47;">
-    <span style="display:inline-block;width:28px;height:28px;line-height:28px;margin-right:8px;border-radius:7px;background:#2450d1;color:#ffffff;text-align:center;font-size:18px;vertical-align:middle;">s</span><span style="vertical-align:middle;">sitecms</span>
+  <div style="background:#060a18;border-radius:14px 14px 0 0;padding:18px 28px;font-size:19px;font-weight:800;letter-spacing:-0.02em;color:#f3f6ff;">
+    <img src="${markUrl}" width="26" height="26" alt="" style="display:inline-block;vertical-align:middle;margin-right:9px;border:0;"><span style="vertical-align:middle;">sitecms</span>
   </div>
-  <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:32px 28px;">
+  <div style="background:#ffffff;border:1px solid #e3e7ef;border-top:0;border-radius:0 0 14px 14px;padding:32px 28px;">
     <h1 style="margin:0 0 20px;font-size:22px;line-height:1.3;font-weight:600;color:#111827;">${escapeHtml(heading)}</h1>
     ${body}
     <div style="margin:28px 0 8px;">
-      <a href="${url}" style="display:inline-block;background:#2450d1;color:#ffffff;text-decoration:none;font-size:16px;font-weight:600;padding:12px 22px;border-radius:8px;">${escapeHtml(button.label)}</a>
+      <a href="${url}" style="display:inline-block;background:#5df0a8;color:#032018;text-decoration:none;font-size:16px;font-weight:700;padding:13px 24px;border-radius:999px;">${escapeHtml(button.label)}</a>
     </div>
     ${note ? `<p style="margin:12px 0 0;font-size:14px;line-height:1.5;color:#6b7280;">${escapeHtml(note)}</p>` : ""}
-    <p style="margin:24px 0 0;font-size:13px;line-height:1.5;color:#6b7280;">Fungerar inte knappen? Kopiera länken till din webbläsare:<br><a href="${url}" style="color:#2450d1;word-break:break-all;">${url}</a></p>
+    <p style="margin:24px 0 0;font-size:13px;line-height:1.5;color:#6b7280;">Fungerar inte knappen? Kopiera länken till din webbläsare:<br><a href="${url}" style="color:#0a7149;word-break:break-all;">${url}</a></p>
   </div>
   <p style="margin:20px 4px 0;font-size:13px;line-height:1.5;color:#9ca3af;">${escapeHtml(footer)}</p>
 </div>

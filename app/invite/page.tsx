@@ -11,7 +11,7 @@ import {
   switchAccountForInviteAction,
 } from "@/lib/actions/members";
 import { MEMBERSHIP_ROLE_LABELS } from "@/lib/emails";
-import { AuthLink, AuthShell } from "@/components/auth/AuthShell";
+import { AuthLink, AuthShell, authInputClassName } from "@/components/auth/AuthShell";
 import { Alert, Badge, ButtonLink, Field, Input, SubmitButton } from "@/components/ui";
 
 export const metadata: Metadata = {
@@ -88,7 +88,7 @@ export default async function InvitePage({
   const isWrongAccount = Boolean(sessionUserId) && !isRightAccount;
 
   const summary = (
-    <div className="mb-5 rounded-xl border border-neutral-200 bg-white p-4 text-sm">
+    <div className="mb-5 rounded-2xl border border-neutral-200 bg-neutral-50 p-4 text-sm">
       <p className="text-neutral-600">
         <span className="font-medium text-neutral-900">{inviterName}</span> har bjudit in{" "}
         <span className="font-medium text-neutral-900">{invite.email}</span> till
@@ -112,7 +112,7 @@ export default async function InvitePage({
           </Alert>
           <form action={switchAccountForInviteAction}>
             <input type="hidden" name="token" value={token} />
-            <SubmitButton variant="secondary" className="w-full" pendingText="Loggar ut…">
+            <SubmitButton variant="secondary" className="w-full rounded-full!" pendingText="Loggar ut…">
               Logga ut och byt konto
             </SubmitButton>
           </form>
@@ -127,7 +127,7 @@ export default async function InvitePage({
         {summary}
         <form action={acceptInviteAction}>
           <input type="hidden" name="token" value={token} />
-          <SubmitButton size="lg" className="w-full" pendingText="Accepterar…">
+          <SubmitButton size="lg" className="w-full rounded-full!" pendingText="Accepterar…">
             Acceptera
           </SubmitButton>
         </form>
@@ -152,7 +152,7 @@ export default async function InvitePage({
         <ButtonLink
           href={`/login?callbackUrl=${encodeURIComponent(invitePath)}&email=${encodeURIComponent(invite.email)}`}
           size="lg"
-          className="w-full"
+          className="w-full rounded-full!"
         >
           Logga in för att acceptera
         </ButtonLink>
@@ -180,6 +180,7 @@ export default async function InvitePage({
 
         <Field htmlFor="name" label="Namn">
           <Input
+            className={authInputClassName}
             id="name"
             name="name"
             type="text"
@@ -192,6 +193,7 @@ export default async function InvitePage({
 
         <Field htmlFor="password" label="Lösenord" hint="Minst 10 tecken.">
           <Input
+            className={authInputClassName}
             id="password"
             name="password"
             type="password"
@@ -204,7 +206,7 @@ export default async function InvitePage({
 
         {errorMessage ? <Alert tone="danger">{errorMessage}</Alert> : null}
 
-        <SubmitButton size="lg" className="w-full" pendingText="Accepterar…">
+        <SubmitButton size="lg" className="w-full rounded-full!" pendingText="Accepterar…">
           Acceptera
         </SubmitButton>
       </form>
