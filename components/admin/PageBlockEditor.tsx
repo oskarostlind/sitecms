@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Check, CircleCheck, ExternalLink, FileText, Undo2 } from "lucide-react";
+import { Check, CircleCheck, ExternalLink, FileText, Trash2, Undo2 } from "lucide-react";
 import { updateBlocks, type BlockUpdate } from "@/lib/actions/pages";
 import { undoActivity } from "@/lib/actions/undo";
+import { deleteBlock } from "@/lib/actions/structure";
+import { ConfirmButton } from "@/components/content/ConfirmButton";
 import { fieldHint, fieldLabel, groupDescription } from "@/components/admin/labels";
 import AutoTextarea from "@/components/admin/AutoTextarea";
 import ImageField from "@/components/admin/ImageField";
@@ -58,13 +60,23 @@ export default function PageBlockEditor({
   groups,
   siteDomain = null,
   pageSlug,
+  pageId,
+  canManageStructure = false,
+  structureSlot,
 }: {
   siteId: string;
   groups: BlockGroupDTO[];
   /** Sajtens domän (om den finns) – används för länken "Visa sidan" efter sparning. */
   siteDomain?: string | null;
   pageSlug?: string;
+  /** Sidans id – krävs för att kunna ta bort fält. */
+  pageId?: string;
+  /** Owner/admin: visa fältnycklar och "Ta bort fält". Editors ser aldrig detta. */
+  canManageStructure?: boolean;
+  /** Renderas sist i innehållskolumnen, t.ex. formuläret "Lägg till fält" (bara owners). */
+  structureSlot?: React.ReactNode;
 }) {
+  const manage = canManageStructure && pageId ? { pageId } : null;
   const { toast } = useToast();
 
   const initial = useMemo(() => {
@@ -396,11 +408,18 @@ export default function PageBlockEditor({
 
   if (groups.length === 0) {
     return (
-      <EmptyState
-        icon={<FileText />}
-        title="Den här sidan har inget innehåll ännu"
-        description="Fälten läggs upp av din leverantör. Hör av dig om det är något du vill kunna ändra här."
-      />
+      <div className="space-y-6 lg:max-w-3xl">
+        <EmptyState
+          icon={<FileText />}
+          title="Den här sidan har inget innehåll ännu"
+          description={
+            manage
+              ? "Lägg till fält nedan, eller låt kundsajten deklarera dem med schema-sync."
+              : "Fälten läggs upp av din leverantör. Hör av dig om det är något du vill kunna ändra här."
+          }
+        />
+        {structureSlot}
+      </div>
     );
   }
 
@@ -467,6 +486,8 @@ export default function PageBlockEditor({
                         dirty={isBlockDirty(block)}
                         onChange={(value) => handleChange(block.id, value)}
                         onImageChange={(next) => handleImageChange(block.id, next)}
+                        manage={manage}
+                        pageHasUnsaved={anyDirty}
                       />
                     ))}
                   </CardContent>
@@ -474,6 +495,8 @@ export default function PageBlockEditor({
               </section>
             );
           })}
+
+          {structureSlot}
         </div>
 
         {/* Sparrad: sticky inuti innehållskolumnen – aldrig fixed över sidomenyn. */}
@@ -597,12 +620,51 @@ function DirtyDot({ dirty }: { dirty: boolean }) {
   return <span aria-hidden title="Osparad ändring" className="inline-block size-2 shrink-0 rounded-full bg-amber-500" />;
 }
 
-function FieldLabel({ label, dirty }: { label: string; dirty: boolean }) {
+function FieldLabel({ label, dirty, fieldKey }: { label: string; dirty: boolean; fieldKey?: string }) {
   return (
-    <span className="inline-flex items-center gap-2">
+    <span className="inline-flex flex-wrap items-center gap-2">
       {label}
+      {fieldKey ? (
+        <code className="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-[11px] font-normal text-neutral-500">
+          {fieldKey}
+        </code>
+      ) : null}
       <DirtyDot dirty={dirty} />
     </span>
+  );
+}
+
+/** Ta bort-knapp för ett fält (bara owners). Egen <form> mot server action. */
+function DeleteFieldForm({
+  siteId,
+  pageId,
+  block,
+  label,
+  pageHasUnsaved,
+}: {
+  siteId: string;
+  pageId: string;
+  block: BlockDTO;
+  label: string;
+  pageHasUnsaved: boolean;
+}) {
+  const confirmText =
+    `Ta bort fältet "${label}" (${block.key})? Innehållet försvinner från sajten och går inte att få tillbaka.` +
+    (pageHasUnsaved ? "\n\nOsparade ändringar på sidan går förlorade – spara först om du vill behålla dem." : "");
+  return (
+    <form action={deleteBlock.bind(null, siteId, pageId, block.id)} className="shrink-0">
+      <ConfirmButton
+        variant="ghost"
+        size="sm"
+        className="px-2 text-neutral-500 hover:bg-red-50 hover:text-red-700"
+        icon={<Trash2 />}
+        aria-label={`Ta bort fältet ${label}`}
+        title="Ta bort fältet"
+        confirmText={confirmText}
+      >
+        {null}
+      </ConfirmButton>
+    </form>
   );
 }
 
@@ -614,6 +676,8 @@ function BlockField({
   dirty,
   onChange,
   onImageChange,
+  manage,
+  pageHasUnsaved,
 }: {
   block: BlockDTO;
   siteId: string;
@@ -622,9 +686,67 @@ function BlockField({
   dirty: boolean;
   onChange: (value: string) => void;
   onImageChange: (next: { value: string; alt: string }) => void;
+  manage: { pageId: string } | null;
+  pageHasUnsaved: boolean;
 }) {
-  const label = fieldLabel(block.key);
-  const hint = fieldHint(block.key);
+  const label = block.label || fieldLabel(block.key);
+  const hint = block.help || fieldHint(block.key);
+  const fieldKey = manage ? block.key : undefined;
+
+  const field = (
+    <BlockFieldControl
+      block={block}
+      siteId={siteId}
+      value={value}
+      alt={alt}
+      dirty={dirty}
+      label={label}
+      hint={hint}
+      fieldKey={fieldKey}
+      onChange={onChange}
+      onImageChange={onImageChange}
+    />
+  );
+
+  if (!manage) return field;
+
+  return (
+    <div className="flex items-start gap-2">
+      <div className="min-w-0 flex-1">{field}</div>
+      <DeleteFieldForm
+        siteId={siteId}
+        pageId={manage.pageId}
+        block={block}
+        label={label}
+        pageHasUnsaved={pageHasUnsaved}
+      />
+    </div>
+  );
+}
+
+function BlockFieldControl({
+  block,
+  siteId,
+  value,
+  alt,
+  dirty,
+  label,
+  hint,
+  fieldKey,
+  onChange,
+  onImageChange,
+}: {
+  block: BlockDTO;
+  siteId: string;
+  value: string;
+  alt: string;
+  dirty: boolean;
+  label: string;
+  hint: string | undefined;
+  fieldKey: string | undefined;
+  onChange: (value: string) => void;
+  onImageChange: (next: { value: string; alt: string }) => void;
+}) {
   const { hintId } = fieldIds(block.id);
 
   if (block.type === "image" || block.type === "richtext") {
@@ -634,7 +756,7 @@ function BlockField({
     return (
       <div role="group" aria-labelledby={labelId} aria-describedby={hint ? hintId : undefined} className="space-y-1.5">
         <div id={labelId} className="text-sm font-medium text-neutral-800">
-          <FieldLabel label={label} dirty={dirty} />
+          <FieldLabel label={label} dirty={dirty} fieldKey={fieldKey} />
         </div>
         {hint ? (
           <p id={hintId} className="text-xs text-neutral-500">
@@ -651,7 +773,7 @@ function BlockField({
   }
 
   return (
-    <Field htmlFor={block.id} label={<FieldLabel label={label} dirty={dirty} />} hint={hint}>
+    <Field htmlFor={block.id} label={<FieldLabel label={label} dirty={dirty} fieldKey={fieldKey} />} hint={hint}>
       <TextBlockControl id={block.id} value={value} onChange={onChange} describedBy={hint ? hintId : undefined} />
     </Field>
   );

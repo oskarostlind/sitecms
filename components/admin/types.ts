@@ -10,6 +10,10 @@ export type BlockDTO = {
   value: string;
   /** Alt-text för bildblock; "" för övriga typer. */
   alt: string;
+  /** Etikett från DB (oftast satt av schema-sync). null → fallback i labels.ts. */
+  label: string | null;
+  /** Hjälptext från DB. null → fallback i labels.ts. */
+  help: string | null;
   sortOrder: number;
 };
 
