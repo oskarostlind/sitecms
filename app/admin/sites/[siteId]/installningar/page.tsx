@@ -8,6 +8,7 @@ import {
   regenerateRevalidateSecret,
   createApiKey,
   deleteApiKey,
+  removeSite,
 } from "@/lib/actions/sites";
 import { formatDateTime } from "@/lib/format";
 import { ConfirmButton } from "@/components/content/ConfirmButton";
@@ -33,6 +34,7 @@ import {
 
 const ERROR_MESSAGES: Record<string, string> = {
   missing: "Fyll i ett namn för sajten.",
+  "confirm-name": "Skriv sajtens namn exakt som det står för att bekräfta borttagningen.",
 };
 
 export default async function SiteSettingsPage({
@@ -203,6 +205,26 @@ export default async function SiteSettingsPage({
               <SubmitButton variant="secondary" pendingText="Skapar…">
                 + Skapa nyckel
               </SubmitButton>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card className="border-red-200">
+          <CardHeader>
+            <CardTitle>Ta bort sajten</CardTitle>
+            <CardDescription>
+              Tar bort sajten med alla sidor, fält, inlägg, tjänster, SEO-inställningar, API-nycklar och
+              medlemskap. Det går inte att ångra.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form action={removeSite.bind(null, siteId)} className="flex flex-wrap items-end gap-3" aria-label="Ta bort sajten">
+              <Field htmlFor="confirmName" label={`Skriv "${site.name}" för att bekräfta`} className="min-w-[240px] flex-1">
+                <Input id="confirmName" name="confirmName" type="text" required autoComplete="off" placeholder={site.name} />
+              </Field>
+              <ConfirmButton confirmText={`Ta bort sajten "${site.name}" permanent? Allt innehåll försvinner.`}>
+                Ta bort sajten
+              </ConfirmButton>
             </form>
           </CardContent>
         </Card>

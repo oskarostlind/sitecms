@@ -50,6 +50,7 @@ const ACTION_LABELS: Record<string, string> = {
   "schema.sync": "Synkade sajtens struktur från kundsajten",
   "sites.connection_check": "Testade anslutningen till kundsajten",
   "sites.delete": "Tog bort sajten",
+  "account.delete": "Avslutade sitt konto",
 };
 
 /** Etikett för en action-nyckel, t.ex. "posts.create" → "Skapade ett inlägg". */

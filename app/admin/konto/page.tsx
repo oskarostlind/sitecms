@@ -2,7 +2,8 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { requireUser } from "@/lib/guard";
-import { changePasswordAction } from "@/lib/actions/account";
+import { changePasswordAction, closeAccountAction } from "@/lib/actions/account";
+import { ConfirmButton } from "@/components/content/ConfirmButton";
 import { formatDate } from "@/lib/format";
 import {
   Alert,
@@ -30,6 +31,9 @@ const ERROR_MESSAGES: Record<string, string> = {
   mismatch: "De nya lösenorden stämmer inte överens.",
   "wrong-current": "Nuvarande lösenord är felaktigt.",
   unknown: "Kunde inte hitta ditt konto. Försök logga in igen.",
+  "confirm-email": "Skriv din e-postadress exakt för att bekräfta att kontot ska avslutas.",
+  "last-owner": "Du är ensam ägare till minst en sajt. Lägg till en annan ägare eller ta bort sajten först.",
+  "last-admin": "Du är den sista administratören och kan inte avsluta kontot.",
 };
 
 export default async function AccountPage({
@@ -149,6 +153,24 @@ export default async function AccountPage({
             {success ? <Alert tone="success">Lösenordet har sparats.</Alert> : null}
 
             <SubmitButton pendingText="Sparar…">{hasPassword ? "Spara nytt lösenord" : "Spara lösenord"}</SubmitButton>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card className="border-red-200">
+        <CardHeader>
+          <CardTitle>Avsluta kontot</CardTitle>
+          <CardDescription>
+            Tar bort ditt konto och dina medlemskap. Sajter du är ensam ägare till måste först få en annan
+            ägare eller tas bort.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form action={closeAccountAction} className="flex flex-wrap items-end gap-3" aria-label="Avsluta kontot">
+            <Field htmlFor="confirmEmail" label="Skriv din e-postadress för att bekräfta" className="min-w-[240px] flex-1">
+              <Input id="confirmEmail" name="confirmEmail" type="email" required autoComplete="off" placeholder={user.email} />
+            </Field>
+            <ConfirmButton confirmText="Avsluta ditt konto permanent?">Avsluta kontot</ConfirmButton>
           </form>
         </CardContent>
       </Card>

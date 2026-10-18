@@ -253,3 +253,37 @@ export async function deleteApiKey(siteId: string, keyId: string, formData?: For
 
   redirect(`${settingsPath(siteId, formData)}?deleted=1`);
 }
+
+/**
+ * Removes a site permanently (pages, blocks, posts, services, media rows,
+ * API keys, memberships and invitations cascade via the FKs). Only admins
+ * and owners may do this, and the form must repeat the site's name exactly
+ * so a stray click can never wipe a customer's content. Uploaded files in
+ * Vercel Blob are left as-is (harmless orphans).
+ */
+export async function removeSite(siteId: string, formData: FormData): Promise<void> {
+  const user = await requireSiteOwner(siteId);
+
+  const [site] = await db.select({ name: sites.name }).from(sites).where(eq(sites.id, siteId)).limit(1);
+  if (!site) {
+    redirect("/admin?list=1");
+  }
+
+  const confirmName = readString(formData, "confirmName");
+  if (confirmName !== site.name) {
+    redirect(`/admin/sites/${siteId}/installningar?error=confirm-name`);
+  }
+
+  await db.delete(sites).where(eq(sites.id, siteId));
+
+  await logActivity({
+    userId: user.id,
+    userEmail: user.email,
+    siteId: null,
+    action: "sites.delete",
+    detail: `Tog bort sajten "${site.name}" med allt innehåll`,
+  });
+
+  revalidatePath("/admin", "layout");
+  redirect(`/admin?list=1&removedSite=${encodeURIComponent(site.name)}`);
+}

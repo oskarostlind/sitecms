@@ -22,10 +22,11 @@ export default async function LoginPage({
     verified?: string;
     reset?: string;
     resent?: string;
+    closed?: string;
     resendError?: string;
   }>;
 }) {
-  const { error, callbackUrl: rawCallback, email, verified, reset, resent, resendError } = await searchParams;
+  const { error, callbackUrl: rawCallback, email, verified, reset, resent, resendError, closed } = await searchParams;
   const callbackUrl = safeCallbackPath(rawCallback);
   const hasCustomCallback = callbackUrl !== "/admin";
   const isInviteCallback = callbackUrl.startsWith("/invite");
@@ -62,6 +63,7 @@ export default async function LoginPage({
           </Alert>
         ) : null}
         {reset === "1" ? <Alert tone="success">Ditt nya lösenord är sparat. Logga in med det.</Alert> : null}
+        {closed === "1" ? <Alert tone="success">Ditt konto är avslutat. Tack för att du använde sitecms.</Alert> : null}
         {resent === "1" ? (
           <Alert tone="success" title="Kolla din mejl">
             Om kontot väntar på bekräftelse har vi skickat en ny länk{email ? ` till ${email}` : ""}.
