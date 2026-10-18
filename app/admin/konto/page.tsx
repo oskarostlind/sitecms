@@ -1,5 +1,9 @@
+import { eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { users } from "@/lib/db/schema";
 import { requireUser } from "@/lib/guard";
 import { changePasswordAction } from "@/lib/actions/account";
+import { formatDate } from "@/lib/format";
 import {
   Alert,
   Avatar,
@@ -35,6 +39,13 @@ export default async function AccountPage({
 }) {
   const { error, success } = await searchParams;
   const user = await requireUser();
+  const [dbUser] = await db
+    .select({ emailVerifiedAt: users.emailVerifiedAt, passwordHash: users.passwordHash })
+    .from(users)
+    .where(eq(users.id, user.id))
+    .limit(1);
+  const hasPassword = Boolean(dbUser?.passwordHash);
+  const emailVerifiedAt = dbUser?.emailVerifiedAt ?? null;
 
   const errorMessage = error
     ? (ERROR_MESSAGES[error] ?? "Något gick fel. Försök igen.")
@@ -56,31 +67,61 @@ export default async function AccountPage({
               <p className="truncate text-sm text-neutral-500">{user.email}</p>
             </div>
           </div>
-          <dl className="mt-4 flex items-center justify-between gap-4 border-t border-neutral-100 pt-4 text-sm">
-            <dt className="text-neutral-500">Roll</dt>
-            <dd>
-              <Badge tone={user.role === "admin" ? "brand" : "neutral"}>{ROLE_LABELS[user.role]}</Badge>
-            </dd>
+          <dl className="mt-4 divide-y divide-neutral-100 border-t border-neutral-100 text-sm">
+            <div className="flex items-center justify-between gap-4 py-3">
+              <dt className="text-neutral-500">Roll</dt>
+              <dd>
+                <Badge tone={user.role === "admin" ? "brand" : "neutral"}>{ROLE_LABELS[user.role]}</Badge>
+              </dd>
+            </div>
+            <div className="flex items-center justify-between gap-4 py-3">
+              <dt className="text-neutral-500">E-post</dt>
+              <dd>
+                {emailVerifiedAt ? (
+                  <Badge tone="success" dot title={`Bekräftad ${formatDate(emailVerifiedAt)}`}>
+                    Bekräftad
+                  </Badge>
+                ) : (
+                  <Badge tone="warning" dot>
+                    Ej bekräftad
+                  </Badge>
+                )}
+              </dd>
+            </div>
+            <div className="flex items-center justify-between gap-4 pt-3">
+              <dt className="text-neutral-500">Lösenord</dt>
+              <dd className="text-neutral-700">{hasPassword ? "Valt" : "Inget lösenord ännu"}</dd>
+            </div>
           </dl>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Byt lösenord</CardTitle>
-          <CardDescription>Ange ditt nuvarande lösenord och ditt nya lösenord.</CardDescription>
+          <CardTitle>{hasPassword ? "Byt lösenord" : "Välj ett lösenord"}</CardTitle>
+          <CardDescription>
+            {hasPassword
+              ? "Ange ditt nuvarande lösenord och ditt nya lösenord."
+              : "Du loggar in med Google eller via en inbjudan. Välj ett lösenord om du även vill kunna logga in med e-post och lösenord."}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form action={changePasswordAction} className="space-y-4">
-            <Field htmlFor="currentPassword" label="Nuvarande lösenord" required>
-              <Input
-                id="currentPassword"
-                name="currentPassword"
-                type="password"
-                autoComplete="current-password"
-                required
-              />
-            </Field>
+            <input type="email" name="username" autoComplete="username" value={user.email} readOnly hidden />
+            {hasPassword ? (
+              <Field htmlFor="currentPassword" label="Nuvarande lösenord" required>
+                <Input
+                  id="currentPassword"
+                  name="currentPassword"
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                />
+              </Field>
+            ) : (
+              // lib/actions/account.ts godtar valfritt "nuvarande lösenord" när kontot saknar lösenord.
+              <input type="hidden" name="currentPassword" value="-" />
+            )}
 
             <Field htmlFor="newPassword" label="Nytt lösenord" required hint="Minst 10 tecken.">
               <Input
@@ -105,9 +146,9 @@ export default async function AccountPage({
             </Field>
 
             {errorMessage ? <Alert tone="danger">{errorMessage}</Alert> : null}
-            {success ? <Alert tone="success">Lösenordet har uppdaterats.</Alert> : null}
+            {success ? <Alert tone="success">Lösenordet har sparats.</Alert> : null}
 
-            <SubmitButton pendingText="Sparar…">Spara nytt lösenord</SubmitButton>
+            <SubmitButton pendingText="Sparar…">{hasPassword ? "Spara nytt lösenord" : "Spara lösenord"}</SubmitButton>
           </form>
         </CardContent>
       </Card>

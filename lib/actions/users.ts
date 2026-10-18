@@ -1,38 +1,19 @@
 "use server";
 
-import { randomInt } from "node:crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { memberships, users } from "@/lib/db/schema";
+import { users } from "@/lib/db/schema";
 import { requireAdmin } from "@/lib/admin-guard";
 import { logActivity } from "@/lib/audit";
-
-const BCRYPT_COST = 12;
-const TEMP_PASSWORD_LENGTH = 14;
-
-function readString(formData: FormData, key: string): string {
-  const value = formData.get(key);
-  return typeof value === "string" ? value.trim() : "";
-}
-
-/**
- * Generates a random temporary password: 14 characters drawn from a charset
- * that mixes upper/lowercase letters, digits and symbols, avoiding visually
- * ambiguous characters (0/O, 1/l/I) — same approach as
- * scripts/seed-users.ts's generatePassword, just an admin-facing length.
- */
-function generateTempPassword(length = TEMP_PASSWORD_LENGTH): string {
-  const charset =
-    "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*";
-  let password = "";
-  for (let i = 0; i < length; i++) {
-    password += charset[randomInt(charset.length)];
-  }
-  return password;
-}
+import {
+  inviteToSite,
+  isMembershipRole,
+  isValidEmail,
+  normalizeEmail,
+  sendPasswordResetEmail,
+} from "@/lib/account-flows";
 
 function buildQuery(params: Record<string, string | undefined>): string {
   const search = new URLSearchParams();
@@ -44,60 +25,53 @@ function buildQuery(params: Record<string, string | undefined>): string {
 }
 
 /**
- * Creates a customer user, hashes a freshly generated temporary password,
- * and links them to one or more sites via memberships. The temp password is
- * shown exactly once, via the redirect query string (same "show once"
- * pattern used for API keys in lib/actions/sites.ts) — it is never stored
- * anywhere other than as a bcrypt hash.
+ * "Bjud in användare" på /admin/anvandare: skickar en inbjudan per vald sajt
+ * via samma logik som medlemssidan (lib/account-flows.ts → inviteToSite).
+ * Kontot skapas utan lösenord om adressen är ny; personen väljer lösenord
+ * själv när hen accepterar. Sajter där adressen redan är medlem hoppas över.
+ *
+ * formData: name (valfritt), email, siteIds (en eller flera), role ("owner" | "editor").
  */
-export async function createCustomerUser(formData: FormData): Promise<void> {
+export async function inviteUserAction(formData: FormData): Promise<void> {
   const admin = await requireAdmin();
 
-  const name = readString(formData, "name");
-  const emailInput = readString(formData, "email");
-  const email = emailInput.toLowerCase();
+  const nameValue = formData.get("name");
+  const name = typeof nameValue === "string" ? nameValue.trim() : "";
+  const email = normalizeEmail(formData.get("email"));
+  const role = formData.get("role");
   const siteIds = formData.getAll("siteIds").filter((v): v is string => typeof v === "string" && v !== "");
 
-  if (!name || !email) {
-    redirect("/admin/anvandare?error=missing");
-  }
+  if (!email) redirect("/admin/anvandare?error=missing");
+  if (!isValidEmail(email)) redirect("/admin/anvandare?error=invalid-email");
+  if (siteIds.length === 0) redirect("/admin/anvandare?error=no-site");
+  if (!isMembershipRole(role)) redirect("/admin/anvandare?error=invalid-role");
 
-  if (siteIds.length === 0) {
-    redirect("/admin/anvandare?error=no-site");
-  }
-
-  const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
-  if (existing) {
-    redirect("/admin/anvandare?error=email-taken");
-  }
-
-  const tempPassword = generateTempPassword();
-  const passwordHash = await bcrypt.hash(tempPassword, BCRYPT_COST);
-
-  const [created] = await db
-    .insert(users)
-    .values({ name, email, passwordHash, role: "customer" })
-    .returning();
+  let invited = 0;
+  let alreadyMember = 0;
+  let mailFailed = 0;
 
   for (const siteId of siteIds) {
-    await db.insert(memberships).values({ userId: created.id, siteId });
+    const result = await inviteToSite({ siteId, email, role, inviter: admin, name });
+    if (result.ok) {
+      invited++;
+      if (!result.mailSent) mailFailed++;
+    } else if (result.error === "already-member") {
+      alreadyMember++;
+    }
   }
-
-  await logActivity({
-    userId: admin.id,
-    userEmail: admin.email,
-    siteId: null,
-    action: "users.create",
-    detail: `Skapade kundanvändaren "${name}" (${email}) med ${siteIds.length} sajt(er)`,
-  });
 
   revalidatePath("/admin/anvandare");
 
+  if (invited === 0) {
+    redirect(`/admin/anvandare${buildQuery({ error: alreadyMember > 0 ? "already-member" : "invite-failed" })}`);
+  }
+
   redirect(
     `/admin/anvandare${buildQuery({
-      createdUser: name,
-      createdEmail: email,
-      tempPassword,
+      invited: email,
+      invitedCount: String(invited),
+      skipped: alreadyMember > 0 ? String(alreadyMember) : undefined,
+      mailFailed: mailFailed > 0 ? String(mailFailed) : undefined,
     })}`,
   );
 }
@@ -105,8 +79,8 @@ export async function createCustomerUser(formData: FormData): Promise<void> {
 /**
  * Deletes a user. Refuses to delete yourself (you'd lock yourself out of the
  * confirming session) and refuses to delete the last remaining admin (the
- * panel would become unmanageable). Memberships cascade-delete via the FK
- * in lib/db/schema.ts, so no manual cleanup is needed there.
+ * panel would become unmanageable). Memberships and auth tokens
+ * cascade-delete via the FKs in lib/db/schema.ts.
  */
 export async function deleteUserAction(userId: string): Promise<void> {
   const admin = await requireAdmin();
@@ -143,8 +117,9 @@ export async function deleteUserAction(userId: string): Promise<void> {
 }
 
 /**
- * Resets a user's password to a new random temporary one, shown exactly
- * once via the redirect query string, matching createCustomerUser.
+ * Skickar ett mejl med en länk där användaren själv väljer nytt lösenord
+ * (samma flöde som "Glömt lösenord?"). Det nuvarande lösenordet fortsätter
+ * att fungera tills länken används — admin ser aldrig något lösenord.
  */
 export async function resetPasswordAction(userId: string): Promise<void> {
   const admin = await requireAdmin();
@@ -154,27 +129,21 @@ export async function resetPasswordAction(userId: string): Promise<void> {
     redirect("/admin/anvandare?error=not-found");
   }
 
-  const tempPassword = generateTempPassword();
-  const passwordHash = await bcrypt.hash(tempPassword, BCRYPT_COST);
-
-  await db
-    .update(users)
-    .set({ passwordHash, updatedAt: new Date() })
-    .where(eq(users.id, userId));
+  const mailSent = await sendPasswordResetEmail(target);
 
   await logActivity({
     userId: admin.id,
     userEmail: admin.email,
     siteId: null,
     action: "users.password_reset",
-    detail: `Återställde lösenordet för "${target.name}" (${target.email})`,
+    detail: mailSent
+      ? `Skickade en länk för nytt lösenord till "${target.name}" (${target.email})`
+      : `Försökte skicka en länk för nytt lösenord till "${target.name}" (${target.email}) — mejlet kunde inte skickas`,
   });
 
-  redirect(
-    `/admin/anvandare${buildQuery({
-      resetUser: target.name,
-      resetEmail: target.email,
-      tempPassword,
-    })}`,
-  );
+  if (!mailSent) {
+    redirect("/admin/anvandare?error=mail-failed");
+  }
+
+  redirect(`/admin/anvandare${buildQuery({ resetSent: target.email })}`);
 }
