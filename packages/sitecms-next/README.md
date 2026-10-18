@@ -1,11 +1,15 @@
-# @sitecms/next
+# sitecms-next
+
+```bash
+npm install sitecms-next
+```
 
 Typad klient för att hämta innehåll från sitecms i en Next.js-sajt (App Router).
 Inga beroenden. All hämtning taggas med `sitecms` så att innehållet kan
 uppdateras direkt när kunden sparar i panelen.
 
-> Paketet är inte publicerat på npm ännu. Tills vidare: kopiera koden från
-> integrationssidan i panelen (`lib/sitecms.ts`) — den är identisk.
+> Vill du hellre slippa beroendet? Koden på integrationssidan i panelen
+> (`lib/sitecms.ts`) är identisk och kan klistras in direkt.
 
 ## Miljövariabler
 
@@ -22,7 +26,7 @@ Värdena finns under **Integration** för sajten i sitecms.
 
 ```ts
 // lib/cms.ts
-import { createSitecms } from "@sitecms/next";
+import { createSitecms } from "sitecms-next";
 
 export const cms = createSitecms({
   apiUrl: process.env.CMS_API_URL!,
@@ -67,7 +71,7 @@ Fel från API:et kastas som `SitecmsError` med `status` (401 fel nyckel, 404 ok�
 ```ts
 // app/api/sitecms/revalidate/route.ts
 import { revalidateTag } from "next/cache";
-import { verifyRevalidateSecret } from "@sitecms/next";
+import { verifyRevalidateSecret } from "sitecms-next";
 
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as { secret?: unknown } | null;
@@ -86,7 +90,7 @@ Ange sedan `https://din-domän.se/api/sitecms/revalidate` som revalidate-URL i p
 `sitecms.config.ts` beskriver vilka sidor och fält sajten har:
 
 ```ts
-import { defineConfig } from "@sitecms/next";
+import { defineConfig } from "sitecms-next";
 
 export default defineConfig({
   version: 1,

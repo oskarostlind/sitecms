@@ -117,7 +117,7 @@ Regler:
   3. **Testa anslutningen**: knapp → server action `checkConnection(siteId)`: POST till `revalidateUrl` med hemligheten, förvänta 2xx; uppdatera `sites.lastConnectionStatus/CheckedAt`; logga `sites.connection_check`; visa resultat. Visa även "Senaste schema-sync: …" från `lastSchemaSyncAt`.
   4. **Bjud in kunden** → länk till medlemmar.
 - `GET /api/v1/sites/[slug]/health` (`x-api-key`): `{ ok: true, site: { name, slug }, pages: n, lastSchemaSyncAt }` — så utvecklaren kan verifiera nyckeln med curl.
-- `packages/sitecms-next/`: samma klient som npm-paket (`@sitecms/next`, `package.json`, `src/index.ts`, `README.md`), inte publicerat ännu — panelen pekar i första hand på copy-paste.
+- `packages/sitecms-next/`: samma klient som npm-paket (`sitecms-next`, `package.json`, `src/index.ts`, `README.md`), inte publicerat ännu — panelen pekar i första hand på copy-paste.
 - `/docs` (publik, utan inloggning): "Kom igång på 10 minuter" (konto → sajt → nycklar → kod → schema-sync → bjud in kund), API-referens (content, posts, posts/[slug], schema GET/POST, health, revalidate-webhook, felkoder), schema-format (ta exakt format från detta dokument, avsnitt B). Statisk, snyggt typsatt, samma designspråk som landningssidan.
 - Landningssidan `app/page.tsx`: primär CTA "Skapa konto" → `/signup`, sekundär "Logga in". Ny sektion "För utvecklare": tre steg + länk till `/docs`. Behåll befintlig stil.
 

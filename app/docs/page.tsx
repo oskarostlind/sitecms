@@ -158,7 +158,7 @@ const TOC: { id: string; label: string; children?: { id: string; label: string }
       { id: "api-fel", label: "Felkoder" },
     ],
   },
-  { id: "paket", label: "@sitecms/next" },
+  { id: "paket", label: "sitecms-next (npm)" },
 ];
 
 const QUICKSTART = [
@@ -793,12 +793,12 @@ export default function DocsPage() {
           {/* Paket */}
           <Section
             id="paket"
-            eyebrow="Kommer snart"
-            title="@sitecms/next"
-            intro="Samma klient som npm-paket, parametriserad i stället för env-läsande. Inte publicerat ännu — använd copy-paste-koden ovan tills vidare."
+            eyebrow="Alternativ"
+            title="sitecms-next på npm"
+            intro="Samma klient som npm-paket, parametriserad i stället för env-läsande: npm install sitecms-next. Inga beroenden, ESM + typer."
           >
             <CodeBlock
-              code={`import { createSitecms } from "@sitecms/next";
+              code={`import { createSitecms } from "sitecms-next";
 
 export const cms = createSitecms({
   apiUrl: process.env.CMS_API_URL!,

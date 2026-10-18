@@ -1,7 +1,7 @@
 /**
- * @sitecms/next — typad sitecms-klient för Next.js App Router.
+ * sitecms-next — typad sitecms-klient för Next.js App Router.
  *
- *   import { createSitecms } from "@sitecms/next";
+ *   import { createSitecms } from "sitecms-next";
  *   export const cms = createSitecms({
  *     apiUrl: process.env.CMS_API_URL!,
  *     site: process.env.CMS_SITE!,
@@ -150,9 +150,9 @@ export function createSitecms(options: SitecmsOptions) {
   const tag = options.tag ?? "sitecms";
   const doFetch = options.fetch ?? globalThis.fetch;
 
-  if (!apiUrl) throw new Error("@sitecms/next: apiUrl saknas (CMS_API_URL).");
-  if (!options.site) throw new Error("@sitecms/next: site saknas (CMS_SITE).");
-  if (!options.apiKey) throw new Error("@sitecms/next: apiKey saknas (CMS_API_KEY).");
+  if (!apiUrl) throw new Error("sitecms-next: apiUrl saknas (CMS_API_URL).");
+  if (!options.site) throw new Error("sitecms-next: site saknas (CMS_SITE).");
+  if (!options.apiKey) throw new Error("sitecms-next: apiKey saknas (CMS_API_KEY).");
 
   const base = `${apiUrl}/api/v1/sites/${encodeURIComponent(options.site)}`;
 
@@ -212,7 +212,7 @@ export type Sitecms = ReturnType<typeof createSitecms>;
  * Hjälpare för `app/api/sitecms/revalidate/route.ts`:
  *
  *   import { revalidateTag } from "next/cache";
- *   import { verifyRevalidateSecret } from "@sitecms/next";
+ *   import { verifyRevalidateSecret } from "sitecms-next";
  *
  *   export async function POST(request: Request) {
  *     const body = await request.json().catch(() => null);
