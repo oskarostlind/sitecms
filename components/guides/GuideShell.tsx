@@ -131,7 +131,7 @@ export function GuideShell({
   const year = new Date().getFullYear();
   return (
     <div className="flex min-h-screen flex-col bg-neutral-50 text-neutral-900">
-      <header className="sticky top-0 z-30 border-b border-white/10 bg-space-950/80 text-ink backdrop-blur-md">
+      <header className="sticky top-0 z-30 border-b border-white/10 bg-space-950/95 text-ink backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 px-4 sm:flex-nowrap sm:px-6">
           <Link
             href="/"
