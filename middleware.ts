@@ -19,7 +19,24 @@ const { auth } = NextAuth(authConfig);
 /** Egna värdar: interna referers ger aldrig en ny källa. */
 const OWN_HOSTS = ["sitecms.se", "sitecms-zeta.vercel.app", "vercel.app", "localhost"];
 
+/**
+ * Kanonisk värd: när CANONICAL_HOST är satt (t.ex. "sitecms.se") skickas
+ * produktionsbesök på *.vercel.app dit med 308. Gäller bara sidor — /api
+ * matchas inte av middleware, så kundsajter som anropar API:t via den gamla
+ * adressen fortsätter fungera. Förhandsgranskningar (VERCEL_ENV=preview) rörs inte.
+ */
+function canonicalRedirect(url: URL): Response | null {
+  const canonical = process.env.CANONICAL_HOST?.trim();
+  if (!canonical || process.env.VERCEL_ENV !== "production") return null;
+  if (url.hostname === canonical || !url.hostname.endsWith(".vercel.app")) return null;
+  const target = new URL(`${url.pathname}${url.search}`, `https://${canonical}`);
+  return Response.redirect(target, 308);
+}
+
 export default auth((req) => {
+  const redirectToCanonical = canonicalRedirect(req.nextUrl);
+  if (redirectToCanonical) return redirectToCanonical;
+
   const isLoggedIn = !!req.auth?.user;
   const { pathname, search } = req.nextUrl;
 
