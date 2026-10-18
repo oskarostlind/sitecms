@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
+import { NOINDEX } from "@/lib/seo";
 import { peekToken } from "@/lib/tokens";
 import { verifyEmailAction, resendVerificationAction } from "@/lib/actions/auth";
 import { AuthLink, AuthShell } from "@/components/auth/AuthShell";
 import { Alert, Field, Input, SubmitButton } from "@/components/ui";
 
 export const metadata: Metadata = {
-  title: "Bekräfta e-post — sitecms",
+  title: "Bekräfta e-post",
+  robots: NOINDEX,
 };
 
 /**

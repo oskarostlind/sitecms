@@ -2,6 +2,8 @@ import Link from "next/link";
 import { ArrowRight, BookOpen, KeyRound, Package, RefreshCw, UserPlus, Workflow } from "lucide-react";
 import { CodeBlock } from "@/components/admin/CodeBlock";
 import { Badge, ButtonLink, Card, CardContent } from "@/components/ui";
+import { JsonLd } from "@/components/JsonLd";
+import { absoluteUrl, breadcrumbJsonLd, SITE_URL } from "@/lib/seo";
 import {
   clientSnippet,
   configSnippet,
@@ -407,9 +409,32 @@ function Toc() {
   );
 }
 
+const DOCS_MODIFIED = "2026-10-18";
+
 export default function DocsPage() {
   return (
     <main className="px-6">
+      <JsonLd
+        nodes={[
+          {
+            "@type": "TechArticle",
+            headline: "Koppla en Next.js-sajt till sitecms",
+            description:
+              "Installera sitecms-next, deklarera fälten i sitecms.config.ts, synka i prebuild och hämta innehållet med en typad klient.",
+            inLanguage: "sv-SE",
+            dateModified: DOCS_MODIFIED,
+            url: absoluteUrl("/docs"),
+            proficiencyLevel: "Beginner",
+            dependencies: "Next.js 14.2+ (App Router), sitecms-next",
+            publisher: { "@id": `${SITE_URL}/#organization` },
+            mainEntityOfPage: absoluteUrl("/docs"),
+          },
+          breadcrumbJsonLd([
+            { name: "sitecms", path: "/" },
+            { name: "Dokumentation", path: "/docs" },
+          ]),
+        ]}
+      />
       {/* Hero */}
       <section className="relative overflow-hidden pt-14 pb-12 sm:pt-20">
         <div

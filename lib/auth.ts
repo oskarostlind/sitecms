@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { authConfig } from "../auth.config";
 import { db } from "./db";
 import { users } from "./db/schema";
+import { readAttribution } from "./attribution-server";
 import { logActivity } from "./audit";
 
 /**
@@ -137,9 +138,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
 
       const name = user.name?.trim() || email.split("@")[0] || email;
+      const attribution = await readAttribution();
       const [created] = await db
         .insert(users)
-        .values({ email, name, role: "customer", passwordHash: null, emailVerifiedAt: new Date() })
+        .values({
+          email,
+          name,
+          role: "customer",
+          passwordHash: null,
+          emailVerifiedAt: new Date(),
+          signupSource: attribution?.source ?? null,
+          signupLanding: attribution?.landing ?? null,
+        })
         .onConflictDoNothing()
         .returning({ id: users.id, email: users.email });
 

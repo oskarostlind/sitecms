@@ -21,6 +21,7 @@ import {
   Plus,
   Search,
   Settings,
+  TrendingUp,
   UserRound,
   Users,
   X,
@@ -62,6 +63,7 @@ type AdminNavItem = { label: string; href: string; icon: LucideIcon };
 const ADMIN_NAV: AdminNavItem[] = [
   { label: "Användare", href: "/admin/anvandare", icon: Users },
   { label: "All aktivitet", href: "/admin/aktivitet", icon: Activity },
+  { label: "Tillväxt", href: "/admin/tillvaxt", icon: TrendingUp },
 ];
 
 /** Visas för alla inloggade — vem som helst kan skapa en sajt (självbetjäning). */

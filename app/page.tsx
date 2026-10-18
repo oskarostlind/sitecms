@@ -4,11 +4,20 @@ import Link from "next/link";
 import PlanetScene from "@/components/landing/PlanetScene";
 import SmoothScroll from "@/components/landing/SmoothScroll";
 import "./landing.css";
+import { JsonLd } from "@/components/JsonLd";
+import { organizationJsonLd, softwareJsonLd, websiteJsonLd } from "@/lib/seo";
 
 export const metadata: Metadata = {
-  title: "sitecms — din hemsida, utan handpåläggning",
+  title: { absolute: "sitecms – låt kunden redigera hemsidan själv" },
   description:
-    "Ett CMS där kunden redigerar texter, bilder, inlägg och priser själv — och utvecklaren kopplar sajten på tio minuter.",
+    "Svenskt CMS för småföretag: ändra texter, bilder, nyheter och priser på hemsidan själv. Utvecklaren kopplar Next.js-sajten på tio minuter.",
+  alternates: { canonical: "/" },
+  openGraph: {
+    title: "sitecms – låt kunden redigera hemsidan själv",
+    description:
+      "Kunden ändrar texter, bilder, nyheter och priser själv. Utvecklaren kopplar sajten på tio minuter. Gratis att börja.",
+    url: "/",
+  },
 };
 
 /* ---------------------------------------------------------------------------
@@ -84,6 +93,7 @@ const rd = (ms: number) => ({ "--rd": `${ms}ms` }) as CSSProperties;
 const NAV_LINKS = [
   { label: "Funktioner", href: "#features" },
   { label: "För utvecklare", href: "#solutions" },
+  { label: "Guider", href: "/guider" },
   { label: "Dokumentation", href: "/docs" },
   { label: "Logga in", href: "/login" },
 ];
@@ -165,8 +175,8 @@ const FOOTER_COLS = [
   {
     title: "Övrigt",
     links: [
-      { label: "Integritet", href: "#" },
-      { label: "Villkor", href: "#" },
+      { label: "Guider", href: "/guider" },
+      { label: "Integritet", href: "/integritet" },
       { label: "Kontakt", href: "mailto:info@oskarostlind.se" },
     ],
   },
@@ -208,6 +218,7 @@ export default function Home() {
 
   return (
     <div className="landing">
+      <JsonLd nodes={[organizationJsonLd, websiteJsonLd, softwareJsonLd]} />
       <PlanetScene />
       <SmoothScroll />
 

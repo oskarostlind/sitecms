@@ -12,6 +12,7 @@ import { sendMail } from "@/lib/mail";
 import { accountExistsEmail } from "@/lib/emails";
 import { appUrl } from "@/lib/app-url";
 import { logActivity } from "@/lib/audit";
+import { readAttribution } from "@/lib/attribution-server";
 import {
   BCRYPT_COST,
   MIN_PASSWORD_LENGTH,
@@ -87,9 +88,18 @@ export async function signupAction(formData: FormData): Promise<void> {
   }
 
   const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
+  const attribution = await readAttribution();
   const [created] = await db
     .insert(users)
-    .values({ name, email, passwordHash, role: "customer", emailVerifiedAt: null })
+    .values({
+      name,
+      email,
+      passwordHash,
+      role: "customer",
+      emailVerifiedAt: null,
+      signupSource: attribution?.source ?? null,
+      signupLanding: attribution?.landing ?? null,
+    })
     .onConflictDoNothing()
     .returning();
 

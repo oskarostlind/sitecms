@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
+import { NOINDEX } from "@/lib/seo";
 import { MailCheck } from "lucide-react";
 import { forgotPasswordAction } from "@/lib/actions/auth";
 import { AuthLink, AuthShell } from "@/components/auth/AuthShell";
 import { Alert, Field, Input, SubmitButton } from "@/components/ui";
 
 export const metadata: Metadata = {
-  title: "Glömt lösenord — sitecms",
+  title: "Glömt lösenord",
+  robots: NOINDEX,
 };
 
 const ERROR_MESSAGES: Record<string, string> = {

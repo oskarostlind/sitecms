@@ -58,6 +58,11 @@ export const users = pgTable("users", {
   role: text("role", { enum: roleEnumValues }).notNull().default("customer"),
   // Set when the address has been confirmed (verification link, accepted invite, Google).
   emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
+  // First-touch attribution captured on the visitor's first page view
+  // (lib/attribution.ts): e.g. "google", "utm:linkedin", "direkt", "ref:example.com".
+  signupSource: text("signup_source"),
+  // The first public page the visitor landed on, e.g. "/guider/andra-text-pa-hemsidan".
+  signupLanding: text("signup_landing"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [

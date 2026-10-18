@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
+import { NOINDEX } from "@/lib/seo";
 import { peekToken } from "@/lib/tokens";
 import { resetPasswordWithTokenAction } from "@/lib/actions/auth";
 import { AuthLink, AuthShell } from "@/components/auth/AuthShell";
 import { Alert, ButtonLink, Field, Input, SubmitButton } from "@/components/ui";
 
 export const metadata: Metadata = {
-  title: "Välj nytt lösenord — sitecms",
+  title: "Välj nytt lösenord",
+  robots: NOINDEX,
 };
 
 const ERROR_MESSAGES: Record<string, string> = {

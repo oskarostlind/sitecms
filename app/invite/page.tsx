@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { NOINDEX } from "@/lib/seo";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { sites, users } from "@/lib/db/schema";
@@ -14,7 +15,8 @@ import { AuthLink, AuthShell } from "@/components/auth/AuthShell";
 import { Alert, Badge, ButtonLink, Field, Input, SubmitButton } from "@/components/ui";
 
 export const metadata: Metadata = {
-  title: "Inbjudan — sitecms",
+  title: "Inbjudan",
+  robots: NOINDEX,
 };
 
 const ERROR_MESSAGES: Record<string, string> = {

@@ -1,9 +1,17 @@
+import type { Metadata } from "next";
+import { NOINDEX } from "@/lib/seo";
 import { loginAction } from "@/lib/auth-actions";
 import { resendVerificationAction } from "@/lib/actions/auth";
 import { googleAuthEnabled } from "@/lib/auth";
 import { safeCallbackPath } from "@/lib/account-flows";
 import { AuthLink, AuthShell, GoogleSignInButton } from "@/components/auth/AuthShell";
 import { Alert, Field, Input, SubmitButton } from "@/components/ui";
+
+export const metadata: Metadata = {
+  title: "Logga in",
+  description: "Logga in i sitecms och redigera din hemsida.",
+  robots: { index: false, follow: true },
+};
 
 const ERROR_MESSAGES: Record<string, string> = {
   invalid: "Fel e-post eller lösenord.",

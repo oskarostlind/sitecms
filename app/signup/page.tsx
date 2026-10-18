@@ -8,7 +8,9 @@ import { AuthLink, AuthShell, GoogleSignInButton } from "@/components/auth/AuthS
 import { Alert, Field, Input, SubmitButton } from "@/components/ui";
 
 export const metadata: Metadata = {
-  title: "Skapa konto — sitecms",
+  title: "Skapa konto gratis",
+  description: "Skapa ett gratis sitecms-konto, koppla din sajt och bjud in kunden som redaktör. Inget kreditkort.",
+  alternates: { canonical: "/signup" },
 };
 
 const ERROR_MESSAGES: Record<string, string> = {

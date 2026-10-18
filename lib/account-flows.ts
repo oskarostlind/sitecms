@@ -119,7 +119,7 @@ export async function inviteToSite(input: {
     const name = input.name?.trim() || emailLocalPart(email);
     [user] = await db
       .insert(users)
-      .values({ email, name, role: "customer", passwordHash: null, emailVerifiedAt: null })
+      .values({ email, name, role: "customer", passwordHash: null, emailVerifiedAt: null, signupSource: "inbjudan" })
       .onConflictDoNothing()
       .returning({ id: users.id, email: users.email, name: users.name });
     if (!user) {

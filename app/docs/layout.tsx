@@ -3,9 +3,10 @@ import Link from "next/link";
 import { ButtonLink, Logo } from "@/components/ui";
 
 export const metadata: Metadata = {
-  title: "Utvecklardokumentation — sitecms",
+  title: "Koppla Next.js till ett CMS – dokumentation",
   description:
-    "Koppla en Next.js-sajt till sitecms på tio minuter: API-nycklar, typad klient, schema-sync, revalidering och API-referens.",
+    "Koppla en Next.js-sajt till sitecms på tio minuter med npm-paketet sitecms-next: typad klient, schema-sync, revalidering och API-referens.",
+  alternates: { canonical: "/docs" },
 };
 
 export default function DocsLayout({ children }: { children: React.ReactNode }) {

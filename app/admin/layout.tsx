@@ -1,6 +1,13 @@
+import type { Metadata } from "next";
+import { NOINDEX } from "@/lib/seo";
 import { requireUser, getUserSites, getOwnedSiteIds } from "@/lib/guard";
 import { logoutAction } from "@/lib/auth-actions";
 import AdminShell from "@/components/admin/AdminShell";
+
+export const metadata: Metadata = {
+  title: "Panel",
+  robots: NOINDEX,
+};
 
 export default async function AdminLayout({
   children,

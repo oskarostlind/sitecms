@@ -1,12 +1,26 @@
 import "@fontsource-variable/inter";
 import type { Metadata } from "next";
+import { SITE_LOCALE, SITE_NAME, SITE_URL } from "@/lib/seo";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://sitecms-zeta.vercel.app"),
-  title: "sitecms — redigera din hemsida enkelt och tryggt",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "sitecms – låt kunden redigera hemsidan själv",
+    template: "%s | sitecms",
+  },
   description:
-    "Sitecms ger småföretag och hantverkare full kontroll över sin hemsida: texter, bilder, inlägg, tjänster och priser — allt från en enkel panel.",
+    "Svenskt CMS för småföretag: ändra texter, bilder, nyheter, tjänster och priser på hemsidan själv. Utvecklaren kopplar sajten på tio minuter.",
+  applicationName: SITE_NAME,
+  openGraph: {
+    type: "website",
+    locale: SITE_LOCALE,
+    siteName: SITE_NAME,
+    url: SITE_URL,
+  },
+  twitter: { card: "summary_large_image" },
+  alternates: { canonical: "/" },
+  formatDetection: { telephone: false, email: false, address: false },
 };
 
 export default function RootLayout({
