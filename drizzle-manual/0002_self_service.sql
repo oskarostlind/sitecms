@@ -42,5 +42,5 @@ CREATE INDEX IF NOT EXISTS "auth_tokens_user_idx" ON "auth_tokens" ("user_id");
 
 -- Existing customer accounts were created by hand and have proven e-mail addresses.
 UPDATE "users" SET "email_verified_at" = now() WHERE "email_verified_at" IS NULL;
--- Existing single-site customers keep managing their site fully.
-UPDATE "memberships" SET "role" = 'owner' WHERE "role" = 'editor';
+-- Existing customer memberships stay 'editor': that matches what customers
+-- could do before (content only); Oskar remains admin over every site.
