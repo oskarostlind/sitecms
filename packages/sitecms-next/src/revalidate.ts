@@ -33,7 +33,12 @@ export function createRevalidateHandler(options: RevalidateHandlerOptions = {}) 
       return Response.json({ revalidated: false, error: "Fel hemlighet." }, { status: 401 });
     }
 
-    revalidateTag(options.tag ?? "sitecms");
+    // Next.js 16+: { expire: 0 } gör att nästa anrop väntar på färskt innehåll
+    // (rekommenderat för webhooks; formen med bara taggen är utfasad där).
+    // Next.js 14–15 tar bara taggen och ignorerar det andra argumentet.
+    (revalidateTag as (tag: string, profile?: string | { expire?: number }) => void)(options.tag ?? "sitecms", {
+      expire: 0,
+    });
     return Response.json({ revalidated: true, now: Date.now() });
   };
 }

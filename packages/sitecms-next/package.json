@@ -1,6 +1,6 @@
 {
   "name": "sitecms-next",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Koppla en Next.js-sajt till sitecms: typad klient, färdig revalidate-route och CLI för schema-sync. Inga beroenden.",
   "type": "module",
   "main": "./dist/index.js",

@@ -252,6 +252,7 @@ Hälsningar,
     },
   ],
   sources: [
+    { title: "IMY: Personuppgiftsbiträdesavtal", url: "https://www.imy.se/verksamhet/dataskydd/det-har-galler-enligt-gdpr/personuppgiftsansvariga-och-personuppgiftsbitraden/personuppgiftsbitradesavtal/" },
     { title: "Vercel – Transferring a project", url: "https://vercel.com/docs/projects/transferring-projects" },
     { title: "Google Search Console – Managing owners, users, and permissions", url: "https://support.google.com/webmasters/answer/7687615" },
     { title: "Google Företagsprofil – Transfer primary ownership", url: "https://support.google.com/business/answer/3415281" },

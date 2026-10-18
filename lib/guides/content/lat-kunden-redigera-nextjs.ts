@@ -159,7 +159,7 @@ export async function POST(request: Request) {
         },
         {
           type: "p",
-          text: "Peka CMS:ets webhook mot `/api/revalidate` och skicka hemligheten i body. Enligt [Next.js-dokumentationen](https://nextjs.org/docs/app/api-reference/functions/revalidateTag), oktober 2026, tar `revalidateTag` ett andra argument: `\"max\"` visar gammalt innehåll medan nytt hämtas i bakgrunden, medan `{ expire: 0 }` gör att nästa anrop väntar på färskt innehåll. Den äldre formen med bara taggen är markerad som utfasad.",
+          text: "Peka CMS:ets webhook mot `/api/revalidate` och skicka hemligheten i body. Enligt [Next.js-dokumentationen](https://nextjs.org/docs/app/api-reference/functions/revalidateTag), oktober 2026, tar `revalidateTag` ett andra argument: `\"max\"` visar gammalt innehåll medan nytt hämtas i bakgrunden, medan `{ expire: 0 }` gör att nästa anrop väntar på färskt innehåll. Den äldre formen med bara taggen är markerad som utfasad. Kör du Next.js 15 tar funktionen bara taggen: skriv då `revalidateTag(\"cms\")`.",
         },
         {
           type: "tip",

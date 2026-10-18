@@ -247,7 +247,9 @@ export async function POST(request: Request) {
     return Response.json({ revalidated: false, error: "Fel hemlighet" }, { status: 401 });
   }
 
-  revalidateTag("sitecms");
+  // Next.js 16: { expire: 0 } ger färskt innehåll direkt (formen med bara taggen är utfasad).
+  // Next.js 14–15 tar bara taggen och ignorerar det andra argumentet.
+  (revalidateTag as (tag: string, profile?: { expire?: number }) => void)("sitecms", { expire: 0 });
   return Response.json({ revalidated: true });
 }
 `;

@@ -16,10 +16,8 @@ export const metadata: Metadata = {
     type: "website",
     locale: SITE_LOCALE,
     siteName: SITE_NAME,
-    url: SITE_URL,
   },
   twitter: { card: "summary_large_image" },
-  alternates: { canonical: "/" },
   formatDetection: { telephone: false, email: false, address: false },
 };
 
