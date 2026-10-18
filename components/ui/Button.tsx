@@ -19,7 +19,8 @@ const base =
   "disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50";
 
 const variants: Record<Exclude<ButtonVariant, "danger">, string> = {
-  primary: "bg-brand-600 text-white shadow-sm hover:bg-brand-700 active:bg-brand-800",
+  primary:
+    "bg-brand-400 text-brand-950 shadow-[0_8px_24px_-10px_rgba(47,211,138,0.6),inset_0_1px_0_rgba(255,255,255,0.4)] hover:bg-brand-300 active:bg-brand-500",
   secondary: "border border-neutral-300 bg-white text-neutral-800 shadow-sm hover:bg-neutral-50",
   ghost: "text-neutral-700 hover:bg-neutral-100",
   link: "text-brand-600 underline-offset-2 hover:text-brand-700 hover:underline",

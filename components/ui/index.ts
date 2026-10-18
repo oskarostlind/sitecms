@@ -25,7 +25,7 @@ export { EmptyState, type EmptyStateProps } from "./EmptyState";
 export { Field, fieldIds, type FieldProps } from "./Field";
 export { Input, type InputProps } from "./Input";
 export { Kbd } from "./Kbd";
-export { Logo, type LogoProps } from "./Logo";
+export { Logo, LogoMark, type LogoProps } from "./Logo";
 export { PageHeader, type Breadcrumb, type PageHeaderProps } from "./PageHeader";
 export { Select, type SelectProps } from "./Select";
 export { Skeleton } from "./Skeleton";
