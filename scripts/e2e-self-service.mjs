@@ -3,8 +3,8 @@
  * e-postlänkarna hämtas ur en riktig inkorg mellan stegen:
  *
  *   STAGE=signup   E2E_EMAIL=… E2E_PASSWORD=…          → skapar konto, väntar på verifieringsmejl
- *   STAGE=site     VERIFY_URL=… INVITEE_EMAIL=…        → verifierar, loggar in, skapar sajt, API/schema/innehåll,
- *                                                        redigering, integration, bjuder in redaktör
+ *   STAGE=site     VERIFY_URL=…                        → verifierar, loggar in, skapar sajt, API/schema/innehåll
+ *   STAGE=edit     INVITEE_EMAIL=…                     → redigering i panelen, nytt fält, integration, bjuder in redaktör
  *   STAGE=invite   INVITE_URL=… INVITEE_PASSWORD=…     → accepterar inbjudan i ny webbläsarkontext, redaktörsrättigheter
  *   STAGE=forgot                                       → begär återställningsmejl
  *   STAGE=reset    RESET_URL=… NEW_PASSWORD=…          → sätter nytt lösenord, loggar in
@@ -45,16 +45,23 @@ function must(cond, name, detail) {
   return cond;
 }
 async function expectUrl(page, re, name) {
-  await page.waitForLoadState("networkidle");
+  await page.waitForURL(re, { timeout: 25000 }).catch(() => {});
+  await page.waitForLoadState("networkidle").catch(() => {});
   const url = page.url();
   return must(re.test(url), name, url.replace(BASE, ""));
+}
+/** Klickar och väntar tills server-actionens redirect har landat (URL ändrad) eller 25 s. */
+async function submit(page, selector) {
+  const before = page.url();
+  await page.click(selector);
+  await page.waitForURL((u) => u.toString() !== before, { timeout: 25000 }).catch(() => {});
+  await page.waitForLoadState("networkidle").catch(() => {});
 }
 async function loginViaForm(page, email, password) {
   await page.goto(`${BASE}/login`, { waitUntil: "networkidle" });
   await page.fill('input[name="email"]', email);
   await page.fill('input[name="password"]', password);
-  await page.click('button[type="submit"]:has-text("Logga in")');
-  await page.waitForLoadState("networkidle");
+  await submit(page, 'button[type="submit"]:has-text("Logga in")');
 }
 async function api(context, method, path, { key, body } = {}) {
   const res = await context.request.fetch(`${BASE}${path}`, {
@@ -87,7 +94,7 @@ try {
     await page.fill('input[name="name"]', "E2E Utvecklare");
     await page.fill('input[name="email"]', email);
     await page.fill('input[name="password"]', password);
-    await page.click('button[type="submit"]');
+    await submit(page, 'button:has-text("Skapa konto")');
     await expectUrl(page, /\/signup\?sent=1/, "signup → kolla din mejl");
     await shot(page, "signup-sent");
     // Overifierat konto får inte logga in
@@ -102,7 +109,7 @@ try {
     const email = state.devEmail;
     await page.goto(verifyUrl, { waitUntil: "networkidle" });
     await shot(page, "verify");
-    await page.click('button:has-text("Bekräfta e-postadressen")');
+    await submit(page, 'button:has-text("Bekräfta e-postadressen")');
     await expectUrl(page, /\/login\?verified=1/, "verify → login?verified=1");
     await loginViaForm(page, email, password);
     await expectUrl(page, /\/admin/, "login efter verifiering");
@@ -112,8 +119,7 @@ try {
     const siteName = `E2E Testsajt ${Date.now().toString(36)}`;
     await page.goto(`${BASE}/admin/sites/new`, { waitUntil: "networkidle" });
     await page.fill('input[name="name"]', siteName);
-    await page.click('button[type="submit"]');
-    await page.waitForLoadState("networkidle");
+    await submit(page, 'button[type="submit"]');
     const url = new URL(page.url());
     const siteId = url.searchParams.get("siteId");
     const apiKey = url.searchParams.get("key");
@@ -182,15 +188,52 @@ try {
     await page.goto(`${BASE}/admin/sites/${siteId}/integration`, { waitUntil: "networkidle" });
     must((await page.textContent("body")).includes("Senaste schema-sync"), "integration visar senaste schema-sync");
 
+    save();
+  }
+
+  if (STAGE === "invite-only") {
+    await loginViaForm(page, state.devEmail, process.env.E2E_PASSWORD);
+    await expectUrl(page, /\/admin/, "login (dev)");
+    const invitee = process.env.INVITEE_EMAIL;
+    state.inviteeEmail = invitee;
+    await page.goto(`${BASE}/admin/sites/${state.siteId}/medlemmar`, { waitUntil: "networkidle" });
+    await shot(page, "members");
+    await page.fill("#invite-email", invitee);
+    await page.selectOption("#invite-role", "editor");
+    await submit(page, 'button[type="submit"]:has-text("Skicka inbjudan")');
+    must(page.url().includes("invited=") && !page.url().includes("mailFailed"), "inbjudan skickad", page.url().replace(BASE, ""));
+    await page.goto(`${BASE}/admin/sites/${state.siteId}/medlemmar`, { waitUntil: "networkidle" });
+    must((await page.textContent("body")).includes(invitee), "väntande inbjudan listas");
+    await shot(page, "members-invited");
+    save();
+  }
+
+  if (STAGE === "edit") {
+    const password = process.env.E2E_PASSWORD;
+    const { siteId } = state;
+    await loginViaForm(page, state.devEmail, password);
+    await expectUrl(page, /\/admin/, "login (dev)");
+    if (!state.apiKey) {
+      // Nyckeln visas bara en gång — skapa en ny via integrationssidan.
+      await page.goto(`${BASE}/admin/sites/${siteId}/integration`, { waitUntil: "networkidle" });
+      await page.fill("#keyName", "E2E-nyckel");
+      await submit(page, 'button:has-text("Skapa nyckel")');
+      state.apiKey = new URL(page.url()).searchParams.get("newKey");
+      must(Boolean(state.apiKey), "ny API-nyckel via integrationssidan");
+      save();
+    }
+    const apiKey = state.apiKey;
+
     // Redigera ett fält i panelen → syns i API:t
     await page.goto(`${BASE}/admin/sites/${siteId}/pages`, { waitUntil: "networkidle" });
     await shot(page, "pages");
     const pageBody = await page.textContent("body");
     must(pageBody.includes("Startsida") && pageBody.includes("Kontakt"), "sidlistan visar synkade sidor");
     await page.click('a:has-text("Startsida")');
+    await page.waitForURL(/\/pages\/[0-9a-f-]{36}/, { timeout: 20000 });
     await page.waitForLoadState("networkidle");
     await shot(page, "page-editor");
-    const input = page.getByLabel("Rubrik", { exact: true }).first();
+    const input = page.getByRole("textbox", { name: /^Rubrik\b/ }).first();
     await input.fill("Rubrik ändrad av E2E");
     await page.click('button:has-text("Spara")');
     await page.waitForTimeout(2500);
@@ -202,21 +245,17 @@ try {
     // Lägg till fält via panelen (owner)
     await page.fill("#new-field-key", "hero.cta");
     await page.fill("#new-field-label", "Knapptext");
-    await page.click('button:has-text("Lägg till fält")');
-    await page.waitForLoadState("networkidle");
+    await submit(page, 'button:has-text("Lägg till fält")');
     must(page.url().includes("created=1"), "owner kan lägga till fält", page.url().replace(BASE, ""));
 
     // Integration: revalidate-URL + hemlighet + anslutningstest
     await page.goto(`${BASE}/admin/sites/${siteId}/integration`, { waitUntil: "networkidle" });
     await page.fill('input[name="revalidateUrl"]', "https://postman-echo.com/post");
-    await page.click('button:has-text("Spara revalidate-URL")');
-    await page.waitForLoadState("networkidle");
+    await submit(page, 'button:has-text("Spara revalidate-URL")');
     page.once("dialog", (d) => d.accept());
-    await page.click('button:has-text("enerera hemlighet")');
-    await page.waitForLoadState("networkidle");
+    await submit(page, 'button:has-text("enerera hemlighet")');
     must(page.url().includes("newSecret="), "revalidate-hemlighet genererad");
-    await page.click('button:has-text("Testa anslutningen")');
-    await page.waitForLoadState("networkidle");
+    await submit(page, 'button:has-text("Testa anslutningen")');
     await shot(page, "connection-check");
     must(page.url().includes("check=ok"), "anslutningstest ok", page.url().replace(BASE, "").slice(0, 120));
 
@@ -225,11 +264,11 @@ try {
     state.inviteeEmail = invitee;
     await page.goto(`${BASE}/admin/sites/${siteId}/medlemmar`, { waitUntil: "networkidle" });
     await shot(page, "members");
-    await page.fill('input[name="email"]', invitee);
-    await page.selectOption('select[name="role"]', "editor");
-    await page.click('button[type="submit"]:has-text("Bjud in")');
-    await page.waitForLoadState("networkidle");
+    await page.fill("#invite-email", invitee);
+    await page.selectOption("#invite-role", "editor");
+    await submit(page, 'button[type="submit"]:has-text("Skicka inbjudan")');
     must(page.url().includes("invited=") && !page.url().includes("mailFailed"), "inbjudan skickad", page.url().replace(BASE, ""));
+    await page.goto(`${BASE}/admin/sites/${siteId}/medlemmar`, { waitUntil: "networkidle" });
     must((await page.textContent("body")).includes(invitee), "väntande inbjudan listas");
     await shot(page, "members-invited");
     save();
@@ -244,7 +283,7 @@ try {
     must(body.includes(state.siteName), "inbjudan visar sajtens namn");
     await page.fill('input[name="name"]', "E2E Redaktör");
     await page.fill('input[name="password"]', password);
-    await page.click('button[type="submit"]:has-text("Acceptera")');
+    await submit(page, 'button[type="submit"]:has-text("Acceptera")');
     await expectUrl(page, new RegExp(`/admin/sites/${state.siteId}`), "accept → inloggad på sajten");
     await shot(page, "editor-dashboard");
     const nav = await page.textContent("body");
@@ -254,8 +293,9 @@ try {
     await page.goto(`${BASE}/admin/sites/${state.siteId}/pages`, { waitUntil: "networkidle" });
     must(!(await page.textContent("body")).includes("Skapa sida"), "redaktör ser inte Ny sida");
     await page.click('a:has-text("Startsida")');
+    await page.waitForURL(/\/pages\/[0-9a-f-]{36}/, { timeout: 20000 });
     await page.waitForLoadState("networkidle");
-    const input = page.getByLabel("Underrubrik", { exact: true }).first();
+    const input = page.getByRole("textbox", { name: /^Underrubrik\b/ }).first();
     await input.fill("Redaktören var här");
     await page.click('button:has-text("Spara")');
     await page.waitForTimeout(2500);
@@ -268,7 +308,7 @@ try {
   if (STAGE === "forgot") {
     await page.goto(`${BASE}/forgot`, { waitUntil: "networkidle" });
     await page.fill('input[name="email"]', state.devEmail);
-    await page.click('button[type="submit"]');
+    await submit(page, 'button[type="submit"]');
     await expectUrl(page, /\/forgot\?sent=1/, "glömt lösenord → mejl skickat");
   }
 
@@ -279,7 +319,7 @@ try {
     await shot(page, "reset");
     await page.fill('input[name="password"]', newPassword);
     await page.fill('input[name="confirmPassword"]', newPassword);
-    await page.click('button[type="submit"]');
+    await submit(page, 'button[type="submit"]');
     await expectUrl(page, /\/admin/, "reset → inloggad");
     await page.goto(`${BASE}/logout`, { waitUntil: "networkidle" }).catch(() => {});
     await context.clearCookies();
@@ -296,16 +336,14 @@ try {
     await page.goto(`${BASE}/admin/sites/${state.siteId}/installningar`, { waitUntil: "networkidle" });
     await page.fill("#confirmName", state.siteName);
     page.once("dialog", (d) => d.accept());
-    await page.click('button:has-text("Ta bort sajten")');
-    await page.waitForLoadState("networkidle");
+    await submit(page, 'button:has-text("Ta bort sajten")');
     must(page.url().includes("removedSite="), "testsajten borttagen", page.url().replace(BASE, ""));
     const gone = await api(context, "GET", `/api/v1/sites/${state.slug}/health`, { key: state.apiKey });
     must(gone.status === 404, "sajten finns inte i API:t längre", `status ${gone.status}`);
     await page.goto(`${BASE}/admin/konto`, { waitUntil: "networkidle" });
     await page.fill("#confirmEmail", state.devEmail);
     page.once("dialog", (d) => d.accept());
-    await page.click('button:has-text("Avsluta kontot")');
-    await page.waitForLoadState("networkidle");
+    await submit(page, 'button:has-text("Avsluta kontot")');
     must(page.url().includes("closed=1"), "dev-kontot avslutat", page.url().replace(BASE, ""));
     await context.clearCookies();
     if (state.inviteeEmail && process.env.INVITEE_PASSWORD) {
@@ -314,8 +352,7 @@ try {
       await page.goto(`${BASE}/admin/konto`, { waitUntil: "networkidle" });
       await page.fill("#confirmEmail", state.inviteeEmail);
       page.once("dialog", (d) => d.accept());
-      await page.click('button:has-text("Avsluta kontot")');
-      await page.waitForLoadState("networkidle");
+      await submit(page, 'button:has-text("Avsluta kontot")');
       must(page.url().includes("closed=1"), "redaktörskontot avslutat", page.url().replace(BASE, ""));
     }
   }
