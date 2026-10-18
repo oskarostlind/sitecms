@@ -17,6 +17,8 @@ import { markdownToHtml } from "@/lib/markdown";
  *   html  richtext blocks: `value` rendered from markdown, ready to drop into
  *         the page (formatting written in the editor shows up as formatting
  *         instead of literal ** characters)
+ *   label, help  editor label/help text (usually from schema sync), or null
+ * Pages likewise carry `description` (or null).
  */
 export async function GET(
   request: Request,
@@ -65,12 +67,15 @@ export async function GET(
     pages: sitePages.map((page) => ({
       slug: page.slug,
       title: page.title,
+      description: page.description,
       blocks: (blocksByPageId.get(page.id) ?? []).map((block) => ({
         key: block.key,
         type: block.type,
         value: block.value,
         alt: block.type === "image" ? block.alt : null,
         html: block.type === "richtext" ? markdownToHtml(block.value) : null,
+        label: block.label,
+        help: block.help,
       })),
     })),
     services: siteServices.map((service) => ({
