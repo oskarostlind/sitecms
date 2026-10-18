@@ -14,7 +14,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write # npm provenance
 
 jobs:
   publish:
@@ -54,6 +53,6 @@ jobs:
         run: |
           [ -n "$NODE_AUTH_TOKEN" ] || { echo "::error::Secret NPM_TOKEN saknas. Lägg den under Settings → Secrets and variables → Actions → Repository secrets."; exit 1; }
       - if: steps.check.outputs.publish == 'true'
-        run: npm publish --access public --provenance
+        run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
