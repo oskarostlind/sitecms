@@ -26,6 +26,7 @@ const wanted = process.argv.slice(2);
 const files = readdirSync(dir).filter((f) => f.endsWith(".ts") && f !== "index.ts");
 let failed = 0;
 
+async function main() {
 for (const file of files) {
   const slug = file.replace(/\.ts$/, "");
   if (wanted.length && !wanted.includes(slug)) continue;
@@ -73,4 +74,6 @@ for (const file of files) {
   }
   for (const w of warn) console.log(`   ⚠ ${w}`);
 }
-process.exit(failed ? 1 : 0);
+}
+
+main().then(() => process.exit(failed ? 1 : 0));
