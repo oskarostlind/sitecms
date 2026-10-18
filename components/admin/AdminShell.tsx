@@ -94,6 +94,10 @@ export type AdminShellProps = {
 const focusRing =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50";
 
+/** Fokusring på mörk yta (sidomeny, mobil-topbar): ljusare mint för tydlig kontrast mot space-900. */
+const focusRingDark =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/70";
+
 function isPathActive(pathname: string, href: string, exact?: boolean) {
   if (exact) return pathname === href;
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -194,7 +198,7 @@ export default function AdminShell({ user, sites, ownedSiteIds, logoutAction, ch
         {/* Desktop-sidebar */}
         <aside
           aria-label="Huvudmeny"
-          className="sticky top-0 hidden h-dvh w-[260px] shrink-0 self-start border-r border-neutral-200 bg-white md:block"
+          className="sticky top-0 hidden h-dvh w-[260px] shrink-0 self-start border-r border-white/10 bg-space-900 bg-linear-to-b from-space-900 to-space-950 text-ink md:block"
         >
           <SidebarContent {...sidebarProps} />
         </aside>
@@ -204,7 +208,7 @@ export default function AdminShell({ user, sites, ownedSiteIds, logoutAction, ch
           aria-hidden
           onClick={() => closeDrawer()}
           className={cn(
-            "fixed inset-0 z-30 bg-neutral-900/40 transition-opacity duration-200 md:hidden",
+            "fixed inset-0 z-30 bg-space-950/60 backdrop-blur-[2px] transition-opacity duration-200 md:hidden",
             drawerOpen ? "opacity-100" : "pointer-events-none opacity-0",
           )}
         />
@@ -216,7 +220,7 @@ export default function AdminShell({ user, sites, ownedSiteIds, logoutAction, ch
           aria-label="Meny"
           inert={!drawerOpen}
           className={cn(
-            "fixed inset-y-0 left-0 z-40 w-[280px] max-w-[85vw] border-r border-neutral-200 bg-white shadow-xl transition-transform duration-200 ease-out md:hidden",
+            "fixed inset-y-0 left-0 z-40 w-[280px] max-w-[85vw] border-r border-white/10 bg-space-900 bg-linear-to-b from-space-900 to-space-950 text-ink shadow-2xl shadow-black/50 transition-transform duration-200 ease-out md:hidden",
             drawerOpen ? "translate-x-0" : "-translate-x-full",
           )}
         >
@@ -226,9 +230,9 @@ export default function AdminShell({ user, sites, ownedSiteIds, logoutAction, ch
         {/* Innehåll */}
         <div className="flex min-w-0 flex-1 flex-col">
           {/* Mobil-topbar */}
-          <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-2 border-b border-neutral-200 bg-white/90 px-4 backdrop-blur md:hidden">
-            <Link href="/admin" className={cn("rounded-md", focusRing)}>
-              <Logo size={26} />
+          <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-2 border-b border-white/10 bg-space-900/95 px-4 text-ink backdrop-blur md:hidden">
+            <Link href="/admin" className={cn("rounded-md", focusRingDark)}>
+              <Logo size={26} tone="dark" />
             </Link>
             <div className="flex items-center gap-1">
               {viewUrl ? (
@@ -238,8 +242,8 @@ export default function AdminShell({ user, sites, ownedSiteIds, logoutAction, ch
                   rel="noopener noreferrer"
                   aria-label="Visa sajten (öppnas i ny flik)"
                   className={cn(
-                    "flex size-10 items-center justify-center rounded-lg text-neutral-600 transition-colors duration-150 hover:bg-neutral-100 hover:text-neutral-900",
-                    focusRing,
+                    "flex size-10 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-white/5 hover:text-ink",
+                    focusRingDark,
                   )}
                 >
                   <ExternalLink aria-hidden className="size-5" />
@@ -253,8 +257,8 @@ export default function AdminShell({ user, sites, ownedSiteIds, logoutAction, ch
                 aria-expanded={drawerOpen}
                 aria-controls="admin-mobile-drawer"
                 className={cn(
-                  "flex size-10 items-center justify-center rounded-lg text-neutral-700 transition-colors duration-150 hover:bg-neutral-100",
-                  focusRing,
+                  "flex size-10 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-white/5 hover:text-ink",
+                  focusRingDark,
                 )}
               >
                 {drawerOpen ? <X aria-hidden className="size-5" /> : <Menu aria-hidden className="size-5" />}
@@ -351,8 +355,8 @@ function SidebarContent({
   return (
     <div className="flex h-full flex-col">
       <div className="flex h-14 shrink-0 items-center justify-between gap-2 px-5">
-        <Link href="/admin" onClick={onNavigate} className={cn("rounded-md", focusRing)}>
-          <Logo size={26} />
+        <Link href="/admin" onClick={onNavigate} className={cn("rounded-md", focusRingDark)}>
+          <Logo size={26} tone="dark" />
         </Link>
         {onClose ? (
           <button
@@ -360,8 +364,8 @@ function SidebarContent({
             onClick={onClose}
             aria-label="Stäng meny"
             className={cn(
-              "-mr-2 flex size-9 items-center justify-center rounded-md text-neutral-500 transition-colors duration-150 hover:bg-neutral-100 hover:text-neutral-900",
-              focusRing,
+              "-mr-2 flex size-9 items-center justify-center rounded-md text-ink-muted transition-colors duration-150 hover:bg-white/5 hover:text-ink",
+              focusRingDark,
             )}
           >
             <X aria-hidden className="size-5" />
@@ -379,7 +383,7 @@ function SidebarContent({
             onNavigate={onNavigate}
           />
           {!activeSiteId && sites.length > 1 ? (
-            <p className="mt-2 px-1 text-xs text-neutral-500">Välj en sajt för att börja</p>
+            <p className="mt-2 px-1 text-xs text-ink-muted">Välj en sajt för att börja</p>
           ) : null}
         </div>
       ) : null}
@@ -426,7 +430,7 @@ function SidebarContent({
           <nav aria-labelledby={adminHeadingId} className="mt-6">
             <p
               id={adminHeadingId}
-              className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-neutral-500"
+              className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-ink-muted"
             >
               Admin
             </p>
@@ -447,7 +451,7 @@ function SidebarContent({
         ) : null}
       </div>
 
-      <div className="shrink-0 border-t border-neutral-200 p-3">
+      <div className="shrink-0 border-t border-white/10 p-3">
         <UserMenu user={user} pathname={pathname} logoutAction={logoutAction} onNavigate={onNavigate} />
       </div>
     </div>
@@ -473,14 +477,20 @@ function NavLink({
       onClick={onNavigate}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors duration-150",
-        focusRing,
+        "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors duration-150",
+        focusRingDark,
         active
-          ? "bg-brand-50 font-medium text-brand-700"
-          : "text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900",
+          ? "bg-brand-400/10 font-medium text-brand-300 before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-full before:bg-brand-400"
+          : "text-ink-muted hover:bg-white/5 hover:text-ink",
       )}
     >
-      <Icon aria-hidden className={cn("size-4 shrink-0", active ? "text-brand-600" : "text-neutral-500")} />
+      <Icon
+        aria-hidden
+        className={cn(
+          "size-4 shrink-0 transition-colors duration-150",
+          active ? "text-brand-400" : "text-ink-subtle group-hover:text-ink",
+        )}
+      />
       <span className="truncate">{label}</span>
     </Link>
   );
@@ -546,11 +556,11 @@ function SiteSwitcher({
   if (!isAdmin && sites.length === 1) {
     const only = sites[0];
     return (
-      <div className="flex items-center gap-2.5 rounded-lg border border-neutral-200 bg-neutral-50 px-2.5 py-2">
+      <div className="flex items-center gap-2.5 rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-2">
         <Avatar name={only.name} size={28} className="rounded-md" />
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-neutral-900">{only.name}</p>
-          {only.domain ? <p className="truncate text-xs text-neutral-500">{displayDomain(only.domain)}</p> : null}
+          <p className="truncate text-sm font-medium text-ink">{only.name}</p>
+          {only.domain ? <p className="truncate text-xs text-ink-muted">{displayDomain(only.domain)}</p> : null}
         </div>
       </div>
     );
@@ -605,9 +615,9 @@ function SiteSwitcher({
           }
         }}
         className={cn(
-          "flex w-full items-center gap-2.5 rounded-lg border border-neutral-200 bg-white px-2.5 py-2 text-left shadow-sm transition-colors duration-150 hover:bg-neutral-50",
-          focusRing,
-          open && "bg-neutral-50",
+          "flex w-full items-center gap-2.5 rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-2 text-left transition-colors duration-150 hover:border-white/15 hover:bg-white/[0.07]",
+          focusRingDark,
+          open && "border-white/15 bg-white/[0.07]",
         )}
       >
         {current ? (
@@ -615,22 +625,22 @@ function SiteSwitcher({
         ) : (
           <span
             aria-hidden
-            className="inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-dashed border-neutral-300 text-neutral-400"
+            className="inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-dashed border-white/20 text-ink-subtle"
           >
             <LayoutDashboard className="size-3.5" />
           </span>
         )}
         <span className="min-w-0 flex-1">
           <span className="sr-only">Byt sajt. Vald sajt: </span>
-          <span className={cn("block truncate text-sm", current ? "font-medium text-neutral-900" : "text-neutral-500")}>
+          <span className={cn("block truncate text-sm", current ? "font-medium text-ink" : "text-ink-muted")}>
             {current ? current.name : "Välj sajt…"}
           </span>
         </span>
-        <ChevronsUpDown aria-hidden className="size-4 shrink-0 text-neutral-400" />
+        <ChevronsUpDown aria-hidden className="size-4 shrink-0 text-ink-subtle" />
       </button>
 
       {open ? (
-        <div className="absolute inset-x-0 top-full z-30 mt-1 overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-lg animate-slide-up-fade">
+        <div className="absolute inset-x-0 top-full z-30 mt-1 overflow-hidden rounded-lg border border-white/10 bg-space-800 shadow-xl shadow-black/40 animate-slide-up-fade">
           <div
             ref={listRef}
             id={listId}
@@ -650,33 +660,33 @@ function SiteSwitcher({
                   tabIndex={-1}
                   onClick={select}
                   className={cn(
-                    "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors duration-150 hover:bg-neutral-100 focus:bg-neutral-100 focus-visible:outline-none",
-                    selected && "bg-brand-50/60",
+                    "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors duration-150 hover:bg-white/5 focus:bg-white/[0.08] focus-visible:outline-none",
+                    selected && "bg-brand-400/10",
                   )}
                 >
                   <Avatar name={site.name} size={24} className="rounded-md" />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-neutral-900">{site.name}</span>
-                    <span className="block truncate text-xs text-neutral-500">
+                    <span className="block truncate text-sm font-medium text-ink">{site.name}</span>
+                    <span className="block truncate text-xs text-ink-muted">
                       {site.domain ? displayDomain(site.domain) : "Ingen domän"}
                     </span>
                   </span>
-                  {selected ? <Check aria-hidden className="size-4 shrink-0 text-brand-600" /> : null}
+                  {selected ? <Check aria-hidden className="size-4 shrink-0 text-brand-400" /> : null}
                 </Link>
               );
             })}
           </div>
           {isAdmin ? (
-            <div className="border-t border-neutral-200 p-1">
+            <div className="border-t border-white/10 p-1">
               <Link
                 href="/admin"
                 onClick={select}
                 className={cn(
-                  "flex items-center gap-2 rounded-md px-2 py-2 text-sm text-neutral-700 transition-colors duration-150 hover:bg-neutral-100 hover:text-neutral-900",
-                  focusRing,
+                  "flex items-center gap-2 rounded-md px-2 py-2 text-sm text-ink-muted transition-colors duration-150 hover:bg-white/5 hover:text-ink",
+                  focusRingDark,
                 )}
               >
-                <LayoutDashboard aria-hidden className="size-4 text-neutral-500" />
+                <LayoutDashboard aria-hidden className="size-4 text-ink-subtle" />
                 Alla sajter
               </Link>
             </div>
@@ -718,8 +728,8 @@ function UserMenu({
   const accountActive = isPathActive(pathname, "/admin/konto");
 
   const itemClass = cn(
-    "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm text-neutral-700 transition-colors duration-150 hover:bg-neutral-100 hover:text-neutral-900",
-    focusRing,
+    "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm text-ink-muted transition-colors duration-150 hover:bg-white/5 hover:text-ink",
+    focusRingDark,
   );
 
   return (
@@ -739,7 +749,7 @@ function UserMenu({
         <div
           ref={menuRef}
           id={menuId}
-          className="absolute inset-x-0 bottom-full z-30 mb-1 rounded-lg border border-neutral-200 bg-white p-1 shadow-lg animate-slide-up-fade"
+          className="absolute inset-x-0 bottom-full z-30 mb-1 rounded-lg border border-white/10 bg-space-800 p-1 shadow-xl shadow-black/40 animate-slide-up-fade"
         >
           <Link
             href="/admin/konto"
@@ -748,14 +758,14 @@ function UserMenu({
               setOpen(false);
               onNavigate?.();
             }}
-            className={cn(itemClass, accountActive && "bg-brand-50 text-brand-700")}
+            className={cn(itemClass, accountActive && "bg-brand-400/10 text-brand-300")}
           >
-            <UserRound aria-hidden className={cn("size-4", accountActive ? "text-brand-600" : "text-neutral-500")} />
+            <UserRound aria-hidden className={cn("size-4", accountActive ? "text-brand-400" : "text-ink-subtle")} />
             Mitt konto
           </Link>
           <form action={logoutAction}>
             <button type="submit" className={itemClass}>
-              <LogOut aria-hidden className="size-4 text-neutral-500" />
+              <LogOut aria-hidden className="size-4 text-ink-subtle" />
               Logga ut
             </button>
           </form>
@@ -770,19 +780,19 @@ function UserMenu({
         aria-label={`Kontomeny för ${displayName}`}
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          "flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors duration-150 hover:bg-neutral-100",
-          focusRing,
-          open && "bg-neutral-100",
+          "flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors duration-150 hover:bg-white/5",
+          focusRingDark,
+          open && "bg-white/5",
         )}
       >
         <Avatar name={displayName} size={32} />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium text-neutral-900">{user.name || "Mitt konto"}</span>
-          <span className="block truncate text-xs text-neutral-500">{user.email}</span>
+          <span className="block truncate text-sm font-medium text-ink">{user.name || "Mitt konto"}</span>
+          <span className="block truncate text-xs text-ink-muted">{user.email}</span>
         </span>
         <ChevronUp
           aria-hidden
-          className={cn("size-4 shrink-0 text-neutral-400 transition-transform duration-150", open && "rotate-180")}
+          className={cn("size-4 shrink-0 text-ink-subtle transition-transform duration-150", open && "rotate-180")}
         />
       </button>
     </div>

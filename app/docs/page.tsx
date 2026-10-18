@@ -1,7 +1,14 @@
 import Link from "next/link";
 import { ArrowRight, BookOpen, KeyRound, Package, RefreshCw, UserPlus, Workflow } from "lucide-react";
-import { CodeBlock } from "@/components/admin/CodeBlock";
-import { Badge, ButtonLink, Card, CardContent } from "@/components/ui";
+import { CodeBlock as AdminCodeBlock, type CodeBlockProps } from "@/components/admin/CodeBlock";
+import { Card, CardContent } from "@/components/ui";
+import {
+  lightLinkClassName,
+  pillClassName,
+  spaceCodeBlockClassName,
+  SpaceBreadcrumbs,
+  SpaceHero,
+} from "@/components/guides/GuideShell";
 import { JsonLd } from "@/components/JsonLd";
 import { absoluteUrl, breadcrumbJsonLd, SITE_URL } from "@/lib/seo";
 import {
@@ -247,8 +254,13 @@ const QUICKSTART = [
   },
 ];
 
+/** Kodrutor i rymdnavy på docs (samma ram som header/footer). */
+function CodeBlock({ className, ...props }: CodeBlockProps) {
+  return <AdminCodeBlock {...props} className={className ? `${spaceCodeBlockClassName} ${className}` : spaceCodeBlockClassName} />;
+}
+
 function DocLink({ href, children }: { href: string; children: React.ReactNode }) {
-  const className = "font-medium text-brand-600 underline-offset-2 hover:text-brand-700 hover:underline";
+  const className = lightLinkClassName;
   return href.startsWith("/") ? (
     <Link href={href} className={className}>
       {children}
@@ -274,9 +286,9 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section id={id} aria-labelledby={`${id}-rubrik`} className="scroll-mt-24 border-t border-neutral-200 pt-12">
+    <section id={id} aria-labelledby={`${id}-rubrik`} className="scroll-mt-28 border-t border-neutral-200 pt-12">
       {eyebrow ? (
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-brand-600">{eyebrow}</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-700">{eyebrow}</p>
       ) : null}
       <h2 id={`${id}-rubrik`} className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">
         {title}
@@ -289,7 +301,7 @@ function Section({
 
 function SubSection({ id, title, children }: { id: string; title: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div id={id} className="scroll-mt-24 space-y-4">
+    <div id={id} className="scroll-mt-28 space-y-4">
       <h3 className="text-lg font-semibold tracking-tight">{title}</h3>
       {children}
     </div>
@@ -309,7 +321,7 @@ function MethodBadge({ method }: { method: "GET" | "POST" }) {
     <span
       className={
         "inline-flex h-6 items-center rounded-md px-2 font-mono text-xs font-semibold " +
-        (method === "GET" ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" : "bg-brand-50 text-brand-700 ring-1 ring-brand-200")
+        (method === "GET" ? "bg-brand-50 text-brand-800 ring-1 ring-brand-200" : "bg-space-900 text-brand-300 ring-1 ring-space-700")
       }
     >
       {method}
@@ -333,7 +345,7 @@ function Endpoint({
   children?: React.ReactNode;
 }) {
   return (
-    <Card id={id} className="scroll-mt-24">
+    <Card id={id} className="scroll-mt-28">
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <h3 className="text-lg font-semibold tracking-tight">{title}</h3>
@@ -413,7 +425,7 @@ const DOCS_MODIFIED = "2026-10-18";
 
 export default function DocsPage() {
   return (
-    <main className="px-6">
+    <main>
       <JsonLd
         nodes={[
           {
@@ -436,32 +448,32 @@ export default function DocsPage() {
         ]}
       />
       {/* Hero */}
-      <section className="relative overflow-hidden pt-14 pb-12 sm:pt-20">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(ellipse_at_top,_var(--color-brand-50)_0%,_transparent_65%)]"
-        />
-        <div className="mx-auto max-w-3xl text-center">
-          <Badge tone="brand">För utvecklare</Badge>
-          <h1 className="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl">
+      <SpaceHero planet="corner" innerClassName="pb-16 pt-8 sm:pb-24 sm:pt-10">
+        <SpaceBreadcrumbs items={[{ label: "sitecms", href: "/" }, { label: "Dokumentation" }]} />
+        <div className="mx-auto mt-10 max-w-3xl text-center sm:mt-12">
+          <span className="inline-flex items-center gap-2 rounded-full border border-brand-400/25 bg-brand-400/10 px-3 py-1 text-xs font-semibold text-brand-300">
+            För utvecklare
+          </span>
+          <h1 className="mt-5 text-balance text-4xl font-extrabold tracking-[-0.02em] text-ink sm:text-5xl sm:leading-[1.05]">
             Koppla en Next.js-sajt till sitecms
           </h1>
-          <p className="mx-auto mt-5 max-w-xl text-base text-neutral-500 sm:text-lg">
+          <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-ink-muted sm:text-lg">
             Deklarera vilka fält sajten har, hämta innehållet med en typad klient utan beroenden och låt kunden
             redigera själv. Allt går att sätta upp utan att prata med oss.
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <ButtonLink href="#kom-igang" size="lg" className="w-full sm:w-auto" icon={<BookOpen />}>
+            <a href="#kom-igang" className={pillClassName({ size: "lg", className: "w-full sm:w-auto" })}>
+              <BookOpen aria-hidden />
               Kom igång
-            </ButtonLink>
-            <ButtonLink href="#api" variant="secondary" size="lg" className="w-full sm:w-auto">
+            </a>
+            <a href="#api" className={pillClassName({ variant: "outline", size: "lg", className: "w-full sm:w-auto" })}>
               API-referens
-            </ButtonLink>
+            </a>
           </div>
         </div>
-      </section>
+      </SpaceHero>
 
-      <div className="mx-auto grid max-w-6xl gap-10 pb-24 lg:grid-cols-[220px_minmax(0,1fr)]">
+      <div className="mx-auto grid max-w-6xl gap-10 px-4 pb-24 pt-10 sm:px-6 lg:grid-cols-[220px_minmax(0,1fr)]">
         <aside className="hidden lg:block">
           <div className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto pr-2">
             <Toc />
@@ -469,7 +481,7 @@ export default function DocsPage() {
         </aside>
 
         <div className="min-w-0 space-y-12">
-          <details className="rounded-xl border border-neutral-200 bg-white px-5 py-3 shadow-sm lg:hidden">
+          <details className="rounded-2xl border border-neutral-200 bg-white px-5 py-3 shadow-sm lg:hidden">
             <summary className="cursor-pointer text-sm font-medium text-neutral-800">Innehåll</summary>
             <div className="pt-3">
               <Toc />
@@ -489,7 +501,7 @@ export default function DocsPage() {
                   <Card className="h-full">
                     <CardContent className="space-y-3">
                       <div className="flex items-center gap-3">
-                        <span className="flex size-8 items-center justify-center rounded-full bg-brand-600 text-sm font-semibold text-white">
+                        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-space-900 text-sm font-bold text-brand-400 ring-1 ring-space-700">
                           {index + 1}
                         </span>
                         <h3 className="text-base font-semibold tracking-tight">{step.title}</h3>
@@ -844,7 +856,7 @@ export default function DocsPage() {
               <CodeBlock code={HEALTH_RESPONSE} filename="200 OK" language="json" maxHeight={null} />
             </Endpoint>
 
-            <Card id="api-webhook" className="scroll-mt-24">
+            <Card id="api-webhook" className="scroll-mt-28">
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <h3 className="text-lg font-semibold tracking-tight">Revalidate-webhook (sitecms → din sajt)</h3>
@@ -961,17 +973,23 @@ export default function DocsPage() {
             </SubSection>
           </Section>
 
-          <Card>
-            <CardContent className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center sm:p-8">
+          <aside className="relative isolate overflow-hidden rounded-2xl border border-white/10 bg-space-900 p-6 text-ink shadow-[0_30px_80px_-40px_rgba(4,6,15,0.8)] sm:p-8">
+            <div aria-hidden className="sc-stars pointer-events-none absolute inset-0 -z-10 opacity-40" />
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(120%_140%_at_50%_0%,rgba(93,240,168,0.12),transparent_55%)]"
+            />
+            <div className="flex flex-col items-start justify-between gap-5 sm:flex-row sm:items-center">
               <div>
-                <h2 className="text-xl font-semibold tracking-tight">Redo att koppla din första sajt?</h2>
-                <p className="mt-1 text-sm text-neutral-500">Skapa ett konto — det tar under en minut.</p>
+                <h2 className="text-xl font-extrabold tracking-[-0.02em] sm:text-2xl">Redo att koppla din första sajt?</h2>
+                <p className="mt-1 text-sm text-ink-muted">Skapa ett konto — det tar under en minut.</p>
               </div>
-              <ButtonLink href="/signup" size="lg" icon={<ArrowRight />}>
+              <Link href="/signup" className={pillClassName({ size: "lg" })}>
                 Skapa konto
-              </ButtonLink>
-            </CardContent>
-          </Card>
+                <ArrowRight aria-hidden />
+              </Link>
+            </div>
+          </aside>
         </div>
       </div>
     </main>

@@ -531,7 +531,7 @@ export default function PageBlockEditor({
                       href={pageUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 rounded-md text-sm text-brand-600 underline-offset-2 hover:text-brand-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50 focus-visible:ring-offset-2"
+                      className="inline-flex items-center gap-1 rounded-md text-sm text-brand-700 underline-offset-2 hover:text-brand-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50 focus-visible:ring-offset-2"
                     >
                       Visa sidan
                       <ExternalLink aria-hidden className="size-3.5" />

@@ -69,7 +69,7 @@ html.lenis, html.lenis body { height: auto }
 /* z-index: .hero-inner flyttas upp 10vh och skulle annars täcka nav-länkarna (klick). */
 .landing .nav { position: relative; z-index: 2; width: 100%; max-width: var(--maxw); margin: 0 auto; padding: 22px 24px; display: flex; align-items: center; justify-content: space-between; gap: 24px }
 .landing .brand { display: inline-flex; align-items: center; gap: 9px; font-weight: 800; font-size: 19px; letter-spacing: .16em }
-.landing .brand-mark { color: var(--accent); font-size: 14px; transform: translateY(-1px) }
+.landing .brand-mark { flex: none; transform: translateY(-1px) }
 .landing .nav-links { display: flex; align-items: center; gap: 30px; font-size: 14.5px; color: var(--muted) }
 .landing .nav-links a { transition: color .2s ease }
 .landing .nav-links a:hover { color: var(--ink) }

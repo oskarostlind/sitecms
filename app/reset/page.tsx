@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { NOINDEX } from "@/lib/seo";
 import { peekToken } from "@/lib/tokens";
 import { resetPasswordWithTokenAction } from "@/lib/actions/auth";
-import { AuthLink, AuthShell } from "@/components/auth/AuthShell";
+import { AuthLink, AuthShell, authInputClassName } from "@/components/auth/AuthShell";
 import { Alert, ButtonLink, Field, Input, SubmitButton } from "@/components/ui";
 
 export const metadata: Metadata = {
@@ -36,7 +36,7 @@ export default async function ResetPage({
           </p>
         }
       >
-        <ButtonLink href="/forgot" size="lg" className="w-full">
+        <ButtonLink href="/forgot" size="lg" className="w-full rounded-full!">
           Skicka en ny länk
         </ButtonLink>
       </AuthShell>
@@ -61,6 +61,7 @@ export default async function ResetPage({
 
         <Field htmlFor="password" label="Nytt lösenord" hint="Minst 10 tecken.">
           <Input
+            className={authInputClassName}
             id="password"
             name="password"
             type="password"
@@ -73,6 +74,7 @@ export default async function ResetPage({
 
         <Field htmlFor="confirmPassword" label="Upprepa lösenordet">
           <Input
+            className={authInputClassName}
             id="confirmPassword"
             name="confirmPassword"
             type="password"
@@ -84,7 +86,7 @@ export default async function ResetPage({
 
         {errorMessage ? <Alert tone="danger">{errorMessage}</Alert> : null}
 
-        <SubmitButton size="lg" className="w-full" pendingText="Sparar…">
+        <SubmitButton size="lg" className="w-full rounded-full!" pendingText="Sparar…">
           Spara och logga in
         </SubmitButton>
       </form>

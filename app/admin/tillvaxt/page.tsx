@@ -41,7 +41,7 @@ function Bars({ rows, total, empty }: { rows: Row[]; total: number; empty: strin
               </span>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-neutral-100">
-              <div className="h-full rounded-full bg-brand-500" style={{ width: `${Math.max(pct, 2)}%` }} />
+              <div className="h-full rounded-full bg-brand-600" style={{ width: `${Math.max(pct, 2)}%` }} />
             </div>
           </li>
         );

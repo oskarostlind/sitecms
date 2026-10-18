@@ -4,7 +4,7 @@ import { MailCheck } from "lucide-react";
 import { auth, googleAuthEnabled } from "@/lib/auth";
 import { signupAction, resendVerificationAction } from "@/lib/actions/auth";
 import { safeCallbackPath } from "@/lib/account-flows";
-import { AuthLink, AuthShell, GoogleSignInButton } from "@/components/auth/AuthShell";
+import { AuthLink, AuthShell, GoogleSignInButton, authInputClassName } from "@/components/auth/AuthShell";
 import { Alert, Field, Input, SubmitButton } from "@/components/ui";
 
 export const metadata: Metadata = {
@@ -63,7 +63,7 @@ export default async function SignupPage({
           <form action={resendVerificationAction}>
             <input type="hidden" name="email" value={email ?? ""} />
             <input type="hidden" name="returnTo" value="signup" />
-            <SubmitButton variant="secondary" className="w-full" pendingText="Skickar…">
+            <SubmitButton variant="secondary" className="w-full rounded-full!" pendingText="Skickar…">
               Skicka ny bekräftelse
             </SubmitButton>
           </form>
@@ -94,6 +94,7 @@ export default async function SignupPage({
       <form action={signupAction} className="space-y-4">
         <Field htmlFor="name" label="Namn">
           <Input
+            className={authInputClassName}
             id="name"
             name="name"
             type="text"
@@ -107,6 +108,7 @@ export default async function SignupPage({
 
         <Field htmlFor="email" label="E-post">
           <Input
+            className={authInputClassName}
             id="email"
             name="email"
             type="email"
@@ -119,6 +121,7 @@ export default async function SignupPage({
 
         <Field htmlFor="password" label="Lösenord" hint="Minst 10 tecken.">
           <Input
+            className={authInputClassName}
             id="password"
             name="password"
             type="password"
@@ -131,7 +134,7 @@ export default async function SignupPage({
 
         {errorMessage ? <Alert tone="danger">{errorMessage}</Alert> : null}
 
-        <SubmitButton size="lg" className="w-full" pendingText="Skapar konto…">
+        <SubmitButton size="lg" className="w-full rounded-full!" pendingText="Skapar konto…">
           Skapa konto
         </SubmitButton>
       </form>

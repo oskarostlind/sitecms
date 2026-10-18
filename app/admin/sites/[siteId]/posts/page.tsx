@@ -91,7 +91,7 @@ export default async function PostsPage({
                   )}
                 >
                   {filter.label}
-                  <span className={cn("tabular-nums", active ? "text-brand-600" : "text-neutral-400")}>
+                  <span className={cn("tabular-nums", active ? "text-brand-700" : "text-neutral-500")}>
                     ({filter.count})
                   </span>
                 </Link>

@@ -4,7 +4,7 @@ import { loginAction } from "@/lib/auth-actions";
 import { resendVerificationAction } from "@/lib/actions/auth";
 import { googleAuthEnabled } from "@/lib/auth";
 import { safeCallbackPath } from "@/lib/account-flows";
-import { AuthLink, AuthShell, GoogleSignInButton } from "@/components/auth/AuthShell";
+import { AuthLink, AuthShell, GoogleSignInButton, authInputClassName } from "@/components/auth/AuthShell";
 import { Alert, Field, Input, SubmitButton } from "@/components/ui";
 
 export const metadata: Metadata = {
@@ -86,7 +86,7 @@ export default async function LoginPage({
               <form action={resendVerificationAction}>
                 <input type="hidden" name="email" value={email ?? ""} />
                 <input type="hidden" name="returnTo" value="login" />
-                <SubmitButton size="sm" variant="secondary" pendingText="Skickar…">
+                <SubmitButton size="sm" variant="secondary" className="rounded-full!" pendingText="Skickar…">
                   Skicka ny bekräftelse
                 </SubmitButton>
               </form>
@@ -102,6 +102,7 @@ export default async function LoginPage({
         {hasCustomCallback ? <input type="hidden" name="callbackUrl" value={callbackUrl} /> : null}
         <Field htmlFor="email" label="E-post">
           <Input
+            className={authInputClassName}
             id="email"
             name="email"
             type="email"
@@ -114,6 +115,7 @@ export default async function LoginPage({
 
         <Field htmlFor="password" label="Lösenord">
           <Input
+            className={authInputClassName}
             id="password"
             name="password"
             type="password"
@@ -129,7 +131,7 @@ export default async function LoginPage({
 
         {errorMessage ? <Alert tone="danger">{errorMessage}</Alert> : null}
 
-        <SubmitButton size="lg" className="w-full" pendingText="Loggar in…">
+        <SubmitButton size="lg" className="w-full rounded-full!" pendingText="Loggar in…">
           Logga in
         </SubmitButton>
       </form>

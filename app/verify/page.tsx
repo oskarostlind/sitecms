@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { NOINDEX } from "@/lib/seo";
 import { peekToken } from "@/lib/tokens";
 import { verifyEmailAction, resendVerificationAction } from "@/lib/actions/auth";
-import { AuthLink, AuthShell } from "@/components/auth/AuthShell";
+import { AuthLink, AuthShell, authInputClassName } from "@/components/auth/AuthShell";
 import { Alert, Field, Input, SubmitButton } from "@/components/ui";
 
 export const metadata: Metadata = {
@@ -53,9 +53,17 @@ export default async function VerifyPage({
           <form action={resendVerificationAction} className="space-y-4">
             <input type="hidden" name="returnTo" value="verify" />
             <Field htmlFor="email" label="E-post">
-              <Input id="email" name="email" type="email" autoComplete="email" required placeholder="namn@exempel.se" />
+              <Input
+                className={authInputClassName}
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                placeholder="namn@exempel.se"
+              />
             </Field>
-            <SubmitButton className="w-full" pendingText="Skickar…">
+            <SubmitButton className="w-full rounded-full!" pendingText="Skickar…">
               Skicka ny bekräftelse
             </SubmitButton>
           </form>
@@ -76,7 +84,7 @@ export default async function VerifyPage({
     >
       <form action={verifyEmailAction}>
         <input type="hidden" name="token" value={token} />
-        <SubmitButton size="lg" className="w-full" pendingText="Bekräftar…">
+        <SubmitButton size="lg" className="w-full rounded-full!" pendingText="Bekräftar…">
           Bekräfta e-postadressen
         </SubmitButton>
       </form>
