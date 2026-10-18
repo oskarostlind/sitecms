@@ -574,7 +574,7 @@ export default function DocsPage() {
               </Prose>
             </SubSection>
 
-            <SubSection id="npm-revalidate" title={<>2. <code className="font-mono">{SNIPPET_FILES.revalidate}</code></>}>
+            <SubSection id="npm-revalidate" title={<>2. <code className="break-all font-mono">{SNIPPET_FILES.revalidate}</code></>}>
               <Prose>
                 <p>
                   En rad. Routen jämför <code>secret</code> med <code>CMS_REVALIDATE_SECRET</code> i konstant tid och tömmer
@@ -585,7 +585,7 @@ export default function DocsPage() {
               <CodeBlock code={npmRevalidateSnippet()} filename={SNIPPET_FILES.revalidate} language="ts" maxHeight={null} />
             </SubSection>
 
-            <SubSection id="npm-config" title={<>3. <code className="font-mono">{SNIPPET_FILES.config}</code></>}>
+            <SubSection id="npm-config" title={<>3. <code className="break-all font-mono">{SNIPPET_FILES.config}</code></>}>
               <Prose>
                 <p>
                   Vilka sidor och fält kunden ska kunna redigera, med etiketter och hjälptexter som syns i panelen.{" "}
@@ -740,7 +740,7 @@ export default function DocsPage() {
             intro={
               <>
                 Bas-URL: <code className="break-all font-mono text-sm">{BASE}</code>. Alla svar är JSON och cachas inte av
-                sitecms (<code className="font-mono text-sm">Cache-Control: private, no-store</code>) — cacha på din sida
+                sitecms (<code className="break-words font-mono text-sm">Cache-Control: private, no-store</code>) — cacha på din sida
                 med <code className="font-mono text-sm">next.tags</code>.
               </>
             }
@@ -917,7 +917,7 @@ export default function DocsPage() {
               </>
             }
           >
-            <SubSection id="kod-klient" title={<code className="font-mono">{SNIPPET_FILES.client}</code>}>
+            <SubSection id="kod-klient" title={<code className="break-all font-mono">{SNIPPET_FILES.client}</code>}>
               <Prose>
                 <p>
                   Typad klient: <code>getContent()</code>, <code>getPosts()</code>, <code>getPost(slug)</code> och
@@ -933,7 +933,7 @@ export default function DocsPage() {
               <CodeBlock code={usageSnippet()} filename="app/page.tsx" language="tsx" />
             </SubSection>
 
-            <SubSection id="kod-revalidate" title={<code className="font-mono">{SNIPPET_FILES.revalidate}</code>}>
+            <SubSection id="kod-revalidate" title={<code className="break-all font-mono">{SNIPPET_FILES.revalidate}</code>}>
               <Prose>
                 <p>
                   Tar emot webhooken från sitecms, jämför hemligheten i konstant tid och tömmer cachetaggen. Ange{" "}
@@ -943,7 +943,7 @@ export default function DocsPage() {
               <CodeBlock code={revalidateRouteSnippet()} filename={SNIPPET_FILES.revalidate} language="ts" />
             </SubSection>
 
-            <SubSection id="kod-config" title={<code className="font-mono">{SNIPPET_FILES.config}</code>}>
+            <SubSection id="kod-config" title={<code className="break-all font-mono">{SNIPPET_FILES.config}</code>}>
               <Prose>
                 <p>
                   Typad deklaration av sidor och fält. Formatet beskrivs under <DocLink href="#schema">Schema-format</DocLink>.
@@ -952,7 +952,7 @@ export default function DocsPage() {
               <CodeBlock code={configSnippet(ctx)} filename={SNIPPET_FILES.config} language="ts" />
             </SubSection>
 
-            <SubSection id="kod-sync" title={<code className="font-mono">{SNIPPET_FILES.sync}</code>}>
+            <SubSection id="kod-sync" title={<code className="break-all font-mono">{SNIPPET_FILES.sync}</code>}>
               <Prose>
                 <p>
                   Läser <code>{SNIPPET_FILES.config}</code>, POST:ar den till <code>…/schema</code> och skriver ut vad som
