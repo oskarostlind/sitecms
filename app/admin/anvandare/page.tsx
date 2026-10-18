@@ -3,9 +3,10 @@ import { KeyRound, Trash2, Users as UsersIcon } from "lucide-react";
 import { db } from "@/lib/db";
 import { memberships, sites, users } from "@/lib/db/schema";
 import { requireAdmin } from "@/lib/admin-guard";
-import { createCustomerUser, deleteUserAction, resetPasswordAction } from "@/lib/actions/users";
+import { deleteUserAction, inviteUserAction, resetPasswordAction } from "@/lib/actions/users";
+import { MEMBERSHIP_ROLE_LABELS } from "@/lib/emails";
+import type { MembershipRole } from "@/lib/db/schema";
 import { ConfirmButton } from "@/components/content/ConfirmButton";
-import { AdminRevealSecret } from "@/components/admin/AdminRevealSecret";
 import { AdminUserForm } from "@/components/admin/AdminUserForm";
 import {
   Alert,
@@ -28,9 +29,13 @@ const ROLE_LABELS: Record<"admin" | "customer", string> = {
 };
 
 const ERROR_MESSAGES: Record<string, string> = {
-  missing: "Fyll i namn och e-post.",
-  "no-site": "Välj minst en sajt för kundanvändaren.",
-  "email-taken": "Det finns redan en användare med den e-postadressen.",
+  missing: "Fyll i en e-postadress.",
+  "invalid-email": "Ange en giltig e-postadress.",
+  "invalid-role": "Välj en roll.",
+  "no-site": "Välj minst en sajt att bjuda in till.",
+  "already-member": "Adressen är redan medlem på alla valda sajter — ingen inbjudan skickades.",
+  "invite-failed": "Ingen inbjudan kunde skapas. Försök igen.",
+  "mail-failed": "Mejlet kunde inte skickas. Kontrollera e-postinställningarna (RESEND_API_KEY/MAIL_FROM) och försök igen.",
   "self-delete": "Du kan inte ta bort ditt eget konto.",
   "last-admin": "Det måste finnas minst en administratör kvar — kan inte ta bort den sista.",
   "not-found": "Hittade ingen sådan användare.",
@@ -41,7 +46,9 @@ type UserRow = {
   name: string;
   email: string;
   role: "admin" | "customer";
-  sites: { id: string; name: string }[];
+  emailVerified: boolean;
+  hasPassword: boolean;
+  sites: { id: string; name: string; role: MembershipRole }[];
 };
 
 export default async function UsersPage({
@@ -49,17 +56,16 @@ export default async function UsersPage({
 }: {
   searchParams: Promise<{
     error?: string;
-    createdUser?: string;
-    createdEmail?: string;
-    resetUser?: string;
-    resetEmail?: string;
-    tempPassword?: string;
+    invited?: string;
+    invitedCount?: string;
+    skipped?: string;
+    mailFailed?: string;
+    resetSent?: string;
     deleted?: string;
   }>;
 }) {
   const admin = await requireAdmin();
-  const { error, createdUser, createdEmail, resetUser, resetEmail, tempPassword, deleted } =
-    await searchParams;
+  const { error, invited, invitedCount, skipped, mailFailed, resetSent, deleted } = await searchParams;
 
   const rows = await db
     .select({
@@ -67,8 +73,11 @@ export default async function UsersPage({
       name: users.name,
       email: users.email,
       role: users.role,
+      emailVerifiedAt: users.emailVerifiedAt,
+      passwordHash: users.passwordHash,
       siteId: sites.id,
       siteName: sites.name,
+      membershipRole: memberships.role,
     })
     .from(users)
     .leftJoin(memberships, eq(memberships.userId, users.id))
@@ -79,11 +88,19 @@ export default async function UsersPage({
   for (const row of rows) {
     let entry = userMap.get(row.userId);
     if (!entry) {
-      entry = { id: row.userId, name: row.name, email: row.email, role: row.role, sites: [] };
+      entry = {
+        id: row.userId,
+        name: row.name,
+        email: row.email,
+        role: row.role,
+        emailVerified: Boolean(row.emailVerifiedAt),
+        hasPassword: Boolean(row.passwordHash),
+        sites: [],
+      };
       userMap.set(row.userId, entry);
     }
-    if (row.siteId && row.siteName) {
-      entry.sites.push({ id: row.siteId, name: row.siteName });
+    if (row.siteId && row.siteName && row.membershipRole) {
+      entry.sites.push({ id: row.siteId, name: row.siteName, role: row.membershipRole });
     }
   }
   const userRows = Array.from(userMap.values());
@@ -92,30 +109,37 @@ export default async function UsersPage({
   const allSites = await db.select().from(sites).orderBy(asc(sites.name));
 
   const errorMessage = error ? (ERROR_MESSAGES[error] ?? "Något gick fel. Försök igen.") : null;
-  const revealTitle = createdUser ? "Tillfälligt lösenord" : "Nytt tillfälligt lösenord";
-  const revealName = createdUser ?? resetUser;
-  const revealEmail = createdEmail ?? resetEmail;
+  const invitedSites = Number(invitedCount ?? "0");
+  const skippedSites = Number(skipped ?? "0");
 
   return (
     <div className="max-w-4xl space-y-6">
-      <PageHeader title="Användare" description="Alla användare i CMS:et och vilka sajter de har åtkomst till." />
+      <PageHeader title="Användare" description="Alla användare i CMS:et, vilka sajter de har åtkomst till och med vilken roll." />
 
       {errorMessage ? <Alert tone="danger">{errorMessage}</Alert> : null}
 
       {deleted === "1" ? <Alert tone="success">Användaren togs bort.</Alert> : null}
 
-      {tempPassword ? (
-        <Alert tone="success" title={revealTitle}>
-          <p className="mb-2">
-            Ge det här lösenordet till {revealName ?? "användaren"} ({revealEmail ?? ""}). De bör byta det direkt
-            efter första inloggningen.
-          </p>
-          <AdminRevealSecret value={tempPassword} variant="inline" />
+      {invited ? (
+        <Alert tone={mailFailed ? "warning" : "success"} title={mailFailed ? "Inbjudan skapad, men mejl misslyckades" : "Inbjudan skickad"}>
+          {invitedSites === 1 ? "En inbjudan" : `${invitedSites} inbjudningar`} till {invited}.
+          {skippedSites > 0
+            ? ` ${skippedSites === 1 ? "En sajt" : `${skippedSites} sajter`} hoppades över eftersom adressen redan är medlem där.`
+            : ""}
+          {mailFailed
+            ? ` ${mailFailed} mejl kunde inte skickas — skicka om från sajtens medlemssida.`
+            : " Den gäller i 7 dagar och syns under Medlemmar på respektive sajt."}
+        </Alert>
+      ) : null}
+
+      {resetSent ? (
+        <Alert tone="success">
+          En länk för att välja nytt lösenord har skickats till {resetSent}. Den gäller i 2 timmar.
         </Alert>
       ) : null}
 
       {userRows.length === 0 ? (
-        <EmptyState icon={<UsersIcon />} title="Inga användare hittades ännu" description="Skapa en kundanvändare nedan." />
+        <EmptyState icon={<UsersIcon />} title="Inga användare hittades ännu" description="Bjud in en användare nedan." />
       ) : (
         <Table>
           <Thead>
@@ -123,7 +147,7 @@ export default async function UsersPage({
               <Th>Namn</Th>
               <Th>E-post</Th>
               <Th>Roll</Th>
-              <Th>Sajter</Th>
+              <Th>Sajter och roller</Th>
               <Th>Åtgärder</Th>
             </Tr>
           </Thead>
@@ -144,7 +168,18 @@ export default async function UsersPage({
                       </span>
                     </div>
                   </Td>
-                  <Td className="whitespace-nowrap text-neutral-700">{row.email}</Td>
+                  <Td className="whitespace-nowrap text-neutral-700">
+                    <div>{row.email}</div>
+                    <div className="mt-0.5 text-xs">
+                      {row.emailVerified ? (
+                        <span className="text-emerald-700">Bekräftad</span>
+                      ) : row.hasPassword ? (
+                        <span className="text-amber-700">Ej bekräftad</span>
+                      ) : (
+                        <span className="text-neutral-500">Inbjuden, ej aktiverad</span>
+                      )}
+                    </div>
+                  </Td>
                   <Td>
                     <Badge tone={row.role === "admin" ? "brand" : "neutral"}>{ROLE_LABELS[row.role]}</Badge>
                   </Td>
@@ -154,8 +189,9 @@ export default async function UsersPage({
                     ) : (
                       <div className="flex flex-wrap gap-1">
                         {row.sites.map((s) => (
-                          <Badge key={s.id} tone="neutral">
+                          <Badge key={s.id} tone={s.role === "owner" ? "brand" : "neutral"} title={MEMBERSHIP_ROLE_LABELS[s.role]}>
                             {s.name}
+                            <span className="font-normal opacity-70">· {MEMBERSHIP_ROLE_LABELS[s.role]}</span>
                           </Badge>
                         ))}
                       </div>
@@ -169,11 +205,11 @@ export default async function UsersPage({
                           size="sm"
                           className="px-2.5"
                           icon={<KeyRound />}
-                          aria-label={`Återställ lösenord för ${row.name}`}
-                          title="Återställ lösenord"
-                          confirmText={`Återställ lösenordet för ${row.name}? Ett nytt tillfälligt lösenord genereras.`}
+                          aria-label={`Skicka länk för nytt lösenord till ${row.name}`}
+                          title="Skicka länk för nytt lösenord"
+                          confirmText={`Skicka ett mejl till ${row.email} med en länk för att välja nytt lösenord? Det nuvarande lösenordet fungerar tills länken används.`}
                         >
-                          <span className="sr-only">Återställ lösenord</span>
+                          <span className="sr-only">Skicka länk för nytt lösenord</span>
                         </ConfirmButton>
                       </form>
                       {canDelete ? (
@@ -213,7 +249,7 @@ export default async function UsersPage({
         </Table>
       )}
 
-      <AdminUserForm action={createCustomerUser} sites={allSites} />
+      <AdminUserForm action={inviteUserAction} sites={allSites} />
     </div>
   );
 }

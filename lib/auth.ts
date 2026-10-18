@@ -1,4 +1,4 @@
-import NextAuth from "next-auth";
+import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import bcrypt from "bcryptjs";
@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { authConfig } from "../auth.config";
 import { db } from "./db";
 import { users } from "./db/schema";
+import { logActivity } from "./audit";
 
 /**
  * Full Auth.js instance, including the Credentials provider and (when
@@ -25,6 +26,16 @@ import { users } from "./db/schema";
 export const googleAuthEnabled = Boolean(
   process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET,
 );
+
+/**
+ * Kastas av authorize() när lösenordet stämmer men e-postadressen inte är
+ * bekräftad ännu. loginAction (lib/auth-actions.ts) känner igen koden och
+ * skickar till /login?error=unverified. Eftersom den bara kastas efter ett
+ * korrekt lösenord avslöjar den inget om vilka adresser som finns.
+ */
+export class UnverifiedEmailError extends CredentialsSignin {
+  code = "unverified";
+}
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -61,6 +72,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
+        if (!user.emailVerifiedAt) {
+          throw new UnverifiedEmailError();
+        }
+
         return {
           id: user.id,
           email: user.email,
@@ -81,13 +96,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     ...authConfig.callbacks,
     /**
-     * Gate for the Google provider: no self-registration. A Google account
-     * is only allowed to sign in if a user with the same (lowercased) email
-     * already exists in the database — its existing role/memberships are
-     * then used as-is. Credentials sign-in already goes through authorize()
-     * above, so it isn't affected by this check.
+     * Google-inloggning: okända adresser får ett konto automatiskt (role
+     * customer, inget lösenord, e-posten räknas som bekräftad eftersom Google
+     * har bekräftat den). Befintliga konton markeras som bekräftade om de inte
+     * redan var det — t.ex. någon som fått en inbjudan men loggar in med
+     * Google i stället. Credentials-inloggning går via authorize() ovan.
      */
-    async signIn({ user, account }) {
+    async signIn({ user, account, profile }) {
       if (account?.provider !== "google") {
         return true;
       }
@@ -96,20 +111,56 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (!email) {
         return false;
       }
+      // Google skickar email_verified; en obekräftad Google-adress släpps inte in.
+      if (profile && (profile as { email_verified?: boolean }).email_verified === false) {
+        return false;
+      }
 
       const [dbUser] = await db
-        .select({ id: users.id })
+        .select({ id: users.id, emailVerifiedAt: users.emailVerifiedAt })
         .from(users)
         .where(eq(users.email, email))
         .limit(1);
 
-      return Boolean(dbUser);
+      if (dbUser) {
+        if (!dbUser.emailVerifiedAt) {
+          // Ett lösenord som satts på ett obekräftat konto har aldrig bevisats
+          // av adressens ägare (vem som helst kan registrera en adress), så det
+          // nollställs när Google bekräftar adressen. Ägaren kan välja ett nytt
+          // under Mitt konto eller via "Glömt lösenord?".
+          await db
+            .update(users)
+            .set({ emailVerifiedAt: new Date(), passwordHash: null, updatedAt: new Date() })
+            .where(eq(users.id, dbUser.id));
+        }
+        return true;
+      }
+
+      const name = user.name?.trim() || email.split("@")[0] || email;
+      const [created] = await db
+        .insert(users)
+        .values({ email, name, role: "customer", passwordHash: null, emailVerifiedAt: new Date() })
+        .onConflictDoNothing()
+        .returning({ id: users.id, email: users.email });
+
+      if (created) {
+        await logActivity({
+          userId: created.id,
+          userEmail: created.email,
+          siteId: null,
+          action: "account.signup",
+          detail: `Skapade kontot ${created.email} med Google`,
+        });
+      }
+
+      return true;
     },
     /**
      * Overrides the edge-safe jwt callback from authConfig so Google
      * sign-ins get the same token.id/token.role as credentials sign-ins.
      * Google's OAuth profile has no role, so it's looked up from the
-     * database (by lowercased email) on initial sign-in.
+     * database (by lowercased email) on initial sign-in. signIn() above runs
+     * first, so accounts it just created are found here too.
      */
     async jwt({ token, user, account }) {
       if (user && account?.provider === "google") {
@@ -126,9 +177,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             token.role = dbUser.role;
             token.name = dbUser.name;
             token.email = dbUser.email;
+            return token;
           }
         }
-        return token;
+        // Utan databasrad finns inget id att knyta sessionen till — släpp
+        // inte igenom en token som skulle se inloggad ut men sakna id.
+        throw new Error("Google-kontot saknas i databasen efter inloggning");
       }
 
       if (user) {
