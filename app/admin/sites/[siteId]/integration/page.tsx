@@ -18,6 +18,13 @@ import {
   packageJsonSnippet,
   revalidateRouteSnippet,
   SNIPPET_FILES,
+  NPM_CHECK,
+  npmConfigSnippet,
+  NPM_INSTALL,
+  NPM_PACKAGE,
+  npmPackageJsonSnippet,
+  npmRevalidateSnippet,
+  npmUsageSnippet,
   STRIP_TYPES_COMMAND,
   suggestedRevalidateUrl,
   syncScriptSnippet,
@@ -377,13 +384,60 @@ export default async function IntegrationPage({
         {/* Steg 2 — Kod */}
         <Card id="kod" className="scroll-mt-6">
           <CardHeader>
-            <StepTitle number={2}>Kod att klistra in</StepTitle>
+            <StepTitle number={2}>Koppla sajten</StepTitle>
             <CardDescription>
-              För Next.js 15 med App Router och TypeScript. Inga beroenden — kopiera filerna till kundsajtens repo.
-              Sajtens slug och CMS-adress är redan ifyllda.
+              För Next.js 14.2+ med App Router. Paketet <code className="font-mono">{NPM_PACKAGE}</code> innehåller
+              klienten, revalidate-routen och schema-sync — inga andra beroenden.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <SubHeading>Installera paketet</SubHeading>
+              <CodeBlock code={NPM_INSTALL} language="bash" maxHeight={null} />
+              <p className="text-sm text-neutral-500">
+                Kör sedan <code className="font-mono">{NPM_CHECK}</code> för att verifiera nycklarna från steg 1.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <SubHeading file={SNIPPET_FILES.revalidate}>tar emot webhooken</SubHeading>
+              <p className="text-sm text-neutral-500">
+                En rad. Tömmer cachetaggen <code className="font-mono">sitecms</code> när kunden sparar.
+              </p>
+              <CodeBlock code={npmRevalidateSnippet()} filename={SNIPPET_FILES.revalidate} language="ts" maxHeight={null} />
+            </div>
+
+            <div className="space-y-2">
+              <SubHeading file={SNIPPET_FILES.config}>sajtens sidor och fält</SubHeading>
+              <p className="text-sm text-neutral-500">
+                Deklarera vad kunden ska kunna redigera. Etiketterna och hjälptexterna syns i panelen.{" "}
+                <Link href="/docs#schema" className="text-brand-600 underline-offset-2 hover:text-brand-700 hover:underline">
+                  Om formatet
+                </Link>
+                .
+              </p>
+              <CodeBlock code={npmConfigSnippet(ctx)} filename={SNIPPET_FILES.config} language="ts" />
+            </div>
+
+            <div className="space-y-2">
+              <SubHeading file={SNIPPET_FILES.packageJson}>synka före varje build</SubHeading>
+              <p className="text-sm text-neutral-500">
+                Skapar sidor och fält som saknas, skriver aldrig över kundens innehåll och stoppar bygget om configen är
+                ogiltig.
+              </p>
+              <CodeBlock code={npmPackageJsonSnippet()} filename={SNIPPET_FILES.packageJson} language="json" maxHeight={null} />
+            </div>
+
+            <div className="space-y-2">
+              <SubHeading>Använd innehållet</SubHeading>
+              <CodeBlock code={npmUsageSnippet()} filename="app/page.tsx" language="tsx" />
+            </div>
+
+            <details className="group rounded-lg border border-neutral-200 bg-neutral-50/60">
+              <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium text-neutral-700 hover:text-neutral-900">
+                Utan npm-paket — kopiera koden till repot i stället
+              </summary>
+              <div className="space-y-6 border-t border-neutral-200 px-4 py-5">
             <div className="space-y-2">
               <SubHeading file={SNIPPET_FILES.client}>klienten</SubHeading>
               <p className="text-sm text-neutral-500">
@@ -438,6 +492,8 @@ export default async function IntegrationPage({
               <SubHeading>Använd innehållet</SubHeading>
               <CodeBlock code={usageSnippet()} filename="app/page.tsx" language="tsx" />
             </div>
+              </div>
+            </details>
           </CardContent>
         </Card>
 
@@ -491,7 +547,7 @@ export default async function IntegrationPage({
                     </span>
                   ) : (
                     <span>
-                      Ingen sync ännu — kör <code className="font-mono text-xs">scripts/sitecms-sync.ts</code>
+                      Ingen sync ännu — kör <code className="font-mono text-xs">npx sitecms-next sync</code>
                     </span>
                   )}
                   <span className="block text-xs text-neutral-500">

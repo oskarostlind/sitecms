@@ -1,15 +1,12 @@
 /**
  * sitecms-next — typad sitecms-klient för Next.js App Router.
  *
- *   import { createSitecms } from "sitecms-next";
- *   export const cms = createSitecms({
- *     apiUrl: process.env.CMS_API_URL!,
- *     site: process.env.CMS_SITE!,
- *     apiKey: process.env.CMS_API_KEY!,
- *   });
+ *   import { getContent, text, image } from "sitecms-next";
  *
- *   const content = await cms.getContent();
- *   cms.text(content, "home", "hero.title");
+ *   const content = await getContent();          // läser CMS_API_URL, CMS_SITE, CMS_API_KEY
+ *   text(content, "home", "hero.title");
+ *
+ * Behöver du flera sajter eller egna värden: `createSitecms({ apiUrl, site, apiKey })`.
  *
  * Inga beroenden. Alla anrop använder `fetch` med `next: { tags: [tag] }` så
  * att en revalidate-route kan tömma cachen med `revalidateTag("sitecms")`.
@@ -145,7 +142,21 @@ export function seo(content: Content, pageSlug: string): Seo | null {
 
 type NextFetchInit = RequestInit & { next?: { tags?: string[]; revalidate?: number | false } };
 
-export function createSitecms(options: SitecmsOptions) {
+function env(name: string): string {
+  return (typeof process !== "undefined" && process.env?.[name]?.trim()) || "";
+}
+
+/**
+ * Skapar en klient. Utelämnade värden läses från miljövariablerna
+ * CMS_API_URL, CMS_SITE och CMS_API_KEY.
+ */
+export function createSitecms(input: Partial<SitecmsOptions> = {}) {
+  const options: SitecmsOptions = {
+    ...input,
+    apiUrl: input.apiUrl ?? env("CMS_API_URL"),
+    site: input.site ?? env("CMS_SITE"),
+    apiKey: input.apiKey ?? env("CMS_API_KEY"),
+  };
   const apiUrl = options.apiUrl.trim().replace(/\/+$/, "");
   const tag = options.tag ?? "sitecms";
   const doFetch = options.fetch ?? globalThis.fetch;
@@ -208,22 +219,34 @@ export function createSitecms(options: SitecmsOptions) {
 
 export type Sitecms = ReturnType<typeof createSitecms>;
 
+// Standardklienten byggs först vid första anropet, så att miljövariablerna
+// hinner laddas och så att en import aldrig kastar under bygget.
+let defaultClient: Sitecms | null = null;
+function client(): Sitecms {
+  return (defaultClient ??= createSitecms());
+}
+
+/** Hela sajtens innehåll (standardklienten, läser env). */
+export function getContent(): Promise<Content> {
+  return client().getContent();
+}
+/** Publicerade inlägg, nyast först (standardklienten, läser env). */
+export function getPosts(): Promise<PostSummary[]> {
+  return client().getPosts();
+}
+/** Ett publicerat inlägg eller null (standardklienten, läser env). */
+export function getPost(slug: string): Promise<Post | null> {
+  return client().getPost(slug);
+}
+/** Verifierar slug + nyckel (standardklienten, läser env). */
+export function health(): Promise<Health> {
+  return client().health();
+}
+
 /**
- * Hjälpare för `app/api/sitecms/revalidate/route.ts`:
- *
- *   import { revalidateTag } from "next/cache";
- *   import { verifyRevalidateSecret } from "sitecms-next";
- *
- *   export async function POST(request: Request) {
- *     const body = await request.json().catch(() => null);
- *     if (!(await verifyRevalidateSecret(body?.secret, process.env.CMS_REVALIDATE_SECRET))) {
- *       return Response.json({ revalidated: false }, { status: 401 });
- *     }
- *     revalidateTag("sitecms");
- *     return Response.json({ revalidated: true });
- *   }
- *
- * Jämför i konstant tid via SHA-256 (Web Crypto), fungerar i både Node och Edge.
+ * Jämför revalidate-hemligheten i konstant tid via SHA-256 (Web Crypto),
+ * fungerar i både Node och Edge. Den färdiga route-handlern finns i
+ * `sitecms-next/revalidate`.
  */
 export async function verifyRevalidateSecret(received: unknown, expected: string | undefined): Promise<boolean> {
   if (typeof received !== "string" || !received || !expected) return false;
@@ -246,7 +269,8 @@ export async function verifyRevalidateSecret(received: unknown, expected: string
 export type SitecmsBlock = {
   /** Unik per sida. a–z, 0–9, punkt, bindestreck, understreck. */
   key: string;
-  type: BlockType;
+  /** Default "text". */
+  type?: BlockType;
   label?: string;
   help?: string;
   default?: string;
@@ -257,11 +281,11 @@ export type SitecmsPage = {
   slug: string;
   title: string;
   description?: string;
-  blocks: SitecmsBlock[];
+  blocks?: SitecmsBlock[];
 };
 
 export type SitecmsConfig = {
-  version: 1;
+  version?: 1;
   pages: SitecmsPage[];
   prune?: boolean;
 };

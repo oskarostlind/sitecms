@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, BookOpen, Code2, KeyRound, RefreshCw, UserPlus, Workflow } from "lucide-react";
+import { ArrowRight, BookOpen, KeyRound, Package, RefreshCw, UserPlus, Workflow } from "lucide-react";
 import { CodeBlock } from "@/components/admin/CodeBlock";
 import { Badge, ButtonLink, Card, CardContent } from "@/components/ui";
 import {
@@ -8,6 +8,15 @@ import {
   DEFAULT_CMS_URL,
   envSnippet,
   healthCurlSnippet,
+  NPM_CHECK,
+  npmConfigSnippet,
+  npmExplicitClientSnippet,
+  NPM_INSTALL,
+  npmPackageJsonSnippet,
+  npmPostsSnippet,
+  npmRevalidateSnippet,
+  NPM_SYNC,
+  npmUsageSnippet,
   packageJsonSnippet,
   PLACEHOLDER_SITE,
   REVALIDATE_ROUTE_PATH,
@@ -133,15 +142,17 @@ const TOC: { id: string; label: string; children?: { id: string; label: string }
   { id: "kom-igang", label: "Kom igång på 10 minuter" },
   { id: "hur-det-fungerar", label: "Hur det hänger ihop" },
   {
-    id: "kod",
-    label: "Kod att klistra in",
+    id: "npm",
+    label: "Koppla sajten med npm",
     children: [
-      { id: "kod-klient", label: SNIPPET_FILES.client },
-      { id: "kod-revalidate", label: SNIPPET_FILES.revalidate },
-      { id: "kod-config", label: SNIPPET_FILES.config },
-      { id: "kod-sync", label: SNIPPET_FILES.sync },
+      { id: "npm-installera", label: "1. Installera" },
+      { id: "npm-revalidate", label: "2. Revalidate-route" },
+      { id: "npm-config", label: "3. sitecms.config.ts" },
+      { id: "npm-sync", label: "4. Synka i prebuild" },
+      { id: "npm-anvand", label: "5. Använd innehållet" },
     ],
   },
+  { id: "cli", label: "CLI: sitecms-next" },
   { id: "schema", label: "Schema-format" },
   {
     id: "api",
@@ -158,7 +169,16 @@ const TOC: { id: string; label: string; children?: { id: string; label: string }
       { id: "api-fel", label: "Felkoder" },
     ],
   },
-  { id: "paket", label: "sitecms-next (npm)" },
+  {
+    id: "kod",
+    label: "Utan npm (copy-paste)",
+    children: [
+      { id: "kod-klient", label: SNIPPET_FILES.client },
+      { id: "kod-revalidate", label: SNIPPET_FILES.revalidate },
+      { id: "kod-config", label: SNIPPET_FILES.config },
+      { id: "kod-sync", label: SNIPPET_FILES.sync },
+    ],
+  },
 ];
 
 const QUICKSTART = [
@@ -193,24 +213,23 @@ const QUICKSTART = [
     ),
   },
   {
-    icon: Code2,
-    title: "Klistra in koden",
+    icon: Package,
+    title: "Installera sitecms-next",
     body: (
       <>
-        Kopiera <code>{SNIPPET_FILES.client}</code> och <code>{SNIPPET_FILES.revalidate}</code> till kundsajten och
-        använd <code>getContent()</code> i dina sidor. Ange <code>https://din-domän.se{REVALIDATE_ROUTE_PATH}</code>{" "}
-        som revalidate-URL.
+        <code>{NPM_INSTALL}</code> i kundsajten. Lägg till revalidate-routen (en rad) och ange{" "}
+        <code>https://din-domän.se{REVALIDATE_ROUTE_PATH}</code> som revalidate-URL i panelen.
       </>
     ),
   },
   {
     icon: RefreshCw,
-    title: "Synka schemat",
+    title: "Deklarera fälten",
     body: (
       <>
-        Beskriv sidor och fält i <code>{SNIPPET_FILES.config}</code> och kör <code>{SNIPPET_FILES.sync}</code>.
-        Lägg det i <code>prebuild</code> så synkas strukturen vid varje deploy. Tryck sedan på{" "}
-        <strong>Testa anslutningen</strong>.
+        Beskriv sidor och fält i <code>{SNIPPET_FILES.config}</code> och lägg{" "}
+        <code>&quot;prebuild&quot;: &quot;sitecms-next sync&quot;</code> i package.json. Fälten dyker upp i panelen
+        vid nästa build. Tryck sedan på <strong>Testa anslutningen</strong>.
       </>
     ),
   },
@@ -465,9 +484,9 @@ export default function DocsPage() {
             <CodeBlock code={envSnippet(ctx)} filename={SNIPPET_FILES.env} language="env" maxHeight={null} />
 
             <Prose>
-              <p>Kontrollera att nyckeln fungerar innan du skriver någon kod:</p>
+              <p>Kontrollera att nycklarna fungerar innan du skriver någon kod:</p>
             </Prose>
-            <CodeBlock code={healthCurlSnippet(ctx)} language="bash" maxHeight={null} />
+            <CodeBlock code={NPM_CHECK} language="bash" maxHeight={null} />
           </Section>
 
           {/* Hur det hänger ihop */}
@@ -476,7 +495,7 @@ export default function DocsPage() {
               <ol>
                 <li>
                   <strong>Kundsajten äger strukturen.</strong> <code>{SNIPPET_FILES.config}</code> beskriver vilka sidor
-                  och fält som finns. <code>{SNIPPET_FILES.sync}</code> skickar den till sitecms före varje build, och
+                  och fält som finns. <code>sitecms-next sync</code> skickar den till sitecms före varje build, och
                   panelen visar fälten med dina etiketter och hjälptexter.
                 </li>
                 <li>
@@ -496,73 +515,131 @@ export default function DocsPage() {
             </Prose>
           </Section>
 
-          {/* Kod */}
+          {/* npm */}
           <Section
-            id="kod"
-            eyebrow="Copy-paste"
-            title="Kod att klistra in"
+            id="npm"
+            eyebrow="Rekommenderat"
+            title="Koppla sajten med npm"
             intro={
               <>
-                Next.js 15, App Router, TypeScript. Inga beroenden utöver <code className="font-mono text-sm">tsx</code>{" "}
-                för synkskriptet. På integrationssidan i panelen är sajtens slug och CMS-adress redan ifyllda.
+                Next.js 14.2+ med App Router. Paketet <code className="font-mono text-sm">sitecms-next</code> har inga
+                beroenden och innehåller klienten, revalidate-routen och CLI:t för schema-sync.
               </>
             }
           >
-            <SubSection id="kod-klient" title={<code className="font-mono">{SNIPPET_FILES.client}</code>}>
+            <SubSection id="npm-installera" title="1. Installera">
+              <CodeBlock code={NPM_INSTALL} language="bash" maxHeight={null} />
               <Prose>
                 <p>
-                  Typad klient: <code>getContent()</code>, <code>getPosts()</code>, <code>getPost(slug)</code> och
-                  hjälparna <code>block(content, sida, nyckel)</code> → <code>{"{ value, html, alt }"}</code>,{" "}
-                  <code>text()</code>, <code>image()</code> och <code>seo()</code>. <code>block()</code> returnerar alltid
-                  strängar, så den är säker att rendera även om fältet saknas.
+                  Lägg miljövariablerna från <DocLink href="#kom-igang">Kom igång</DocLink> i <code>.env.local</code> och
+                  i Vercel (Production och Preview). Kör <code>{NPM_CHECK}</code> för att se att de stämmer.
                 </p>
               </Prose>
-              <CodeBlock code={clientSnippet(ctx)} filename={SNIPPET_FILES.client} language="ts" />
-              <Prose>
-                <p>Användning i en sida:</p>
-              </Prose>
-              <CodeBlock code={usageSnippet()} filename="app/page.tsx" language="tsx" />
             </SubSection>
 
-            <SubSection id="kod-revalidate" title={<code className="font-mono">{SNIPPET_FILES.revalidate}</code>}>
+            <SubSection id="npm-revalidate" title={<>2. <code className="font-mono">{SNIPPET_FILES.revalidate}</code></>}>
               <Prose>
                 <p>
-                  Tar emot webhooken från sitecms, jämför hemligheten i konstant tid och tömmer cachetaggen. Ange{" "}
-                  <code>https://din-domän.se{REVALIDATE_ROUTE_PATH}</code> som revalidate-URL i panelen.
+                  En rad. Routen jämför <code>secret</code> med <code>CMS_REVALIDATE_SECRET</code> i konstant tid och tömmer
+                  cachetaggen <code>sitecms</code>. Ange <code>https://din-domän.se{REVALIDATE_ROUTE_PATH}</code> som
+                  revalidate-URL under Integration i panelen.
                 </p>
               </Prose>
-              <CodeBlock code={revalidateRouteSnippet()} filename={SNIPPET_FILES.revalidate} language="ts" />
+              <CodeBlock code={npmRevalidateSnippet()} filename={SNIPPET_FILES.revalidate} language="ts" maxHeight={null} />
             </SubSection>
 
-            <SubSection id="kod-config" title={<code className="font-mono">{SNIPPET_FILES.config}</code>}>
+            <SubSection id="npm-config" title={<>3. <code className="font-mono">{SNIPPET_FILES.config}</code></>}>
               <Prose>
                 <p>
-                  Typad deklaration av sidor och fält. Formatet beskrivs under <DocLink href="#schema">Schema-format</DocLink>.
+                  Vilka sidor och fält kunden ska kunna redigera, med etiketter och hjälptexter som syns i panelen.{" "}
+                  <code>type</code> är <code>text</code> om det utelämnas. Formatet beskrivs under{" "}
+                  <DocLink href="#schema">Schema-format</DocLink>.
                 </p>
               </Prose>
-              <CodeBlock code={configSnippet(ctx)} filename={SNIPPET_FILES.config} language="ts" />
+              <CodeBlock code={npmConfigSnippet(ctx)} filename={SNIPPET_FILES.config} language="ts" />
             </SubSection>
 
-            <SubSection id="kod-sync" title={<code className="font-mono">{SNIPPET_FILES.sync}</code>}>
+            <SubSection id="npm-sync" title="4. Synka i prebuild">
               <Prose>
                 <p>
-                  Läser <code>{SNIPPET_FILES.config}</code>, POST:ar den till <code>…/schema</code> och skriver ut vad som
-                  skapades, uppdaterades och vilka fält som bara finns i CMS:et. Avslutar med felkod 1 vid fel, så att
-                  bygget stoppas innan en trasig struktur går ut. Läser env från miljön eller{" "}
-                  <code>.env.local</code>/<code>.env</code>.
+                  <code>sitecms-next sync</code> skickar configen till sitecms före varje build. Saknade sidor och fält
+                  skapas, kundens innehåll skrivs aldrig över, och bygget stoppas om configen är ogiltig. Saknas
+                  miljövariablerna hoppas steget över (lägg till <code>--strict</code> om bygget ska faila då).
                 </p>
               </Prose>
-              <CodeBlock code={syncScriptSnippet()} filename={SNIPPET_FILES.sync} language="ts" />
+              <CodeBlock code={npmPackageJsonSnippet()} filename={SNIPPET_FILES.packageJson} language="json" maxHeight={null} />
+              <Prose>
+                <p>Vill du synka direkt utan att bygga:</p>
+              </Prose>
+              <CodeBlock code={NPM_SYNC} language="bash" maxHeight={null} />
+            </SubSection>
+
+            <SubSection id="npm-anvand" title="5. Använd innehållet">
               <Prose>
                 <p>
-                  Installera <code>tsx</code> och kör synken före varje build. Utan tsx (Node 22.6 eller senare) fungerar{" "}
-                  <code>{STRIP_TYPES_COMMAND}</code>.
+                  <code>getContent()</code>, <code>getPosts()</code> och <code>getPost(slug)</code> läser{" "}
+                  <code>CMS_API_URL</code>, <code>CMS_SITE</code> och <code>CMS_API_KEY</code> från miljön och cachar
+                  med taggen <code>sitecms</code>, så sidorna kan vara statiska. <code>block()</code> returnerar alltid
+                  strängar och är säker att rendera även om fältet saknas.
                 </p>
               </Prose>
-              <CodeBlock code={TSX_INSTALL} language="bash" maxHeight={null} />
-              <CodeBlock code={packageJsonSnippet()} filename={SNIPPET_FILES.packageJson} language="json" maxHeight={null} />
+              <CodeBlock code={npmUsageSnippet()} filename="app/page.tsx" language="tsx" />
+              <Prose>
+                <p>Inlägg:</p>
+              </Prose>
+              <CodeBlock code={npmPostsSnippet()} filename="app/nyheter/[slug]/page.tsx" language="tsx" />
+              <Prose>
+                <p>Flera sajter i samma projekt, eller egna värden:</p>
+              </Prose>
+              <CodeBlock code={npmExplicitClientSnippet()} filename="lib/cms.ts" language="ts" maxHeight={null} />
             </SubSection>
           </Section>
+
+          {/* CLI */}
+          <Section
+            id="cli"
+            eyebrow="Verktyg"
+            title="CLI: sitecms-next"
+            intro="Följer med paketet. Läser CMS_API_URL, CMS_SITE och CMS_API_KEY från miljön eller .env.local / .env."
+          >
+            <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white">
+              <table className="w-full min-w-[520px] text-left text-sm">
+                <thead className="bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
+                  <tr>
+                    <th className="px-4 py-2.5 font-medium">Kommando</th>
+                    <th className="px-4 py-2.5 font-medium">Gör</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-100 text-neutral-700 [&_code]:font-mono [&_code]:text-[12.5px] [&_code]:text-neutral-900">
+                  <tr>
+                    <td className="px-4 py-2.5 align-top whitespace-nowrap"><code>sitecms-next sync</code></td>
+                    <td className="px-4 py-2.5">Skickar <code>sitecms.config.ts</code> (eller .mjs/.js/.json) till sitecms och skriver ut vad som skapades. Exit 1 vid fel.</td>
+                  </tr>
+                  <tr>
+                    <td className="px-4 py-2.5 align-top whitespace-nowrap"><code>--prune</code></td>
+                    <td className="px-4 py-2.5">Tar också bort fält och sidor som inte längre finns i configen (inklusive innehållet).</td>
+                  </tr>
+                  <tr>
+                    <td className="px-4 py-2.5 align-top whitespace-nowrap"><code>--strict</code></td>
+                    <td className="px-4 py-2.5">Låter bygget faila om miljövariablerna saknas (annars hoppas synken över).</td>
+                  </tr>
+                  <tr>
+                    <td className="px-4 py-2.5 align-top whitespace-nowrap"><code>--config &lt;fil&gt;</code></td>
+                    <td className="px-4 py-2.5">Använd en annan config-fil.</td>
+                  </tr>
+                  <tr>
+                    <td className="px-4 py-2.5 align-top whitespace-nowrap"><code>sitecms-next check</code></td>
+                    <td className="px-4 py-2.5">Verifierar nycklarna och visar sajtens namn och senaste sync.</td>
+                  </tr>
+                  <tr>
+                    <td className="px-4 py-2.5 align-top whitespace-nowrap"><code>sitecms-next pull</code></td>
+                    <td className="px-4 py-2.5">Skriver ut strukturen som finns i sitecms som JSON.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </Section>
+
 
           {/* Schema */}
           <Section
@@ -790,28 +867,73 @@ export default function DocsPage() {
             </SubSection>
           </Section>
 
-          {/* Paket */}
+          {/* Utan npm */}
           <Section
-            id="paket"
+            id="kod"
             eyebrow="Alternativ"
-            title="sitecms-next på npm"
-            intro="Samma klient som npm-paket, parametriserad i stället för env-läsande: npm install sitecms-next. Inga beroenden, ESM + typer."
+            title="Utan npm (copy-paste)"
+            intro={
+              <>
+                Samma funktionalitet som <code className="font-mono text-sm">sitecms-next</code>, som filer i ditt eget
+                repo. Inga beroenden utöver <code className="font-mono text-sm">tsx</code> för synkskriptet. På
+                integrationssidan i panelen är sajtens slug och CMS-adress redan ifyllda.
+              </>
+            }
           >
-            <CodeBlock
-              code={`import { createSitecms } from "sitecms-next";
+            <SubSection id="kod-klient" title={<code className="font-mono">{SNIPPET_FILES.client}</code>}>
+              <Prose>
+                <p>
+                  Typad klient: <code>getContent()</code>, <code>getPosts()</code>, <code>getPost(slug)</code> och
+                  hjälparna <code>block(content, sida, nyckel)</code> → <code>{"{ value, html, alt }"}</code>,{" "}
+                  <code>text()</code>, <code>image()</code> och <code>seo()</code>. <code>block()</code> returnerar alltid
+                  strängar, så den är säker att rendera även om fältet saknas.
+                </p>
+              </Prose>
+              <CodeBlock code={clientSnippet(ctx)} filename={SNIPPET_FILES.client} language="ts" />
+              <Prose>
+                <p>Användning i en sida:</p>
+              </Prose>
+              <CodeBlock code={usageSnippet()} filename="app/page.tsx" language="tsx" />
+            </SubSection>
 
-export const cms = createSitecms({
-  apiUrl: process.env.CMS_API_URL!,
-  site: process.env.CMS_SITE!,
-  apiKey: process.env.CMS_API_KEY!,
-});
+            <SubSection id="kod-revalidate" title={<code className="font-mono">{SNIPPET_FILES.revalidate}</code>}>
+              <Prose>
+                <p>
+                  Tar emot webhooken från sitecms, jämför hemligheten i konstant tid och tömmer cachetaggen. Ange{" "}
+                  <code>https://din-domän.se{REVALIDATE_ROUTE_PATH}</code> som revalidate-URL i panelen.
+                </p>
+              </Prose>
+              <CodeBlock code={revalidateRouteSnippet()} filename={SNIPPET_FILES.revalidate} language="ts" />
+            </SubSection>
 
-const content = await cms.getContent();
-const title = cms.text(content, "home", "hero.title");`}
-              filename="lib/cms.ts"
-              language="ts"
-              maxHeight={null}
-            />
+            <SubSection id="kod-config" title={<code className="font-mono">{SNIPPET_FILES.config}</code>}>
+              <Prose>
+                <p>
+                  Typad deklaration av sidor och fält. Formatet beskrivs under <DocLink href="#schema">Schema-format</DocLink>.
+                </p>
+              </Prose>
+              <CodeBlock code={configSnippet(ctx)} filename={SNIPPET_FILES.config} language="ts" />
+            </SubSection>
+
+            <SubSection id="kod-sync" title={<code className="font-mono">{SNIPPET_FILES.sync}</code>}>
+              <Prose>
+                <p>
+                  Läser <code>{SNIPPET_FILES.config}</code>, POST:ar den till <code>…/schema</code> och skriver ut vad som
+                  skapades, uppdaterades och vilka fält som bara finns i CMS:et. Avslutar med felkod 1 vid fel, så att
+                  bygget stoppas innan en trasig struktur går ut. Läser env från miljön eller{" "}
+                  <code>.env.local</code>/<code>.env</code>.
+                </p>
+              </Prose>
+              <CodeBlock code={syncScriptSnippet()} filename={SNIPPET_FILES.sync} language="ts" />
+              <Prose>
+                <p>
+                  Installera <code>tsx</code> och kör synken före varje build. Utan tsx (Node 22.6 eller senare) fungerar{" "}
+                  <code>{STRIP_TYPES_COMMAND}</code>.
+                </p>
+              </Prose>
+              <CodeBlock code={TSX_INSTALL} language="bash" maxHeight={null} />
+              <CodeBlock code={packageJsonSnippet()} filename={SNIPPET_FILES.packageJson} language="json" maxHeight={null} />
+            </SubSection>
           </Section>
 
           <Card>

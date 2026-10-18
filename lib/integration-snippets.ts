@@ -480,3 +480,108 @@ export function revalidateCurlSnippet({ domain }: Pick<SnippetContext, "domain">
 export function suggestedRevalidateUrl(domain?: string | null): string {
   return `${exampleOrigin(domain)}${REVALIDATE_ROUTE_PATH}`;
 }
+
+// ---------------------------------------------------------------------------
+// npm-vägen (rekommenderad): sitecms-next
+// ---------------------------------------------------------------------------
+
+export const NPM_PACKAGE = "sitecms-next";
+export const NPM_INSTALL = "npm install sitecms-next";
+export const NPM_CHECK = "npx sitecms-next check";
+export const NPM_SYNC = "npx sitecms-next sync";
+
+/** app/api/sitecms/revalidate/route.ts med paketet: en rad. */
+export function npmRevalidateSnippet(): string {
+  return `export { POST } from "sitecms-next/revalidate";`;
+}
+
+/** sitecms.config.ts med defineConfig från paketet. */
+export function npmConfigSnippet({ domain }: Pick<SnippetContext, "domain"> = {}): string {
+  const origin = exampleOrigin(domain);
+  return `import { defineConfig } from "sitecms-next";
+
+// Vilka sidor och fält kunden ska kunna redigera. Synkas till sitecms med
+// "sitecms-next sync" (prebuild). Kundens innehåll skrivs aldrig över;
+// nya fält får sitt default-värde.
+export default defineConfig({
+  pages: [
+    {
+      slug: "home",
+      title: "Startsida",
+      description: "Det besökaren ser först.",
+      blocks: [
+        { key: "hero.title", label: "Rubrik", help: "Max 60 tecken", default: "Välkommen" },
+        {
+          key: "hero.image",
+          type: "image",
+          label: "Hero-bild",
+          default: "${origin}/hero.jpg",
+          defaultAlt: "Byggarbetare på ett tak",
+        },
+        { key: "intro.body", type: "richtext", label: "Ingress" },
+      ],
+    },
+  ],
+});
+`;
+}
+
+/** package.json-utdrag: synka strukturen före varje build. */
+export function npmPackageJsonSnippet(): string {
+  return `{
+  "scripts": {
+    "prebuild": "sitecms-next sync"
+  }
+}`;
+}
+
+/** Användning i en sida med paketet (läser CMS_* från env). */
+export function npmUsageSnippet(): string {
+  return `// app/page.tsx
+import Image from "next/image";
+import { block, getContent, image, text } from "sitecms-next";
+
+export default async function Home() {
+  const content = await getContent();
+  const hero = image(content, "home", "hero.image");
+
+  return (
+    <main>
+      <h1>{text(content, "home", "hero.title", "Välkommen")}</h1>
+      {hero ? <Image src={hero.src} alt={hero.alt} width={1200} height={630} /> : null}
+      <div dangerouslySetInnerHTML={{ __html: block(content, "home", "intro.body").html }} />
+    </main>
+  );
+}`;
+}
+
+/** Inlägg med paketet. */
+export function npmPostsSnippet(): string {
+  return `// app/nyheter/[slug]/page.tsx
+import { notFound } from "next/navigation";
+import { getPost } from "sitecms-next";
+
+export default async function Post({ params }: { params: Promise<{ slug: string }> }) {
+  const post = await getPost((await params).slug);
+  if (!post) notFound();
+  return (
+    <article>
+      <h1>{post.title}</h1>
+      <div dangerouslySetInnerHTML={{ __html: post.bodyHtml }} />
+    </article>
+  );
+}`;
+}
+
+/** Flera sajter eller egna värden: explicit klient. */
+export function npmExplicitClientSnippet(): string {
+  return `import { createSitecms } from "sitecms-next";
+
+export const cms = createSitecms({
+  apiUrl: process.env.CMS_API_URL!,
+  site: "annan-sajt",
+  apiKey: process.env.CMS_API_KEY_ANNAN!,
+});
+
+const content = await cms.getContent();`;
+}

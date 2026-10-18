@@ -1,7 +1,7 @@
 {
   "name": "sitecms-next",
-  "version": "0.1.0",
-  "description": "Typad sitecms-klient för Next.js App Router — hämta innehåll, inlägg och block med cache-taggen \"sitecms\". Inga beroenden.",
+  "version": "0.2.0",
+  "description": "Koppla en Next.js-sajt till sitecms: typad klient, färdig revalidate-route och CLI för schema-sync. Inga beroenden.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -10,7 +10,13 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
-    }
+    },
+    "./revalidate": {
+      "types": "./dist/revalidate.d.ts",
+      "import": "./dist/revalidate.js",
+      "default": "./dist/revalidate.js"
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
@@ -35,7 +41,9 @@
     "sitecms",
     "cms",
     "nextjs",
-    "headless"
+    "headless",
+    "next",
+    "app-router"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -44,7 +52,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "@types/node": "^22.0.0",
+    "next": "^15.4.0"
   },
   "repository": {
     "type": "git",
@@ -57,6 +67,10 @@
   },
   "author": "Oskar Östlind",
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
+  },
+  "bin": {
+    "sitecms-next": "./dist/cli.js"
   }
 }
