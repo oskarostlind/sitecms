@@ -1,17 +1,16 @@
 name: Publicera sitecms-next till npm
 
-# Körs när en tagg "sitecms-next-v1.2.3" pushas, eller manuellt från Actions-fliken.
-# Kräver repo-secret NPM_TOKEN (granular access token med publish-rätt).
+# Publicerar automatiskt när packages/sitecms-next ändras på main och
+# versionen i package.json ännu inte finns på npm. Höj "version" för att släppa
+# en ny version. Kan även köras manuellt från Actions-fliken.
+# Kräver secret NPM_TOKEN (granular access token med publish-rätt).
 on:
   push:
-    tags:
-      - "sitecms-next-v*"
+    branches: [main]
+    paths:
+      - "packages/sitecms-next/**"
+      - ".github/workflows/publish-sitecms-next.yml"
   workflow_dispatch:
-    inputs:
-      tag:
-        description: "npm dist-tag (latest/next)"
-        required: false
-        default: "latest"
 
 permissions:
   contents: read
@@ -29,14 +28,32 @@ jobs:
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
-      - run: npm install --no-audit --no-fund
-      - run: npm run typecheck
-      - run: npm run build
-      - name: Kontrollera att taggen matchar package.json
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Finns versionen redan på npm?
+        id: check
         run: |
-          v=$(node -p "require('./package.json').version")
-          [ "${GITHUB_REF_NAME}" = "sitecms-next-v${v}" ] || { echo "Taggen ${GITHUB_REF_NAME} matchar inte version ${v}"; exit 1; }
-      - run: npm publish --access public --provenance --tag "${{ github.event.inputs.tag || 'latest' }}"
+          name=$(node -p "require('./package.json').name")
+          version=$(node -p "require('./package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if npm view "$name@$version" version >/dev/null 2>&1; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "$name@$version finns redan på npm — inget att publicera."
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+            echo "Publicerar $name@$version."
+          fi
+      - if: steps.check.outputs.publish == 'true'
+        run: npm install --no-audit --no-fund
+      - if: steps.check.outputs.publish == 'true'
+        run: npm run typecheck
+      - if: steps.check.outputs.publish == 'true'
+        run: npm run build
+      - if: steps.check.outputs.publish == 'true'
+        name: Kontrollera att NPM_TOKEN finns
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          [ -n "$NODE_AUTH_TOKEN" ] || { echo "::error::Secret NPM_TOKEN saknas. Lägg den under Settings → Secrets and variables → Actions → Repository secrets."; exit 1; }
+      - if: steps.check.outputs.publish == 'true'
+        run: npm publish --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
