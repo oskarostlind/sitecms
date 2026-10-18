@@ -33,6 +33,23 @@ const ACTION_LABELS: Record<string, string> = {
   "users.create": "Skapade en användare",
   "users.delete": "Tog bort en användare",
   "users.password_reset": "Återställde ett lösenord",
+  "account.signup": "Skapade sitt konto",
+  "account.verify": "Bekräftade sin e-postadress",
+  "account.password_reset": "Återställde sitt lösenord via e-post",
+  "members.invite": "Bjöd in en medlem",
+  "members.invite_resend": "Skickade om en inbjudan",
+  "members.invite_revoke": "Återkallade en inbjudan",
+  "members.accept": "Accepterade en inbjudan",
+  "members.role_change": "Ändrade en medlems roll",
+  "members.remove": "Tog bort en medlem",
+  "pages.create": "Skapade en sida",
+  "pages.update": "Uppdaterade en sida",
+  "pages.delete": "Tog bort en sida",
+  "blocks.create": "Lade till ett fält",
+  "blocks.delete": "Tog bort ett fält",
+  "schema.sync": "Synkade sajtens struktur från kundsajten",
+  "sites.connection_check": "Testade anslutningen till kundsajten",
+  "sites.delete": "Tog bort sajten",
 };
 
 /** Etikett för en action-nyckel, t.ex. "posts.create" → "Skapade ett inlägg". */

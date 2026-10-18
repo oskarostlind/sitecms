@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { apiKeys, sites } from "@/lib/db/schema";
-import { requireAdmin } from "@/lib/admin-guard";
+import { requireSiteOwner } from "@/lib/guard";
 import {
   updateSiteSettings,
   regenerateRevalidateSecret,
@@ -50,7 +50,7 @@ export default async function SiteSettingsPage({
   }>;
 }) {
   const { siteId } = await params;
-  await requireAdmin();
+  await requireSiteOwner(siteId);
   const { error, success, newSecret, newKey, newKeyName, deleted } = await searchParams;
 
   const [site] = await db.select().from(sites).where(eq(sites.id, siteId)).limit(1);

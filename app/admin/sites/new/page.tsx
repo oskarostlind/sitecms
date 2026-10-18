@@ -1,4 +1,4 @@
-import { requireAdmin } from "@/lib/admin-guard";
+import { requireUser } from "@/lib/guard";
 import { createSite } from "@/lib/actions/sites";
 import { AdminSiteForm } from "@/components/admin/AdminSiteForm";
 import { AdminRevealSecret } from "@/components/admin/AdminRevealSecret";
@@ -20,7 +20,7 @@ export default async function NewSitePage({
     key?: string;
   }>;
 }) {
-  await requireAdmin();
+  await requireUser();
   const { error, created, siteId, siteName, key } = await searchParams;
 
   const errorMessage = error ? (ERROR_MESSAGES[error] ?? "Något gick fel. Försök igen.") : null;

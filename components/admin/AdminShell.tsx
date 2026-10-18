@@ -17,6 +17,7 @@ import {
   LogOut,
   Menu,
   Newspaper,
+  Plug,
   Plus,
   Search,
   Settings,
@@ -39,7 +40,8 @@ type SiteNavItem = {
   segment: string;
   icon: LucideIcon;
   exact?: boolean;
-  adminOnly?: boolean;
+  /** Visas bara för admin och sajtens ägare (inte för redaktörer). */
+  ownerOnly?: boolean;
 };
 
 const SITE_NAV: SiteNavItem[] = [
@@ -50,7 +52,9 @@ const SITE_NAV: SiteNavItem[] = [
   { label: "SEO", segment: "seo", icon: Search },
   { label: "Media", segment: "media", icon: ImageIcon },
   { label: "Aktivitet", segment: "aktivitet", icon: History },
-  { label: "Inställningar", segment: "installningar", icon: Settings, adminOnly: true },
+  { label: "Medlemmar", segment: "medlemmar", icon: Users, ownerOnly: true },
+  { label: "Integration", segment: "integration", icon: Plug, ownerOnly: true },
+  { label: "Inställningar", segment: "installningar", icon: Settings, ownerOnly: true },
 ];
 
 type AdminNavItem = { label: string; href: string; icon: LucideIcon };
@@ -58,6 +62,11 @@ type AdminNavItem = { label: string; href: string; icon: LucideIcon };
 const ADMIN_NAV: AdminNavItem[] = [
   { label: "Användare", href: "/admin/anvandare", icon: Users },
   { label: "All aktivitet", href: "/admin/aktivitet", icon: Activity },
+];
+
+/** Visas för alla inloggade — vem som helst kan skapa en sajt (självbetjäning). */
+const GENERAL_NAV: AdminNavItem[] = [
+  { label: "Alla sajter", href: "/admin?list=1", icon: LayoutDashboard },
   { label: "Ny sajt", href: "/admin/sites/new", icon: Plus },
 ];
 
@@ -74,6 +83,8 @@ export type AdminShellUser = {
 export type AdminShellProps = {
   user: AdminShellUser;
   sites: Site[];
+  /** Sajter där användaren är ägare (alla sajter för admin). */
+  ownedSiteIds: string[];
   logoutAction: () => Promise<void>;
   children: React.ReactNode;
 };
@@ -94,7 +105,7 @@ function siteHref(siteId: string, segment: string) {
 // Shell
 // ---------------------------------------------------------------------------
 
-export default function AdminShell({ user, sites, logoutAction, children }: AdminShellProps) {
+export default function AdminShell({ user, sites, ownedSiteIds, logoutAction, children }: AdminShellProps) {
   const pathname = usePathname() ?? "/admin";
   const isAdmin = user.role === "admin";
 
@@ -103,7 +114,8 @@ export default function AdminShell({ user, sites, logoutAction, children }: Admi
     siteMatch && !RESERVED_SITE_SEGMENTS.has(siteMatch[1]) ? decodeURIComponent(siteMatch[1]) : null;
   const activeSite = activeSiteId ? (sites.find((s) => s.id === activeSiteId) ?? null) : null;
 
-  const siteNav = SITE_NAV.filter((item) => !item.adminOnly || isAdmin);
+  const isOwnerOfActive = isAdmin || (activeSiteId ? ownedSiteIds.includes(activeSiteId) : false);
+  const siteNav = SITE_NAV.filter((item) => !item.ownerOnly || isOwnerOfActive);
 
   // Etikett för aktiv sektion (brödsmulan i topbaren).
   const sectionLabel = (() => {
@@ -111,7 +123,7 @@ export default function AdminShell({ user, sites, logoutAction, children }: Admi
       const item = siteNav.find((i) => isPathActive(pathname, siteHref(activeSiteId, i.segment), i.exact));
       return item?.label ?? null;
     }
-    const adminItem = ADMIN_NAV.find((i) => isPathActive(pathname, i.href));
+    const adminItem = [...ADMIN_NAV, ...GENERAL_NAV].find((i) => isPathActive(pathname, i.href.replace(/\?.*$/, ""), i.href.startsWith("/admin?")));
     if (adminItem) return adminItem.label;
     if (isPathActive(pathname, "/admin/konto")) return "Mitt konto";
     if (pathname === "/admin") return "Dina sajter";
@@ -392,8 +404,24 @@ function SidebarContent({
           </nav>
         ) : null}
 
+        <nav aria-label="Konto" className={cn(activeSiteId && "mt-6")}>
+          <ul className="space-y-0.5">
+            {GENERAL_NAV.map((item) => (
+              <li key={item.href}>
+                <NavLink
+                  href={item.href}
+                  label={item.label}
+                  icon={item.icon}
+                  active={isPathActive(pathname, item.href.replace(/\?.*$/, ""), item.href.startsWith("/admin?"))}
+                  onNavigate={onNavigate}
+                />
+              </li>
+            ))}
+          </ul>
+        </nav>
+
         {isAdmin ? (
-          <nav aria-labelledby={adminHeadingId} className={cn(activeSiteId && "mt-6")}>
+          <nav aria-labelledby={adminHeadingId} className="mt-6">
             <p
               id={adminHeadingId}
               className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-neutral-500"

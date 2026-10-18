@@ -5,8 +5,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { apiKeys, pages, sites } from "@/lib/db/schema";
-import { requireAdmin } from "@/lib/admin-guard";
+import { apiKeys, memberships, pages, sites } from "@/lib/db/schema";
+import { requireUser, requireSiteOwner } from "@/lib/guard";
 import { logActivity } from "@/lib/audit";
 import { slugify } from "@/components/content/slugify";
 
@@ -57,14 +57,14 @@ function buildQuery(params: Record<string, string | undefined>): string {
 
 /**
  * Creates a new tenant site: the site row itself, a default "home" page, and
- * one API key. Only admins may create sites (customers are scoped to the
- * sites they already have a membership for). Redirects back to
+ * one API key. Any logged-in user may create a site (self-service) and
+ * becomes its owner via an owner-membership. Redirects back to
  * /admin/sites/new with the freshly created API key in the query string so
  * the page can show it exactly once — the key itself is never re-displayed
  * after this redirect since it's only masked in later reads.
  */
 export async function createSite(formData: FormData): Promise<void> {
-  const user = await requireAdmin();
+  const user = await requireUser();
 
   const name = readString(formData, "name");
   const slugInput = readString(formData, "slug");
@@ -82,8 +82,12 @@ export async function createSite(formData: FormData): Promise<void> {
 
   const [site] = await db
     .insert(sites)
-    .values({ name, slug, domain })
+    .values({ name, slug, domain, createdByUserId: user.id })
     .returning();
+
+  // The creator owns the site. Admins already see every site; the membership
+  // is still written so ownership survives a later role change.
+  await db.insert(memberships).values({ userId: user.id, siteId: site.id, role: "owner" });
 
   await db.insert(pages).values({
     siteId: site.id,
@@ -123,7 +127,7 @@ export async function createSite(formData: FormData): Promise<void> {
 
 /** Updates the editable settings for a site (name, domain, revalidate URL). */
 export async function updateSiteSettings(siteId: string, formData: FormData): Promise<void> {
-  const user = await requireAdmin();
+  const user = await requireSiteOwner(siteId);
 
   const name = readString(formData, "name");
   const domain = readString(formData, "domain") || null;
@@ -159,7 +163,7 @@ export async function updateSiteSettings(siteId: string, formData: FormData): Pr
  * once on this redirect.
  */
 export async function regenerateRevalidateSecret(siteId: string): Promise<void> {
-  const user = await requireAdmin();
+  const user = await requireSiteOwner(siteId);
 
   const newSecret = generateRevalidateSecret();
 
@@ -181,7 +185,7 @@ export async function regenerateRevalidateSecret(siteId: string): Promise<void> 
 
 /** Creates a new API key for a site. Shown once via the redirect query string. */
 export async function createApiKey(siteId: string, formData: FormData): Promise<void> {
-  const user = await requireAdmin();
+  const user = await requireSiteOwner(siteId);
 
   const name = readString(formData, "name") || "Namnlös nyckel";
   const keyValue = generateApiKey();
@@ -212,7 +216,7 @@ export async function createApiKey(siteId: string, formData: FormData): Promise<
  * the confirm dialog fires.
  */
 export async function deleteApiKey(siteId: string, keyId: string): Promise<void> {
-  const user = await requireAdmin();
+  const user = await requireSiteOwner(siteId);
 
   const [existing] = await db
     .select({ name: apiKeys.name })

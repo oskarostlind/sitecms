@@ -9,14 +9,15 @@ import { displayDomain } from "@/lib/site-url";
 export default async function AdminHomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; list?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, list } = await searchParams;
   const user = await requireUser();
   const sites = await getUserSites(user);
   const isAdmin = user.role === "admin";
 
-  if (sites.length === 1) {
+  // Ett enda ställe att vara på → hoppa dit direkt, utom när listan uttryckligen begärs.
+  if (sites.length === 1 && !list) {
     redirect(`/admin/sites/${sites[0].id}`);
   }
 
@@ -32,11 +33,9 @@ export default async function AdminHomePage({
             : "Välj vilken sajt du vill hantera."
         }
         actions={
-          isAdmin ? (
-            <ButtonLink href="/admin/sites/new" icon={<Plus />}>
-              Ny sajt
-            </ButtonLink>
-          ) : null
+          <ButtonLink href="/admin/sites/new" icon={<Plus />}>
+            Ny sajt
+          </ButtonLink>
         }
         className="mb-0"
       />
@@ -51,11 +50,7 @@ export default async function AdminHomePage({
         <EmptyState
           icon={<Building2 />}
           title="Inga sajter kopplade till ditt konto ännu."
-          description={
-            isAdmin
-              ? "Skapa en sajt för att komma igång."
-              : "Hör av dig till oss så kopplar vi din sajt till ditt konto."
-          }
+          description="Skapa en sajt för att komma igång, eller be sajtens ägare att bjuda in dig."
           action={
             isAdmin ? (
               <ButtonLink href="/admin/sites/new" icon={<Plus />}>

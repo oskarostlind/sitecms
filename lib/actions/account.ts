@@ -48,7 +48,11 @@ export async function changePasswordAction(formData: FormData): Promise<void> {
     redirect("/admin/konto?error=unknown");
   }
 
-  const currentMatches = await bcrypt.compare(currentPassword, dbUser.passwordHash);
+  // Google-only accounts have no password yet: any "current password" is
+  // accepted so they can set one from the account page.
+  const currentMatches = dbUser.passwordHash
+    ? await bcrypt.compare(currentPassword, dbUser.passwordHash)
+    : true;
   if (!currentMatches) {
     redirect("/admin/konto?error=wrong-current");
   }

@@ -50,7 +50,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           .where(eq(users.email, normalizedEmail))
           .limit(1);
 
-        if (!user) {
+        if (!user || !user.passwordHash) {
+          // Unknown address, or an account that hasn't chosen a password yet
+          // (pending invite / Google-only).
           return null;
         }
 

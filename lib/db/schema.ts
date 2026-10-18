@@ -28,6 +28,13 @@ export const sites = pgTable("sites", {
   // Optional ISR/on-demand revalidation webhook for the site's frontend.
   revalidateUrl: text("revalidate_url"),
   revalidateSecret: text("revalidate_secret"),
+  // Who created the site (null for sites seeded before self-service existed).
+  createdByUserId: uuid("created_by_user_id"),
+  // Last successful schema sync from the customer site (POST /api/v1/sites/[slug]/schema).
+  lastSchemaSyncAt: timestamp("last_schema_sync_at", { withTimezone: true }),
+  // Last connection check from the integration page: 'ok' | 'failed' | null.
+  lastConnectionStatus: text("last_connection_status"),
+  lastConnectionCheckedAt: timestamp("last_connection_checked_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
@@ -43,10 +50,14 @@ export type Role = (typeof roleEnumValues)[number];
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: text("email").notNull(),
-  passwordHash: text("password_hash").notNull(),
+  // Null until the user has chosen a password (invited users, Google-only accounts).
+  passwordHash: text("password_hash"),
   name: text("name").notNull(),
-  // 'admin' manages every tenant; 'customer' is scoped via memberships.
+  // 'admin' manages every tenant; 'customer' is scoped via memberships
+  // (memberships.role decides owner vs editor per site).
   role: text("role", { enum: roleEnumValues }).notNull().default("customer"),
+  // Set when the address has been confirmed (verification link, accepted invite, Google).
+  emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
@@ -54,12 +65,17 @@ export const users = pgTable("users", {
 ]);
 
 // ---------------------------------------------------------------------------
-// memberships (links a customer user to the one site they manage)
+// memberships (links a user to a site they may manage)
 // ---------------------------------------------------------------------------
+export const membershipRoleEnumValues = ["owner", "editor"] as const;
+export type MembershipRole = (typeof membershipRoleEnumValues)[number];
+
 export const memberships = pgTable("memberships", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+  // 'owner' manages settings, integration, members and structure; 'editor' edits content.
+  role: text("role", { enum: membershipRoleEnumValues }).notNull().default("editor"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
@@ -74,6 +90,8 @@ export const pages = pgTable("pages", {
   siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
   slug: text("slug").notNull(),
   title: text("title").notNull(),
+  // One line shown under the page title in the editor (from schema sync).
+  description: text("description"),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -98,6 +116,10 @@ export const blocks = pgTable("blocks", {
   // Alt text for type 'image': what the picture shows, for screen readers and
   // search engines. Null/empty means the image is decorative.
   alt: text("alt"),
+  // Editor label/help text, usually set by the customer site's schema sync.
+  // Null falls back to components/admin/labels.ts.
+  label: text("label"),
+  help: text("help"),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -186,6 +208,31 @@ export const apiKeys = pgTable("api_keys", {
 ]);
 
 // ---------------------------------------------------------------------------
+// auth_tokens (one-time links sent by e-mail: verify, reset, invite)
+// ---------------------------------------------------------------------------
+export const authTokenTypeEnumValues = ["verify", "reset", "invite"] as const;
+export type AuthTokenType = (typeof authTokenTypeEnumValues)[number];
+
+export const authTokens = pgTable("auth_tokens", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  // The raw token only ever lives in the e-mail link; we store its sha256.
+  tokenHash: text("token_hash").notNull(),
+  type: text("type", { enum: authTokenTypeEnumValues }).notNull(),
+  // Target user (verify/reset) or invited user row (invite).
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  // For invites: which site and which membership role is granted on accept.
+  siteId: uuid("site_id").references(() => sites.id, { onDelete: "cascade" }),
+  membershipRole: text("membership_role", { enum: membershipRoleEnumValues }),
+  invitedByUserId: uuid("invited_by_user_id"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("auth_tokens_hash_idx").on(table.tokenHash),
+]);
+
+// ---------------------------------------------------------------------------
 // audit_logs
 // ---------------------------------------------------------------------------
 export const auditLogs = pgTable("audit_logs", {
@@ -222,6 +269,12 @@ export const sitesRelations = relations(sites, ({ many }) => ({
 
 export const usersRelations = relations(users, ({ many }) => ({
   memberships: many(memberships),
+  authTokens: many(authTokens),
+}));
+
+export const authTokensRelations = relations(authTokens, ({ one }) => ({
+  user: one(users, { fields: [authTokens.userId], references: [users.id] }),
+  site: one(sites, { fields: [authTokens.siteId], references: [sites.id] }),
 }));
 
 export const membershipsRelations = relations(memberships, ({ one }) => ({
