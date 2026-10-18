@@ -16,7 +16,7 @@ const guide: Guide = {
   ],
   summary: [
     "Fråga alltid hur byrån **avrundar tiden**: per minut, kvart, halvtimme eller påbörjad timme. Det avgör priset på småändringar mer än timpriset.",
-    "Få byråer publicerar sina priser. De som gör det anger ofta timpriser runt 1 000 kr exkl. moms.",
+    "Få byråer publicerar sina priser. De fyra vi hittade anger timpriser på 995–1 190 kr exkl. moms.",
     "Ett serviceavtal lönar sig om du gör ändringar regelbundet eller behöver teknisk skötsel. Gör du bara ett par ändringar om året blir det ofta dyrare.",
     "Billigast är att kunna göra ändringarna själv, antingen i systemet du redan har eller genom att utvecklaren kopplar ett CMS.",
   ],
@@ -49,13 +49,17 @@ const guide: Guide = {
       blocks: [
         {
           type: "p",
-          text: "De flesta svenska webbyråer publicerar inga priser för ändringar, och svaret blir ofta ”kontakta oss”. Tabellen visar de uppgifter vi kunde hitta och kontrollera på byråernas egna sidor. Det är för få för att säga vad som är ”normalt”, men de ger en känsla för nivån och för hur olika debiteringen kan se ut.",
+          text: "De flesta svenska webbyråer publicerar inga priser för ändringar, och svaret blir ofta ”kontakta oss”. Tabellen visar vad fyra byråer anger på sina egna sidor. Fyra byråer räcker inte för att säga vad som är ”normalt” på marknaden, men de ger en känsla för nivån och visar hur olika debiteringen kan se ut.",
         },
         {
           type: "table",
           caption: "Offentliga prisuppgifter hämtade oktober 2026. Priser ändras – kontrollera hos respektive byrå.",
           head: ["Byrå", "Vad som anges", "Belopp enligt byrån"],
           rows: [
+            ["EMS Design", "Löpande arbete, t.ex. uppdateringar (debiteras per påbörjad halvtimme)", "995 kr exkl. moms per timme"],
+            ["EMS Design", "Serviceavtal MINI / BAS / PRO (PRO inkl. en fri arbetstimme per månad, löper årsvis)", "495 / 695 / 1 495 kr/mån exkl. moms"],
+            ["Grafix Studio", "Ändringar utan avtal", "1 190 kr/h exkl. moms"],
+            ["Grafix Studio", "Supportavtal Basic / Premium / Business WP (1 / 2 / 3 timmar webbjobb per månad, 6 månaders bindningstid)", "1 990 / 2 990 / 4 490 kr/mån exkl. moms"],
             ["Webby Design", "Byte av bilder och texter", "995 kr exkl. moms per påbörjad timme"],
             ["Webby Design", "Ändring av öppettider", "250 kr exkl. moms, engångskostnad"],
             ["Webby Design", "Serviceavtal ”Komplett inkl. fria ändringar”", "2 995 kr exkl. moms per år"],
@@ -82,7 +86,7 @@ const guide: Guide = {
           head: ["Debitering", "Underlag", "Kostnad för tio minuter"],
           rows: [
             ["Per påbörjad timme", "995 kr/tim (Webby Design)", "995 kr"],
-            ["Per påbörjad halvtimme", "Hypotetiskt timpris 1 000 kr", "500 kr"],
+            ["Per påbörjad halvtimme", "995 kr/tim (EMS Design)", "497,50 kr"],
             ["Per påbörjad kvart", "Hypotetiskt timpris 1 000 kr", "250 kr"],
             ["Per minut", "995 kr/tim (Punktgruppen)", "165,83 kr enligt byråns eget exempel"],
           ],
@@ -161,7 +165,7 @@ const guide: Guide = {
   faq: [
     {
       q: "Vad är normalt timpris för en webbyrå?",
-      a: "Det går inte att säga exakt eftersom få byråer publicerar priser. De prislistor vi hittade anger 995 kr i timmen exkl. moms, och Webbis prisguide uppskattar 800–1 500 kr i timmen för innehållsuppdateringar. Be alltid om priset skriftligt.",
+      a: "Det går inte att säga exakt eftersom få byråer publicerar priser. De fyra prislistor vi hittade anger 995–1 190 kr i timmen exkl. moms, och Webbis prisguide uppskattar 800–1 500 kr i timmen för innehållsuppdateringar. Be alltid om priset skriftligt.",
     },
     {
       q: "Debiteras man per påbörjad timme för ändringar på hemsidan?",
@@ -181,6 +185,11 @@ const guide: Guide = {
     },
   ],
   sources: [
+    { title: "EMS Design: Priser", url: "https://www.emsdesign.se/priser" },
+    { title: "EMS Design: Avtalsvillkor", url: "https://emsdesign.se/avtalsvillkor/" },
+    { title: "EMS Design: Serviceavtal för hemsidor", url: "https://emsdesign.se/tjanster/serviceavtal-hemsidor/" },
+    { title: "Grafix Studio: Supportavtal WordPress", url: "https://grafixstudio.se/tjanster/supportavtal-wordpress/" },
+    { title: "Grafix Studio: Vad kostar en hemsida 2026?", url: "https://grafixstudio.se/blogg/vad-kostar-en-hemsida/" },
     { title: "Webby Design: Priser hemsida", url: "https://webbydesign.se/priser" },
     { title: "Punktgruppen: WordPress-hjälp för företag", url: "https://www.punktgruppen.se/wordpress/" },
     {
