@@ -46,6 +46,17 @@ async function uniqueSiteSlug(base: string, excludeId?: string): Promise<string>
   }
 }
 
+/**
+ * Where the site-settings actions redirect back to. Forms on the integration
+ * page send a hidden `returnTo=integration`; everything else keeps going to
+ * /installningar. Only known sub-pages are accepted (no open redirect).
+ */
+function settingsPath(siteId: string, formData?: FormData): string {
+  const returnTo = formData ? readString(formData, "returnTo") : "";
+  const section = returnTo === "integration" ? "integration" : "installningar";
+  return `/admin/sites/${siteId}/${section}`;
+}
+
 function buildQuery(params: Record<string, string | undefined>): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -134,7 +145,7 @@ export async function updateSiteSettings(siteId: string, formData: FormData): Pr
   const revalidateUrl = readString(formData, "revalidateUrl") || null;
 
   if (!name) {
-    redirect(`/admin/sites/${siteId}/installningar?error=missing`);
+    redirect(`${settingsPath(siteId, formData)}?error=missing`);
   }
 
   await db
@@ -153,7 +164,7 @@ export async function updateSiteSettings(siteId: string, formData: FormData): Pr
   revalidatePath(`/admin/sites/${siteId}`, "layout");
   revalidatePath("/admin", "layout");
 
-  redirect(`/admin/sites/${siteId}/installningar?success=1`);
+  redirect(`${settingsPath(siteId, formData)}?success=1`);
 }
 
 /**
@@ -162,7 +173,7 @@ export async function updateSiteSettings(siteId: string, formData: FormData): Pr
  * with it will start failing until it's updated with the new value shown
  * once on this redirect.
  */
-export async function regenerateRevalidateSecret(siteId: string): Promise<void> {
+export async function regenerateRevalidateSecret(siteId: string, formData?: FormData): Promise<void> {
   const user = await requireSiteOwner(siteId);
 
   const newSecret = generateRevalidateSecret();
@@ -180,7 +191,7 @@ export async function regenerateRevalidateSecret(siteId: string): Promise<void> 
     detail: "Genererade en ny revalidate-hemlighet (den gamla slutade fungera)",
   });
 
-  redirect(`/admin/sites/${siteId}/installningar?newSecret=${newSecret}`);
+  redirect(`${settingsPath(siteId, formData)}?newSecret=${newSecret}`);
 }
 
 /** Creates a new API key for a site. Shown once via the redirect query string. */
@@ -201,9 +212,10 @@ export async function createApiKey(siteId: string, formData: FormData): Promise<
   });
 
   revalidatePath(`/admin/sites/${siteId}/installningar`);
+  revalidatePath(`/admin/sites/${siteId}/integration`);
 
   redirect(
-    `/admin/sites/${siteId}/installningar${buildQuery({
+    `${settingsPath(siteId, formData)}${buildQuery({
       newKey: keyValue,
       newKeyName: name,
     })}`,
@@ -215,7 +227,7 @@ export async function createApiKey(siteId: string, formData: FormData): Promise<
  * being able to authenticate — the settings page warns about this before
  * the confirm dialog fires.
  */
-export async function deleteApiKey(siteId: string, keyId: string): Promise<void> {
+export async function deleteApiKey(siteId: string, keyId: string, formData?: FormData): Promise<void> {
   const user = await requireSiteOwner(siteId);
 
   const [existing] = await db
@@ -237,6 +249,7 @@ export async function deleteApiKey(siteId: string, keyId: string): Promise<void>
   }
 
   revalidatePath(`/admin/sites/${siteId}/installningar`);
+  revalidatePath(`/admin/sites/${siteId}/integration`);
 
-  redirect(`/admin/sites/${siteId}/installningar?deleted=1`);
+  redirect(`${settingsPath(siteId, formData)}?deleted=1`);
 }
