@@ -99,7 +99,55 @@ const NAV_LINKS = [
   { label: "Logga in", href: "/login" },
 ];
 
-const LOGOS = ["JJ Bygg", "Timringskurs", "Byggboden", "Norrhed Skog", "Swea", "Gällivare Traktor"];
+const LOGOS = ["JJ Bygg", "Swea Enterprise", "Kundnytt", "ReceptAPI"];
+
+/** Huvudcaset – bara fakta som går att verifiera på kundens sajt och i integrationen. */
+const FEATURED_CASE = {
+  name: "JJ Bygg & Entreprenad",
+  meta: "Bygg & entreprenad · Boden och Luleå",
+  href: "https://www.jjbyggboden.se",
+  domain: "jjbyggboden.se",
+  steps: [
+    {
+      label: "Utmaningen",
+      text: "Varje ny tjänst, ändrad text eller utbytt bild krävde att en utvecklare gick in i koden. Små ändringar blev liggande.",
+    },
+    {
+      label: "Lösningen",
+      text: "Sajten hämtar sidtexter, bilder, tjänster och SEO från sitecms via API. Fälten är låsta till det som får ändras – layouten går inte att ha sönder.",
+    },
+    {
+      label: "Resultatet",
+      text: "JJ Bygg uppdaterar rubriker, tjänstebeskrivningar och bilder själva i panelen, och ändringen syns på jjbyggboden.se inom en minut.",
+    },
+  ],
+  tags: ["Sidtexter & bilder", "Tjänster", "SEO per sida", "Live inom 60 s"],
+};
+
+/** Kunder som är på väg in – inga resultat påstås innan de finns. */
+const UPCOMING_CASES = [
+  {
+    name: "Swea Enterprise",
+    meta: "Mellerud",
+    text: "Ny hemsida som byggs direkt på sitecms, så att företaget kan uppdatera sitt innehåll själva från första dagen.",
+    href: null,
+    domain: "sweaenterprise.se",
+  },
+  {
+    name: "Kundnytt",
+    meta: "Omvärldsbevakning",
+    text: "Sajtens innehåll flyttas in i sitecms. Hela caset publiceras när kopplingen är live.",
+    href: "https://www.kundnytt.se",
+    domain: "kundnytt.se",
+  },
+  {
+    name: "ReceptAPI",
+    meta: "API med svenska recept",
+    text: "Sajtens innehåll kopplas till sitecms. Hela caset publiceras när kopplingen är live.",
+    href: "https://receptapi.se",
+    domain: "receptapi.se",
+  },
+];
 
 const FEATURES = [
   {
@@ -264,12 +312,80 @@ export default function Home() {
           <p className="logos-label">Byggt för små företag och de som bygger åt dem</p>
           <div className="logos-row">
             {LOGOS.map((name) => (
-              <span key={name} className="logo">
+              <a key={name} href="#kundcase" className="logo">
                 {name}
-              </span>
+              </a>
             ))}
           </div>
         </div>
+
+        {/* SECTION · KUNDCASE */}
+        <section className="section cases" id="kundcase">
+          <div className="section-head">
+            <span className="eyebrow" data-reveal>
+              Kundcase
+            </span>
+            <h2 data-reveal style={rd(80)}>
+              Så använder kunderna sitecms
+            </h2>
+            <p data-reveal style={rd(160)}>
+              Riktiga sajter, riktiga ändringar – gjorda av kunden själv.
+            </p>
+          </div>
+
+          <article className="case-featured" data-reveal style={rd(120)}>
+            <div className="case-head">
+              <div>
+                <span className="case-status case-status-live">
+                  <span className="dash-dot" />
+                  Live
+                </span>
+                <h3>{FEATURED_CASE.name}</h3>
+                <p className="case-meta">{FEATURED_CASE.meta}</p>
+              </div>
+              <a
+                href={FEATURED_CASE.href}
+                className="btn btn-outline case-link"
+                target="_blank"
+                rel="noopener"
+              >
+                Besök {FEATURED_CASE.domain}
+                {Icons.arrow}
+              </a>
+            </div>
+            <div className="case-steps">
+              {FEATURED_CASE.steps.map((s) => (
+                <div key={s.label} className="case-step">
+                  <h4>{s.label}</h4>
+                  <p>{s.text}</p>
+                </div>
+              ))}
+            </div>
+            <ul className="case-tags" aria-label="Används för">
+              {FEATURED_CASE.tags.map((t) => (
+                <li key={t}>{t}</li>
+              ))}
+            </ul>
+          </article>
+
+          <div className="case-grid">
+            {UPCOMING_CASES.map((c, i) => (
+              <article key={c.name} className="card case-card" data-reveal style={rd(i * 90)}>
+                <span className="case-status">Kommer snart</span>
+                <h3>{c.name}</h3>
+                <p className="case-meta">{c.meta}</p>
+                <p>{c.text}</p>
+                {c.href ? (
+                  <a href={c.href} className="case-domain" target="_blank" rel="noopener">
+                    {c.domain} ↗
+                  </a>
+                ) : (
+                  <span className="case-domain case-domain-muted">{c.domain} · lanseras snart</span>
+                )}
+              </article>
+            ))}
+          </div>
+        </section>
 
         {/* SECTION 2 · FEATURES */}
         <section className="section features" id="features">

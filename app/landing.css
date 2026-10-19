@@ -87,6 +87,36 @@ html.lenis, html.lenis body { height: auto }
 .landing .logo:hover { color: var(--ink); opacity: 1 }
 
 /* ---------------------------------------------------------------------------
+   SECTION · KUNDCASE
+--------------------------------------------------------------------------- */
+.landing .cases { padding-top: clamp(40px,6vw,80px) }
+.landing .case-featured {
+  position: relative; padding: clamp(26px,4vw,44px); border-radius: var(--radius-lg);
+  background: radial-gradient(120% 140% at 0% 0%, rgba(93,240,168,.1), transparent 50%), var(--glass-2);
+  border: 1px solid var(--line-strong); box-shadow: var(--shadow);
+  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+}
+.landing .case-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; flex-wrap: wrap }
+.landing .case-head h3 { margin-top: 14px; font-size: clamp(24px,3vw,32px); font-weight: 800; letter-spacing: -.015em }
+.landing .case-meta { margin-top: 6px; font-size: 14.5px; color: var(--muted-2) }
+.landing .case-link { flex-shrink: 0 }
+.landing .case-status { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 5px 11px; border-radius: 999px; background: rgba(255,255,255,.05); border: 1px solid var(--line) }
+.landing .case-status-live { color: var(--accent); background: rgba(93,240,168,.08); border-color: rgba(93,240,168,.2) }
+.landing .case-steps { margin-top: clamp(26px,4vw,40px); display: grid; grid-template-columns: repeat(3,1fr); gap: clamp(18px,3vw,36px) }
+.landing .case-step { padding-top: 18px; border-top: 1px solid var(--line) }
+.landing .case-step h4 { font-size: 12px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--accent) }
+.landing .case-step p { margin-top: 10px; font-size: 15.5px; line-height: 1.65; color: var(--muted) }
+.landing .case-tags { margin-top: clamp(24px,3vw,34px); display: flex; flex-wrap: wrap; gap: 8px }
+.landing .case-tags li { font-size: 13px; color: var(--ink); padding: 6px 12px; border-radius: 999px; background: rgba(255,255,255,.05); border: 1px solid var(--line) }
+.landing .case-grid { margin-top: 18px; display: grid; grid-template-columns: repeat(3,1fr); gap: 18px }
+.landing .case-card h3 { margin-top: 16px }
+.landing .case-card .case-meta { margin-top: 4px }
+.landing .case-domain { display: inline-block; margin-top: 18px; font-size: 14px; font-weight: 600; color: var(--accent) }
+.landing .case-domain:hover { text-decoration: underline }
+.landing .case-domain-muted { color: var(--muted-2); font-weight: 500 }
+.landing .case-domain-muted:hover { text-decoration: none }
+
+/* ---------------------------------------------------------------------------
    SECTION 2 · FEATURES
 --------------------------------------------------------------------------- */
 .landing .feature-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 18px }
@@ -175,6 +205,8 @@ html.lenis, html.lenis body { height: auto }
   .landing .showcase-grid { grid-template-columns: 1fr }
   .landing .showcase-copy { text-align: center; max-width: 640px; margin: 0 auto }
   .landing .stats { grid-template-columns: repeat(2,1fr) }
+  .landing .case-steps { grid-template-columns: 1fr }
+  .landing .case-grid { grid-template-columns: 1fr }
 }
 @media (max-width: 720px) {
   .landing .nav-links { display: none }
