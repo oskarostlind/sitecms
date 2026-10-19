@@ -145,6 +145,27 @@ const FEATURED_CASES = [
     ],
     tags: ["Config-fil → 38 fält", "Priser", "Nyheter", "Standardtexter som skydd"],
   },
+  {
+    name: "Kundnytt",
+    meta: "Omvärldsbevakning · morgonsammanfattning om bevakade bolag",
+    href: "https://www.kundnytt.se",
+    domain: "kundnytt.se",
+    steps: [
+      {
+        label: "Utmaningen",
+        text: "Startsidans och prissidans texter låg i koden, så varje ny formulering krävde en deploy. Samtidigt får priserna på sajten aldrig skilja sig från det kassan tar.",
+      },
+      {
+        label: "Lösningen",
+        text: "Hjältetexten, exemplen, prissidans texter och SEO per sida är fält i sitecms – tre sidor och 24 fält. Priserna skrivs som platshållare som fylls i från samma prislista som kassan, och svarar inte sitecms visas standardtexterna.",
+      },
+      {
+        label: "Resultatet",
+        text: "Texter, SEO och nyhetsinlägg uppdateras i panelen. Inläggen visas under /nyheter och i sitemapen, och sajten hämtar nytt innehåll så fort något sparas.",
+      },
+    ],
+    tags: ["24 fält", "Prisplatshållare", "Nyheter + sitemap", "Standardtexter som skydd"],
+  },
 ];
 
 /** Kunder som är på väg in – inga resultat påstås innan de finns. */
@@ -156,14 +177,6 @@ const UPCOMING_CASES = [
     href: null,
     domain: "sweaenterprise.se",
   },
-  {
-    name: "Kundnytt",
-    meta: "Omvärldsbevakning",
-    text: "Sajten är upplagd i sitecms och kopplingen av kundnytt.se pågår. Hela caset publiceras när den är live.",
-    href: "https://www.kundnytt.se",
-    domain: "kundnytt.se",
-  },
-
 ];
 
 const FEATURES = [
