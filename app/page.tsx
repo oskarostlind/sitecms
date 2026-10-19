@@ -101,28 +101,51 @@ const NAV_LINKS = [
 
 const LOGOS = ["JJ Bygg", "Swea Enterprise", "Kundnytt", "ReceptAPI"];
 
-/** Huvudcaset – bara fakta som går att verifiera på kundens sajt och i integrationen. */
-const FEATURED_CASE = {
-  name: "JJ Bygg & Entreprenad",
-  meta: "Bygg & entreprenad · Boden och Luleå",
-  href: "https://www.jjbyggboden.se",
-  domain: "jjbyggboden.se",
-  steps: [
-    {
-      label: "Utmaningen",
-      text: "Varje ny tjänst, ändrad text eller utbytt bild krävde att en utvecklare gick in i koden. Små ändringar blev liggande.",
-    },
-    {
-      label: "Lösningen",
-      text: "Sajten hämtar sidtexter, bilder, tjänster och SEO från sitecms via API. Fälten är låsta till det som får ändras – layouten går inte att ha sönder.",
-    },
-    {
-      label: "Resultatet",
-      text: "JJ Bygg uppdaterar rubriker, tjänstebeskrivningar och bilder själva i panelen, och ändringen syns på jjbyggboden.se inom en minut.",
-    },
-  ],
-  tags: ["Sidtexter & bilder", "Tjänster", "SEO per sida", "Live inom 60 s"],
-};
+/** Live-case – bara fakta som går att verifiera på kundens sajt och i integrationen. */
+const FEATURED_CASES = [
+  {
+    name: "JJ Bygg & Entreprenad",
+    meta: "Bygg & entreprenad · Boden och Luleå",
+    href: "https://www.jjbyggboden.se",
+    domain: "jjbyggboden.se",
+    steps: [
+      {
+        label: "Utmaningen",
+        text: "Varje ny tjänst, ändrad text eller utbytt bild krävde att en utvecklare gick in i koden. Små ändringar blev liggande.",
+      },
+      {
+        label: "Lösningen",
+        text: "Sajten hämtar sidtexter, bilder, tjänster och SEO från sitecms via API. Fälten är låsta till det som får ändras – layouten går inte att ha sönder.",
+      },
+      {
+        label: "Resultatet",
+        text: "JJ Bygg uppdaterar rubriker, tjänstebeskrivningar och bilder själva i panelen, och ändringen syns på jjbyggboden.se inom en minut.",
+      },
+    ],
+    tags: ["Sidtexter & bilder", "Tjänster", "SEO per sida", "Live inom 60 s"],
+  },
+  {
+    name: "ReceptAPI",
+    meta: "API med svenska recept · för appar och tjänster",
+    href: "https://receptapi.se",
+    domain: "receptapi.se",
+    steps: [
+      {
+        label: "Utmaningen",
+        text: "Texterna på startsidan, prissidan och i sidfoten låg direkt i koden. Att justera en formulering eller ett paket krävde en ny deploy.",
+      },
+      {
+        label: "Lösningen",
+        text: "Sajtens fält deklareras i en config-fil och synkas till sitecms – fyra sidor och 38 fält på en gång. Texterna i filen fungerar som standardvärden, så sajten ser likadan ut även om CMS:et inte svarar.",
+      },
+      {
+        label: "Resultatet",
+        text: "Startsidan, priserna, sidfoten och en ny nyhetssida redigeras i panelen. När något sparas uppdateras receptapi.se direkt, utan en ny deploy.",
+      },
+    ],
+    tags: ["Config-fil → 38 fält", "Priser", "Nyheter", "Standardtexter som skydd"],
+  },
+];
 
 /** Kunder som är på väg in – inga resultat påstås innan de finns. */
 const UPCOMING_CASES = [
@@ -136,17 +159,11 @@ const UPCOMING_CASES = [
   {
     name: "Kundnytt",
     meta: "Omvärldsbevakning",
-    text: "Sajtens innehåll flyttas in i sitecms. Hela caset publiceras när kopplingen är live.",
+    text: "Sajten är upplagd i sitecms och kopplingen av kundnytt.se pågår. Hela caset publiceras när den är live.",
     href: "https://www.kundnytt.se",
     domain: "kundnytt.se",
   },
-  {
-    name: "ReceptAPI",
-    meta: "API med svenska recept",
-    text: "Sajtens innehåll kopplas till sitecms. Hela caset publiceras när kopplingen är live.",
-    href: "https://receptapi.se",
-    domain: "receptapi.se",
-  },
+
 ];
 
 const FEATURES = [
@@ -333,40 +350,44 @@ export default function Home() {
             </p>
           </div>
 
-          <article className="case-featured" data-reveal style={rd(120)}>
-            <div className="case-head">
-              <div>
-                <span className="case-status case-status-live">
-                  <span className="dash-dot" />
-                  Live
-                </span>
-                <h3>{FEATURED_CASE.name}</h3>
-                <p className="case-meta">{FEATURED_CASE.meta}</p>
-              </div>
-              <a
-                href={FEATURED_CASE.href}
-                className="btn btn-outline case-link"
-                target="_blank"
-                rel="noopener"
-              >
-                Besök {FEATURED_CASE.domain}
-                {Icons.arrow}
-              </a>
-            </div>
-            <div className="case-steps">
-              {FEATURED_CASE.steps.map((s) => (
-                <div key={s.label} className="case-step">
-                  <h4>{s.label}</h4>
-                  <p>{s.text}</p>
+          <div className="case-list">
+            {FEATURED_CASES.map((c) => (
+            <article key={c.name} className="case-featured" data-reveal style={rd(120)}>
+              <div className="case-head">
+                <div>
+                  <span className="case-status case-status-live">
+                    <span className="dash-dot" />
+                    Live
+                  </span>
+                  <h3>{c.name}</h3>
+                  <p className="case-meta">{c.meta}</p>
                 </div>
-              ))}
-            </div>
-            <ul className="case-tags" aria-label="Används för">
-              {FEATURED_CASE.tags.map((t) => (
-                <li key={t}>{t}</li>
-              ))}
-            </ul>
-          </article>
+                <a
+                  href={c.href}
+                  className="btn btn-outline case-link"
+                  target="_blank"
+                  rel="noopener"
+                >
+                  Besök {c.domain}
+                  {Icons.arrow}
+                </a>
+              </div>
+              <div className="case-steps">
+                {c.steps.map((s) => (
+                  <div key={s.label} className="case-step">
+                    <h4>{s.label}</h4>
+                    <p>{s.text}</p>
+                  </div>
+                ))}
+              </div>
+              <ul className="case-tags" aria-label="Används för">
+                {c.tags.map((t) => (
+                  <li key={t}>{t}</li>
+                ))}
+              </ul>
+            </article>
+            ))}
+          </div>
 
           <div className="case-grid">
             {UPCOMING_CASES.map((c, i) => (

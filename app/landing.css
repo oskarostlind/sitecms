@@ -108,7 +108,8 @@ html.lenis, html.lenis body { height: auto }
 .landing .case-step p { margin-top: 10px; font-size: 15.5px; line-height: 1.65; color: var(--muted) }
 .landing .case-tags { margin-top: clamp(24px,3vw,34px); display: flex; flex-wrap: wrap; gap: 8px }
 .landing .case-tags li { font-size: 13px; color: var(--ink); padding: 6px 12px; border-radius: 999px; background: rgba(255,255,255,.05); border: 1px solid var(--line) }
-.landing .case-grid { margin-top: 18px; display: grid; grid-template-columns: repeat(3,1fr); gap: 18px }
+.landing .case-list { display: grid; gap: 18px }
+.landing .case-grid { margin-top: 18px; display: grid; grid-template-columns: repeat(auto-fit,minmax(260px,1fr)); gap: 18px }
 .landing .case-card h3 { margin-top: 16px }
 .landing .case-card .case-meta { margin-top: 4px }
 .landing .case-domain { display: inline-block; margin-top: 18px; font-size: 14px; font-weight: 600; color: var(--accent) }
