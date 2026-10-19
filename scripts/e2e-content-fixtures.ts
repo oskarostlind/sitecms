@@ -10,6 +10,7 @@ import { randomBytes } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { db } from "../lib/db";
 import { apiKeys, blocks, pages, seoMeta, services, sites } from "../lib/db/schema";
+import { apiKeyColumns, generateApiKey } from "../lib/api-keys";
 
 async function main() {
   const [site] = await db.select().from(sites).where(eq(sites.slug, "e2e-test")).limit(1);
@@ -70,13 +71,11 @@ async function main() {
       .returning();
   }
 
-  let [key] = await db.select().from(apiKeys).where(eq(apiKeys.siteId, site.id)).limit(1);
-  if (!key) {
-    [key] = await db
-      .insert(apiKeys)
-      .values({ siteId: site.id, key: `e2e_${randomBytes(24).toString("base64url")}`, name: "E2E" })
-      .returning();
-  }
+  // Nycklar lagras bara som hash: ersätt E2E-nyckeln varje körning så att
+  // klartexten finns att skriva ut.
+  await db.delete(apiKeys).where(and(eq(apiKeys.siteId, site.id), eq(apiKeys.name, "E2E")));
+  const apiKeyValue = generateApiKey();
+  await db.insert(apiKeys).values({ siteId: site.id, ...apiKeyColumns(apiKeyValue), name: "E2E" });
 
   console.log(
     JSON.stringify({
@@ -85,7 +84,7 @@ async function main() {
       blockId: block.id,
       serviceId: service.id,
       seoId: seo.id,
-      apiKey: key.key,
+      apiKey: apiKeyValue,
     })
   );
 }

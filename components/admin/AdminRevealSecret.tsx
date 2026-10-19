@@ -23,7 +23,7 @@ const MASK = "••••••••";
  * Visar en hemlighet (API-nyckel, revalidate-hemlighet, tillfälligt
  * lösenord) maskerad som standard, med knappar för att visa/dölja och
  * kopiera. Hämtar eller lagrar inget själv – värdet kommer alltid in via
- * props (t.ex. en redirect-query-sträng eller en databasrad).
+ * props (t.ex. den krypterade engångscookien, se lib/reveal-flash.ts).
  */
 export function AdminRevealSecret({ value, title, description, variant = "callout" }: AdminRevealSecretProps) {
   const [visible, setVisible] = useState(false);

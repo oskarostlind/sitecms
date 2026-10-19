@@ -9,15 +9,12 @@ import { apiKeys, memberships, pages, sites } from "@/lib/db/schema";
 import { requireUser, requireSiteOwner } from "@/lib/guard";
 import { logActivity } from "@/lib/audit";
 import { slugify } from "@/components/content/slugify";
+import { apiKeyColumns, generateApiKey } from "@/lib/api-keys";
+import { setReveal } from "@/lib/reveal-flash";
 
 function readString(formData: FormData, key: string): string {
   const value = formData.get(key);
   return typeof value === "string" ? value.trim() : "";
-}
-
-/** 32 hex characters (16 random bytes) — matches the format used by scripts/seed.ts. */
-function generateApiKey(): string {
-  return randomBytes(16).toString("hex");
 }
 
 /** 48 hex characters (24 random bytes) for the higher-value revalidate secret. */
@@ -69,10 +66,10 @@ function buildQuery(params: Record<string, string | undefined>): string {
 /**
  * Creates a new tenant site: the site row itself, a default "home" page, and
  * one API key. Any logged-in user may create a site (self-service) and
- * becomes its owner via an owner-membership. Redirects back to
- * /admin/sites/new with the freshly created API key in the query string so
- * the page can show it exactly once — the key itself is never re-displayed
- * after this redirect since it's only masked in later reads.
+ * becomes its owner via an owner-membership. The freshly created API key is
+ * handed to /admin/sites/new through the encrypted one-time reveal cookie
+ * (never the URL) so the page can show it exactly once; only its hash is
+ * stored.
  */
 export async function createSite(formData: FormData): Promise<void> {
   const user = await requireUser();
@@ -110,7 +107,7 @@ export async function createSite(formData: FormData): Promise<void> {
   const apiKeyValue = generateApiKey();
   await db.insert(apiKeys).values({
     siteId: site.id,
-    key: apiKeyValue,
+    ...apiKeyColumns(apiKeyValue),
     name: "Standardnyckel",
   });
 
@@ -126,12 +123,12 @@ export async function createSite(formData: FormData): Promise<void> {
   // se till att den är färsk nästa gång admin-trädet renderas.
   revalidatePath("/admin", "layout");
 
+  await setReveal({ scope: "new-site", siteId: site.id, siteName: name, apiKey: apiKeyValue });
+
   redirect(
     `/admin/sites/new${buildQuery({
       created: "1",
       siteId: site.id,
-      siteName: name,
-      key: apiKeyValue,
     })}`,
   );
 }
@@ -170,8 +167,8 @@ export async function updateSiteSettings(siteId: string, formData: FormData): Pr
 /**
  * Regenerates the on-demand revalidation secret for a site. The old secret
  * stops working immediately — any customer-site webhook still configured
- * with it will start failing until it's updated with the new value shown
- * once on this redirect.
+ * with it will start failing until it's updated with the new value, which is
+ * shown once via the encrypted reveal cookie (never in the URL).
  */
 export async function regenerateRevalidateSecret(siteId: string, formData?: FormData): Promise<void> {
   const user = await requireSiteOwner(siteId);
@@ -191,17 +188,18 @@ export async function regenerateRevalidateSecret(siteId: string, formData?: Form
     detail: "Genererade en ny revalidate-hemlighet (den gamla slutade fungera)",
   });
 
-  redirect(`${settingsPath(siteId, formData)}?newSecret=${newSecret}`);
+  await setReveal({ scope: `site:${siteId}`, revalidateSecret: newSecret });
+  redirect(settingsPath(siteId, formData));
 }
 
-/** Creates a new API key for a site. Shown once via the redirect query string. */
+/** Creates a new API key for a site. Shown once via the reveal cookie; only the hash is stored. */
 export async function createApiKey(siteId: string, formData: FormData): Promise<void> {
   const user = await requireSiteOwner(siteId);
 
   const name = readString(formData, "name") || "Namnlös nyckel";
   const keyValue = generateApiKey();
 
-  await db.insert(apiKeys).values({ siteId, key: keyValue, name });
+  await db.insert(apiKeys).values({ siteId, ...apiKeyColumns(keyValue), name });
 
   await logActivity({
     userId: user.id,
@@ -214,12 +212,8 @@ export async function createApiKey(siteId: string, formData: FormData): Promise<
   revalidatePath(`/admin/sites/${siteId}/installningar`);
   revalidatePath(`/admin/sites/${siteId}/integration`);
 
-  redirect(
-    `${settingsPath(siteId, formData)}${buildQuery({
-      newKey: keyValue,
-      newKeyName: name,
-    })}`,
-  );
+  await setReveal({ scope: `site:${siteId}`, apiKey: keyValue, apiKeyName: name });
+  redirect(settingsPath(siteId, formData));
 }
 
 /**

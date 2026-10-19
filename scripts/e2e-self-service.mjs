@@ -122,8 +122,10 @@ try {
     await submit(page, 'button[type="submit"]');
     const url = new URL(page.url());
     const siteId = url.searchParams.get("siteId");
-    const apiKey = url.searchParams.get("key");
-    must(Boolean(siteId && apiKey), "sajt skapad med API-nyckel", `siteId=${siteId}`);
+    must(!/[?&](key|newKey|newSecret)=/.test(page.url()), "API-nyckeln ligger inte i URL:en", page.url().replace(BASE, ""));
+    await page.click('button:has-text("Visa")');
+    const apiKey = ((await page.locator("code").first().textContent()) ?? "").trim();
+    must(Boolean(siteId && apiKey.startsWith("scms_")), "sajt skapad med API-nyckel", `siteId=${siteId}`);
     state.siteId = siteId;
     state.siteName = siteName;
     state.apiKey = apiKey;
@@ -218,7 +220,8 @@ try {
       await page.goto(`${BASE}/admin/sites/${siteId}/integration`, { waitUntil: "networkidle" });
       await page.fill("#keyName", "E2E-nyckel");
       await submit(page, 'button:has-text("Skapa nyckel")');
-      state.apiKey = new URL(page.url()).searchParams.get("newKey");
+      must(!page.url().includes("newKey="), "ny API-nyckel ligger inte i URL:en");
+      state.apiKey = ((await page.textContent("body")) ?? "").match(/CMS_API_KEY=(scms_[A-Za-z0-9_-]+)/)?.[1] ?? null;
       must(Boolean(state.apiKey), "ny API-nyckel via integrationssidan");
       save();
     }
@@ -254,7 +257,8 @@ try {
     await submit(page, 'button:has-text("Spara revalidate-URL")');
     page.once("dialog", (d) => d.accept());
     await submit(page, 'button:has-text("enerera hemlighet")');
-    must(page.url().includes("newSecret="), "revalidate-hemlighet genererad");
+    must(!page.url().includes("newSecret="), "hemligheten ligger inte i URL:en");
+    must(/CMS_REVALIDATE_SECRET=[0-9a-f]{48}/.test((await page.textContent("body")) ?? ""), "revalidate-hemlighet genererad");
     await submit(page, 'button:has-text("Testa anslutningen")');
     await shot(page, "connection-check");
     must(page.url().includes("check=ok"), "anslutningstest ok", page.url().replace(BASE, "").slice(0, 120));

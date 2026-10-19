@@ -11,6 +11,7 @@ config({ path: ".env.local" });
 import { randomBytes } from "node:crypto";
 import { eq, and } from "drizzle-orm";
 import { db } from "../lib/db";
+import { apiKeyColumns, generateApiKey } from "../lib/api-keys";
 import {
   sites,
   pages,
@@ -336,15 +337,16 @@ async function main() {
     .where(and(eq(apiKeys.siteId, site.id), eq(apiKeys.name, "Default API Key")))
     .limit(1);
 
+  // Nycklar lagras bara som hash, så en befintlig nyckel kan inte skrivas ut igen.
   let apiKeyValue: string;
   if (existingKey.length > 0) {
-    apiKeyValue = existingKey[0].key;
+    apiKeyValue = `(finns redan, slutar på ${existingKey[0].keyHint} — skapa en ny i panelen om du behöver klartexten)`;
     console.log(`API key: already exists, reusing.`);
   } else {
-    apiKeyValue = randomBytes(16).toString("hex"); // 32 hex chars
+    apiKeyValue = generateApiKey();
     await db.insert(apiKeys).values({
       siteId: site.id,
-      key: apiKeyValue,
+      ...apiKeyColumns(apiKeyValue),
       name: "Default API Key",
     });
     console.log(`API key: created.`);

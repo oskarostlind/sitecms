@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { readReveal } from "@/lib/reveal-flash";
+import { hashApiKey, maskApiKey } from "@/lib/api-keys";
+import { ConsumeReveal } from "@/components/admin/ConsumeReveal";
 import { notFound } from "next/navigation";
 import { count, desc, eq } from "drizzle-orm";
 import { BookOpen, Circle, CircleCheck, KeyRound, Plug, UserPlus } from "lucide-react";
@@ -59,10 +62,6 @@ const ERROR_MESSAGES: Record<string, string> = {
   missing: "Sajten saknar namn — fyll i det under Inställningar och försök igen.",
 };
 
-function maskKey(key: string): string {
-  return `••••••••${key.slice(-4)}`;
-}
-
 function StepTitle({ number, children }: { number: number; children: React.ReactNode }) {
   return (
     <CardTitle className="flex items-center gap-3">
@@ -113,9 +112,6 @@ export default async function IntegrationPage({
   searchParams: Promise<{
     error?: string;
     success?: string;
-    newSecret?: string;
-    newKey?: string;
-    newKeyName?: string;
     deleted?: string;
     check?: string;
     detail?: string;
@@ -123,7 +119,13 @@ export default async function IntegrationPage({
 }) {
   const { siteId } = await params;
   await requireSiteOwner(siteId);
-  const { error, success, newSecret, newKey, newKeyName, deleted, check, detail } = await searchParams;
+  const { error, success, deleted, check, detail } = await searchParams;
+  // Nya hemligheter kommer från den krypterade engångscookien — aldrig från URL:en.
+  const reveal = await readReveal(`site:${siteId}`);
+  const newSecret = reveal?.revalidateSecret;
+  const newKey = reveal?.apiKey;
+  const newKeyName = reveal?.apiKeyName;
+  const newKeyHash = newKey ? hashApiKey(newKey) : null;
 
   const [site] = await db.select().from(sites).where(eq(sites.id, siteId)).limit(1);
   if (!site) notFound();
@@ -155,6 +157,7 @@ export default async function IntegrationPage({
 
   return (
     <div className="max-w-3xl">
+      {reveal ? <ConsumeReveal /> : null}
       <PageHeader
         title="Integration"
         description={`Koppla ${site.name} till sitecms: nycklar, kod att klistra in, test av anslutningen och inbjudan till kunden.`}
@@ -258,7 +261,7 @@ export default async function IntegrationPage({
                         </Td>
                         <Td>
                           <code className="font-mono text-xs text-neutral-700">
-                            {newKey === k.key ? k.key : maskKey(k.key)}
+                            {newKey && newKeyHash === k.keyHash ? newKey : maskApiKey(k.keyHint)}
                           </code>
                         </Td>
                         <Td className="whitespace-nowrap text-neutral-500" title={formatDateTime(k.createdAt)}>

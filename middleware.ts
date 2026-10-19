@@ -33,7 +33,30 @@ function canonicalRedirect(url: URL): Response | null {
   return Response.redirect(target, 308);
 }
 
+/**
+ * Query-parametrar som tidigare bar hemligheter (API-nycklar och
+ * revalidate-hemligheter) i adminpanelen. Hemligheterna lämnas numera över
+ * via en krypterad engångscookie, men gamla bokmärken eller historikposter
+ * kan fortfarande innehålla dem — de skalas bort innan något annat händer, så
+ * att de inte hamnar i callbackUrl, Referer eller fler loggrader.
+ */
+const LEGACY_SECRET_PARAMS = ["key", "newKey", "newKeyName", "newSecret"];
+
+function stripLegacySecrets(url: URL): Response | null {
+  if (!url.pathname.startsWith("/admin")) return null;
+  if (!LEGACY_SECRET_PARAMS.some((p) => url.searchParams.has(p))) return null;
+  const clean = new URL(url);
+  for (const p of LEGACY_SECRET_PARAMS) clean.searchParams.delete(p);
+  const res = NextResponse.redirect(clean, 303);
+  res.headers.set("Cache-Control", "no-store");
+  res.headers.set("Referrer-Policy", "no-referrer");
+  return res;
+}
+
 export default auth((req) => {
+  const stripped = stripLegacySecrets(req.nextUrl);
+  if (stripped) return stripped;
+
   const redirectToCanonical = canonicalRedirect(req.nextUrl);
   if (redirectToCanonical) return redirectToCanonical;
 

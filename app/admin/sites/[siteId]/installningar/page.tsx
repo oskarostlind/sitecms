@@ -1,4 +1,7 @@
 import { notFound } from "next/navigation";
+import { readReveal } from "@/lib/reveal-flash";
+import { maskApiKey } from "@/lib/api-keys";
+import { ConsumeReveal } from "@/components/admin/ConsumeReveal";
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { apiKeys, sites } from "@/lib/db/schema";
@@ -45,15 +48,17 @@ export default async function SiteSettingsPage({
   searchParams: Promise<{
     error?: string;
     success?: string;
-    newSecret?: string;
-    newKey?: string;
-    newKeyName?: string;
     deleted?: string;
   }>;
 }) {
   const { siteId } = await params;
   await requireSiteOwner(siteId);
-  const { error, success, newSecret, newKey, newKeyName, deleted } = await searchParams;
+  const { error, success, deleted } = await searchParams;
+  // Nya hemligheter kommer från den krypterade engångscookien — aldrig från URL:en.
+  const reveal = await readReveal(`site:${siteId}`);
+  const newSecret = reveal?.revalidateSecret;
+  const newKey = reveal?.apiKey;
+  const newKeyName = reveal?.apiKeyName;
 
   const [site] = await db.select().from(sites).where(eq(sites.id, siteId)).limit(1);
   if (!site) notFound();
@@ -68,6 +73,7 @@ export default async function SiteSettingsPage({
 
   return (
     <div className="max-w-3xl">
+      {reveal ? <ConsumeReveal /> : null}
       <PageHeader title="Inställningar" description={`Grundinställningar, revalidation och API-nycklar för ${site.name}.`} />
 
       <div className="space-y-6">
@@ -178,7 +184,7 @@ export default async function SiteSettingsPage({
                         {k.name}
                       </Td>
                       <Td>
-                        <AdminRevealSecret value={k.key} variant="inline" />
+                        <code className="font-mono text-xs text-neutral-700">{maskApiKey(k.keyHint)}</code>
                       </Td>
                       <Td className="whitespace-nowrap text-neutral-500">{formatDateTime(k.createdAt)}</Td>
                       <Td className="text-right">

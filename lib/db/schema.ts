@@ -204,12 +204,15 @@ export const media = pgTable("media", {
 export const apiKeys = pgTable("api_keys", {
   id: uuid("id").primaryKey().defaultRandom(),
   siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
-  key: text("key").notNull(),
+  // Klartexten lagras aldrig — bara SHA-256 för uppslag och de fyra sista
+  // tecknen för att kunna känna igen nyckeln (se lib/api-keys.ts).
+  keyHash: text("key_hash").notNull(),
+  keyHint: text("key_hint").notNull(),
   name: text("name").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
-  uniqueIndex("api_keys_key_idx").on(table.key),
+  uniqueIndex("api_keys_key_hash_idx").on(table.keyHash),
 ]);
 
 // ---------------------------------------------------------------------------

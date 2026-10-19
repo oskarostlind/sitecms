@@ -1,5 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { db, apiKeys, sites } from "@/lib/db";
+import { hashApiKey } from "@/lib/api-keys";
 
 export type ApiSite = {
   id: string;
@@ -14,7 +15,9 @@ export type ApiAuthResult =
 
 /**
  * Resolves a site by its public slug and checks the "x-api-key" header
- * against that site's api_keys. Used by every route under /api/v1/sites.
+ * against that site's api_keys. Only SHA-256 hashes are stored, so the
+ * header is hashed and looked up — the plaintext key never touches the
+ * database. Used by every route under /api/v1/sites.
  */
 export async function authenticateSite(slug: string, request: Request): Promise<ApiAuthResult> {
   const [site] = await db
@@ -27,15 +30,15 @@ export async function authenticateSite(slug: string, request: Request): Promise<
     return { ok: false, status: 404, error: "Sajten hittades inte." };
   }
 
-  const apiKey = request.headers.get("x-api-key");
-  if (!apiKey) {
+  const apiKey = request.headers.get("x-api-key")?.trim();
+  if (!apiKey || apiKey.length > 200) {
     return { ok: false, status: 401, error: "API-nyckel saknas (header x-api-key)." };
   }
 
   const [match] = await db
     .select({ id: apiKeys.id })
     .from(apiKeys)
-    .where(and(eq(apiKeys.siteId, site.id), eq(apiKeys.key, apiKey)))
+    .where(and(eq(apiKeys.siteId, site.id), eq(apiKeys.keyHash, hashApiKey(apiKey))))
     .limit(1);
 
   if (!match) {
