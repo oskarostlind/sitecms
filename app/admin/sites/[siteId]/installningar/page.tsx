@@ -38,6 +38,7 @@ import {
 const ERROR_MESSAGES: Record<string, string> = {
   missing: "Fyll i ett namn för sajten.",
   "confirm-name": "Skriv sajtens namn exakt som det står för att bekräfta borttagningen.",
+  "notify-email": "E-postadressen för förfrågningar ser inte giltig ut.",
 };
 
 export default async function SiteSettingsPage({
@@ -107,6 +108,20 @@ export default async function SiteSettingsPage({
                   defaultValue={site.revalidateUrl ?? ""}
                   placeholder="https://kundsajt.se/api/revalidate"
                   className="font-mono"
+                />
+              </Field>
+
+              <Field
+                htmlFor="notifyEmail"
+                label="E-post för offertförfrågningar"
+                hint="Nya förfrågningar från sajtens formulär mejlas hit (svara-till = kunden). Lämna tomt för att bara spara dem under Förfrågningar."
+              >
+                <Input
+                  id="notifyEmail"
+                  name="notifyEmail"
+                  type="email"
+                  defaultValue={site.notifyEmail ?? ""}
+                  placeholder="offert@kundensajt.se"
                 />
               </Field>
 

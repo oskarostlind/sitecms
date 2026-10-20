@@ -10,12 +10,26 @@ const GROUP_TITLES: Record<string, string> = {
   cta: "Uppmaning (CTA)",
   footer: "Sidfot & kontaktuppgifter",
   faq: "Vanliga frågor",
+  services: "Tjänster – rubrik",
+  fleet: "Maskinpark",
+  about: "Om oss",
+  contact: "Kontaktuppgifter",
+  company: "Företagsuppgifter",
+  offert: "Offertsidan",
+  tack: "Tack-sidan",
+  privacy: "Integritetspolicy",
+  recruit: "Rekrytering",
+  memberships: "Medlemskap",
 };
 
 const FIELD_LABELS: Record<string, string> = {
   "hero.title": "Rubrik",
   "hero.subtitle": "Underrubrik",
   "hero.image": "Bild",
+  "contact.phone": "Telefon",
+  "memberships.item1": "Medlemskap 1",
+  "memberships.item2": "Medlemskap 2",
+  "memberships.item3": "Medlemskap 3",
   "why.item1": "Punkt 1",
   "why.item2": "Punkt 2",
   "why.item3": "Punkt 3",
@@ -78,17 +92,62 @@ export function groupDescription(prefix: string): string | undefined {
 export function fieldHint(key: string): string | undefined {
   return FIELD_HINTS[key];
 }
+/** Svenska namn på vanliga fältsuffix (t.ex. "title" i "about.title"). */
+const SUFFIX_LABELS: Record<string, string> = {
+  phoneLabel: "Telefon – vad numret avser",
+  phoneAlt: "Telefon 2",
+  phoneAltLabel: "Telefon 2 – vad numret avser",
+  title: "Rubrik",
+  subtitle: "Underrubrik",
+  intro: "Ingress",
+  text: "Text",
+  body: "Text",
+  image: "Bild",
+  button: "Knapptext",
+  phone: "Telefon",
+  email: "E-post",
+  address: "Besöksadress",
+  postal: "Postadress",
+  hours: "Öppettider",
+  person: "Kontaktperson",
+  mapQuery: "Adress för karta",
+  name: "Namn",
+  orgnr: "Organisationsnummer",
+  founded: "Grundat år",
+};
+
+/** Numrerade fält: "item3" → "Punkt 3", "q2" → "Fråga 2" osv. */
+const NUMBERED_LABELS: Record<string, string> = {
+  item: "Punkt",
+  name: "Kontaktperson",
+  role: "Roll",
+  phone: "Telefon",
+  email: "E-post",
+  text: "Text",
+  count: "Antal",
+  trust: "Förtroendepunkt",
+  q: "Fråga",
+  a: "Svar",
+};
 
 export function fieldLabel(key: string): string {
   if (FIELD_LABELS[key]) return FIELD_LABELS[key];
   const dotIndex = key.indexOf(".");
   const suffix = dotIndex >= 0 ? key.slice(dotIndex + 1) : key;
+  if (SUFFIX_LABELS[suffix]) return SUFFIX_LABELS[suffix];
+  const numbered = suffix.match(/^([a-zA-Z]+)(\d+)$/);
+  if (numbered && NUMBERED_LABELS[numbered[1]]) {
+    return `${NUMBERED_LABELS[numbered[1]]} ${numbered[2]}`;
+  }
   return humanizeSuffix(suffix);
 }
 
 /** Sorteringsordning för kända grupper; okända grupper hamnar sist, i den
  * ordning de påträffas. */
-const GROUP_ORDER = ["hero", "why", "cta", "faq", "footer"];
+const GROUP_ORDER = [
+  "hero", "services", "fleet", "about", "why", "faq", "cta", "contact", "company",
+  "recruit", "offert", "tack", "privacy", "footer",
+];
 
 export function groupSortIndex(prefix: string): number {
   const idx = GROUP_ORDER.indexOf(prefix);

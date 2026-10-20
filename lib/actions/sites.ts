@@ -140,14 +140,18 @@ export async function updateSiteSettings(siteId: string, formData: FormData): Pr
   const name = readString(formData, "name");
   const domain = readString(formData, "domain") || null;
   const revalidateUrl = readString(formData, "revalidateUrl") || null;
+  const notifyEmail = readString(formData, "notifyEmail") || null;
 
   if (!name) {
     redirect(`${settingsPath(siteId, formData)}?error=missing`);
   }
+  if (notifyEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(notifyEmail)) {
+    redirect(`${settingsPath(siteId, formData)}?error=notify-email`);
+  }
 
   await db
     .update(sites)
-    .set({ name, domain, revalidateUrl, updatedAt: new Date() })
+    .set({ name, domain, revalidateUrl, notifyEmail, updatedAt: new Date() })
     .where(eq(sites.id, siteId));
 
   await logActivity({

@@ -28,6 +28,8 @@ const ACTION_LABELS: Record<string, string> = {
   "services.update": "Uppdaterade en tjänst",
   "services.delete": "Tog bort en tjänst",
   "sites.create": "Skapade sajten",
+  "quotes.status": "Ändrade status på en offertförfrågan",
+  "quotes.delete": "Tog bort en offertförfrågan",
   "sites.update": "Uppdaterade sajtens inställningar",
   "sites.secret_regenerate": "Skapade en ny hemlig nyckel",
   "users.create": "Skapade en användare",
