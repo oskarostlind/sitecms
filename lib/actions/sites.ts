@@ -11,6 +11,7 @@ import { logActivity } from "@/lib/audit";
 import { slugify } from "@/components/content/slugify";
 import { apiKeyColumns, generateApiKey } from "@/lib/api-keys";
 import { setReveal } from "@/lib/reveal-flash";
+import { revalidateUrlForDomain } from "@/lib/webhook-url";
 
 function readString(formData: FormData, key: string): string {
   const value = formData.get(key);
@@ -65,7 +66,11 @@ function buildQuery(params: Record<string, string | undefined>): string {
 
 /**
  * Creates a new tenant site: the site row itself, a default "home" page, and
- * one API key. Any logged-in user may create a site (self-service) and
+ * one API key. When a domain is given, the revalidate URL is set right away to
+ * https://<domain>/api/sitecms/revalidate (what `npx sitecms-next init`
+ * creates), so content changes reach the site without a manual step. No
+ * revalidate secret is generated any more — the webhook is signed with the
+ * site's API keys (lib/webhook.ts). Any logged-in user may create a site (self-service) and
  * becomes its owner via an owner-membership. The freshly created API key is
  * handed to /admin/sites/new through the encrypted one-time reveal cookie
  * (never the URL) so the page can show it exactly once; only its hash is
@@ -88,9 +93,11 @@ export async function createSite(formData: FormData): Promise<void> {
   }
   const slug = await uniqueSiteSlug(baseSlug);
 
+  const revalidateUrl = revalidateUrlForDomain(domain);
+
   const [site] = await db
     .insert(sites)
-    .values({ name, slug, domain, createdByUserId: user.id })
+    .values({ name, slug, domain, revalidateUrl, createdByUserId: user.id })
     .returning();
 
   // The creator owns the site. Admins already see every site; the membership
@@ -133,13 +140,23 @@ export async function createSite(formData: FormData): Promise<void> {
   );
 }
 
-/** Updates the editable settings for a site (name, domain, revalidate URL). */
+/**
+ * Updates the editable settings for a site (name, domain, revalidate URL,
+ * notify e-mail). Only fields that are present in the submitted form are
+ * written, so a form that edits a subset (e.g. the revalidate URL on the
+ * integration page) never blanks the others.
+ *
+ * When the domain goes from empty to a value and no revalidate URL is set
+ * (neither in the form nor on the site), the standard
+ * https://<domain>/api/sitecms/revalidate is filled in. An existing revalidate
+ * URL is never overwritten automatically.
+ */
 export async function updateSiteSettings(siteId: string, formData: FormData): Promise<void> {
   const user = await requireSiteOwner(siteId);
 
   const name = readString(formData, "name");
   const domain = readString(formData, "domain") || null;
-  const revalidateUrl = readString(formData, "revalidateUrl") || null;
+  let revalidateUrl = readString(formData, "revalidateUrl") || null;
   const notifyEmail = readString(formData, "notifyEmail") || null;
 
   if (!name) {
@@ -149,17 +166,45 @@ export async function updateSiteSettings(siteId: string, formData: FormData): Pr
     redirect(`${settingsPath(siteId, formData)}?error=notify-email`);
   }
 
-  await db
-    .update(sites)
-    .set({ name, domain, revalidateUrl, notifyEmail, updatedAt: new Date() })
-    .where(eq(sites.id, siteId));
+  const [current] = await db
+    .select({ domain: sites.domain, revalidateUrl: sites.revalidateUrl })
+    .from(sites)
+    .where(eq(sites.id, siteId))
+    .limit(1);
+
+  const hasDomainField = formData.has("domain");
+  const hasRevalidateField = formData.has("revalidateUrl");
+
+  let autoRevalidateUrl = false;
+  if (
+    hasDomainField &&
+    domain &&
+    !current?.domain?.trim() &&
+    !revalidateUrl &&
+    !current?.revalidateUrl?.trim()
+  ) {
+    const suggested = revalidateUrlForDomain(domain);
+    if (suggested) {
+      revalidateUrl = suggested;
+      autoRevalidateUrl = true;
+    }
+  }
+
+  const update: Partial<typeof sites.$inferInsert> = { name, updatedAt: new Date() };
+  if (hasDomainField) update.domain = domain;
+  if (hasRevalidateField || autoRevalidateUrl) update.revalidateUrl = revalidateUrl;
+  if (formData.has("notifyEmail")) update.notifyEmail = notifyEmail;
+
+  await db.update(sites).set(update).where(eq(sites.id, siteId));
 
   await logActivity({
     userId: user.id,
     userEmail: user.email,
     siteId,
     action: "sites.update",
-    detail: `Uppdaterade inställningarna för "${name}"`,
+    detail: autoRevalidateUrl
+      ? `Uppdaterade inställningarna för "${name}" (revalidate-URL satt till ${revalidateUrl})`
+      : `Uppdaterade inställningarna för "${name}"`,
   });
 
   revalidatePath(`/admin/sites/${siteId}`, "layout");

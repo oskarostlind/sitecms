@@ -111,14 +111,21 @@ Regler:
 
 ### C — Integration, SDK, utvecklardokumentation, landningssida (`app/admin/sites/[siteId]/integration/`, `app/api/v1/sites/[slug]/health/route.ts`, `app/docs/`, `app/page.tsx`, `packages/sitecms-next/`)
 
-- `/admin/sites/[siteId]/integration` (owner): steg-för-steg:
-  1. **Nycklar**: sajtens `slug`, `CMS_API_URL` (= `appUrl()`), API-nycklar (lista + skapa/ta bort — återanvänd actions i `lib/actions/sites.ts`), revalidate-URL + hemlighet (formulär från installningar kan flyttas hit eller länkas). Env-block att kopiera: `CMS_API_URL=…`, `CMS_SITE=slug`, `CMS_API_KEY=…` (visas bara när ny nyckel just skapats), `CMS_REVALIDATE_SECRET=…`.
-  2. **Kod att klistra in** (Next.js App Router, TypeScript, utan beroenden): `lib/sitecms.ts` (typad klient: `getContent()`, `getPosts()`, `getPost(slug)`, `block(content, pageSlug, key)`, allt med `fetch(..., { next: { tags: ["sitecms"] } })`), `app/api/sitecms/revalidate/route.ts` (POST, jämför `secret`, `revalidateTag("sitecms")`), `sitecms.config.ts` + `scripts/sitecms-sync.ts` (läser config, `POST …/schema`; körs i `"prebuild"`).
-  3. **Testa anslutningen**: knapp → server action `checkConnection(siteId)`: POST till `revalidateUrl` med hemligheten, förvänta 2xx; uppdatera `sites.lastConnectionStatus/CheckedAt`; logga `sites.connection_check`; visa resultat. Visa även "Senaste schema-sync: …" från `lastSchemaSyncAt`.
-  4. **Bjud in kunden** → länk till medlemmar.
-- `GET /api/v1/sites/[slug]/health` (`x-api-key`): `{ ok: true, site: { name, slug }, pages: n, lastSchemaSyncAt }` — så utvecklaren kan verifiera nyckeln med curl.
-- `packages/sitecms-next/`: samma klient som npm-paket (`sitecms-next`, `package.json`, `src/index.ts`, `README.md`), inte publicerat ännu — panelen pekar i första hand på copy-paste.
-- `/docs` (publik, utan inloggning): "Kom igång på 10 minuter" (konto → sajt → nycklar → kod → schema-sync → bjud in kund), API-referens (content, posts, posts/[slug], schema GET/POST, health, revalidate-webhook, felkoder), schema-format (ta exakt format från detta dokument, avsnitt B). Statisk, snyggt typsatt, samma designspråk som landningssidan.
+- `/admin/sites/[siteId]/integration` (owner), sedan sitecms-next 0.3 (oktober 2026):
+  1. **Koppla sajten**: kommandot `npx sitecms-next init <nyckel>` (nyckeln ifylld när den just skapats) + förklaring av vad det gör (verifierar nyckeln, `CMS_API_KEY` i `.env.local`, installerar paketet, revalidate-route, `sitecms.config.ts`, `"prebuild": "sitecms-next sync"`, synkar). Därunder "Lägg `CMS_API_KEY` hos ditt webbhotell" — den enda variabeln (`CMS_API_URL` visas bara om panelen inte körs på sitecms.se). Ruta "Inte Next.js?" → REST-API + deploy hook.
+  2. **Prompt till AI-assistent** (ChatGPT/Cursor/Claude): kopierbar, utan nyckel, pekar på `/llms.txt` (`aiPromptSnippet()`).
+  3. **API-nycklar**: lista + skapa/ta bort (actions i `lib/actions/sites.ts`); nyckeln visas en gång.
+  4. **Revalidate-URL**: förifylld för nya sajter med domän och fylls i av första `sync` från en publik https-adress (`siteUrl`). Webhook-status från `sites.lastWebhookStatus/At/Error`. Deploy hook-URL fungerar som revalidate-URL för andra ramverk.
+  5. **Testa anslutningen**: `checkConnection(siteId)` skickar den signerade webhooken, förväntar 2xx, sparar `lastConnectionStatus` + webhook-status. Visar även "Senaste schema-sync".
+  6. **Bjud in kunden** → medlemmar.
+  - Checklista: API-nyckel, revalidate-URL, schema synkat, anslutning testad.
+  - Hopfällt: "Utan npm-paket" (copy-paste: `lib/sitecms.ts` mot `/api/v1/site/…` med bara `CMS_API_KEY`, revalidate-route som verifierar v1-signaturen med Web Crypto och godtar legacy `CMS_REVALIDATE_SECRET`, `sitecms.config.ts`, `scripts/sitecms-sync.ts`) och "Äldre integrationer (före sitecms-next 0.3)" (revalidate-hemlighet generera/regenerera, de fyra gamla variablerna).
+- `/admin/sites/new`: efter skapande visas nyckeln en gång + `npx sitecms-next init <nyckel>` och `CMS_API_KEY=…` med kopieringsknappar, och länk till Integration.
+- `GET /api/v1/site/health` (och `/api/v1/sites/[slug]/health`) med `x-api-key`: `{ ok, site: { name, slug }, pages, lastSchemaSyncAt, revalidateUrl, webhook: { configured, lastStatus, lastAt, lastError } }`.
+- Webhook: `POST` till `revalidateUrl` med `x-sitecms-timestamp` och `x-sitecms-signature: v1=<hex>[,…]`, där hex = HMAC-SHA256(nyckel = `sha256hex(apiKey)` = `api_keys.key_hash`, meddelande = `${timestamp}.${rawBody}`), en post per nyckel. Body `{ event: "content.updated", site, timestamp, secret? }` (`secret` bara om sajten har en hemlighet).
+- `packages/sitecms-next/` (npm `sitecms-next`): klient, `sitecms-next/revalidate`, `verifyWebhook()`, CLI `init`/`sync`/`check`/`pull`. Bara `CMS_API_KEY` krävs; `CMS_SITE` satt → gamla slug-routes.
+- `/docs` (publik): "Kom igång på en minut" (konto → init → variabeln hos webbhotellet → fält och deploy → testa → bjud in), sitecms-next, AI-assistent, deploy hooks, CLI, schema-format, API-referens (nyckel-routes; slug-routes finns kvar), webhook-signatur och `verifyWebhook()`, copy-paste, "Uppgradera från 0.2".
+- `/llms.txt` (publik, text/plain): hela integrationen för AI-assistenter enligt llms.txt-konventionen (`app/llms.txt/route.ts`).
 - Landningssidan `app/page.tsx`: primär CTA "Skapa konto" → `/signup`, sekundär "Logga in". Ny sektion "För utvecklare": tre steg + länk till `/docs`. Behåll befintlig stil.
 
 ## Efter merge (arkitekten)

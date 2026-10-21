@@ -99,14 +99,14 @@ export default async function SiteSettingsPage({
               <Field
                 htmlFor="revalidateUrl"
                 label="Revalidate-URL"
-                hint="Anropas med hemligheten nedan varje gång innehåll sparas, så kundens sajt kan hämta nytt innehåll direkt."
+                hint="Anropas (signerat med API-nyckeln) varje gång innehåll sparas, så kundens sajt visar nytt innehåll direkt. Fungerar även med ett webbhotells deploy hook."
               >
                 <Input
                   id="revalidateUrl"
                   name="revalidateUrl"
                   type="text"
                   defaultValue={site.revalidateUrl ?? ""}
-                  placeholder="https://kundsajt.se/api/revalidate"
+                  placeholder="https://kundsajt.se/api/sitecms/revalidate"
                   className="font-mono"
                 />
               </Field>
@@ -132,14 +132,14 @@ export default async function SiteSettingsPage({
 
         <Card>
           <CardHeader>
-            <CardTitle>Revalidate-hemlighet</CardTitle>
-            <CardDescription>Delas med kundens revalidate-endpoint så att den kan verifiera anropen.</CardDescription>
+            <CardTitle>Revalidate-hemlighet (äldre integrationer)</CardTitle>
+            <CardDescription>Behövs bara för integrationer byggda före sitecms-next 0.3, som kontrollerar CMS_REVALIDATE_SECRET. Nya integrationer verifierar anropen med API-nyckeln.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Alert tone="info">
               {site.revalidateSecret
                 ? "En hemlighet är konfigurerad. Regenerera bara om du misstänker att den läckt — den gamla slutar fungera omedelbart."
-                : "Ingen hemlighet konfigurerad ännu. Generera en och lägg in den i kundens revalidate-endpoint."}
+                : "Ingen hemlighet konfigurerad — det behövs inte med sitecms-next 0.3 eller senare."}
             </Alert>
 
             {newSecret ? (

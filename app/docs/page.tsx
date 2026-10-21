@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, BookOpen, KeyRound, Package, RefreshCw, UserPlus, Workflow } from "lucide-react";
+import { ArrowRight, BookOpen, KeyRound, Rocket, Server, Terminal, UserPlus } from "lucide-react";
 import { CodeBlock as AdminCodeBlock, type CodeBlockProps } from "@/components/admin/CodeBlock";
 import { Card, CardContent } from "@/components/ui";
 import {
@@ -12,11 +12,18 @@ import {
 import { JsonLd } from "@/components/JsonLd";
 import { absoluteUrl, breadcrumbJsonLd, SITE_URL } from "@/lib/seo";
 import {
+  aiPromptSnippet,
   clientSnippet,
   configSnippet,
   DEFAULT_CMS_URL,
+  DEPLOY_HOOK_HOSTS,
   envSnippet,
   healthCurlSnippet,
+  INIT_COMMAND,
+  initCommand,
+  INIT_STEPS,
+  LEGACY_SITE_API_PATH,
+  legacyEnvSnippet,
   NPM_CHECK,
   npmConfigSnippet,
   npmExplicitClientSnippet,
@@ -24,25 +31,33 @@ import {
   npmPackageJsonSnippet,
   npmPostsSnippet,
   npmRevalidateSnippet,
+  npmSeoSnippet,
   NPM_SYNC,
+  NPM_UPGRADE,
   npmUsageSnippet,
+  npmVerifyWebhookSnippet,
   packageJsonSnippet,
   PLACEHOLDER_SITE,
   REVALIDATE_ROUTE_PATH,
   revalidateCurlSnippet,
   revalidateRouteSnippet,
+  signedWebhookCurlSnippet,
+  SITE_API_PATH,
   SNIPPET_FILES,
+  snippetApiUrl,
   STRIP_TYPES_COMMAND,
   syncScriptSnippet,
   TSX_INSTALL,
   usageSnippet,
+  webhookBodyExample,
 } from "@/lib/integration-snippets";
 
 export const dynamic = "force-static";
 
-const CMS_URL = process.env.APP_URL?.trim().replace(/\/+$/, "") || DEFAULT_CMS_URL;
+const CMS_URL = snippetApiUrl(process.env.APP_URL?.trim() || DEFAULT_CMS_URL);
 const ctx = { apiUrl: CMS_URL, site: PLACEHOLDER_SITE, domain: null };
-const BASE = `${CMS_URL}/api/v1/sites/{slug}`;
+const BASE = `${CMS_URL}${SITE_API_PATH}`;
+const LEGACY_BASE = `${CMS_URL}${LEGACY_SITE_API_PATH}/{slug}`;
 
 /** Exakt format från docs/SELF-SERVICE.md, avsnitt B. */
 const SCHEMA_EXAMPLE = `{
@@ -67,7 +82,8 @@ const SCHEMA_POST_RESPONSE = `{
   "created": { "pages": 1, "blocks": 3 },
   "updated": { "pages": 0, "blocks": 0 },
   "orphans": [{ "pageSlug": "home", "key": "gammal.rubrik" }],
-  "pruned": { "pages": 0, "blocks": 0 }
+  "pruned": { "pages": 0, "blocks": 0 },
+  "revalidateUrl": "https://jjbygg.se/api/sitecms/revalidate"
 }`;
 
 const SCHEMA_GET_RESPONSE = `{
@@ -142,25 +158,73 @@ const HEALTH_RESPONSE = `{
   "ok": true,
   "site": { "name": "JJ Bygg", "slug": "jjbygg" },
   "pages": 4,
-  "lastSchemaSyncAt": "2026-10-18T09:14:03.000Z"
+  "lastSchemaSyncAt": "2026-10-18T09:14:03.000Z",
+  "revalidateUrl": "https://jjbygg.se/api/sitecms/revalidate",
+  "webhook": {
+    "configured": true,
+    "lastStatus": "ok",
+    "lastAt": "2026-10-20T14:02:11.000Z",
+    "lastError": null
+  }
 }`;
 
-const ERROR_RESPONSE = `{ "error": "Ogiltig API-nyckel för denna sajt." }`;
+const ERROR_RESPONSE = `{ "error": "Ogiltig API-nyckel." }`;
+
+const WEBHOOK_HEADERS = `POST https://jjbygg.se${REVALIDATE_ROUTE_PATH}
+content-type: application/json
+user-agent: sitecms-webhook
+x-sitecms-timestamp: 1792560000
+x-sitecms-signature: v1=5f2b…c9e1,v1=a03d…77f0
+
+${webhookBodyExample("jjbygg")}`;
+
+/** Signaturen i Node, för mottagare i andra språk/ramverk. */
+const SIGNATURE_NODE = `import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+
+// rawBody = exakt den mottagna bodyn som sträng, timestamp = x-sitecms-timestamp
+const keyHash = createHash("sha256").update(process.env.CMS_API_KEY!).digest("hex");
+const expected = createHmac("sha256", keyHash).update(\`\${timestamp}.\${rawBody}\`).digest("hex");
+
+const valid =
+  Math.abs(Date.now() / 1000 - Number(timestamp)) <= 300 &&
+  signatureHeader
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part) => part.startsWith("v1="))
+    .some((part) => {
+      const given = Buffer.from(part.slice(3), "hex");
+      return given.length === 32 && timingSafeEqual(given, Buffer.from(expected, "hex"));
+    });`;
+
+/** Exempel för ett annat ramverk: hämta vid build. */
+const BUILD_FETCH_EXAMPLE = `// Körs vid build (t.ex. i Astro, SvelteKit, Eleventy eller ett Node-skript)
+const res = await fetch("${CMS_URL}${SITE_API_PATH}/content", {
+  headers: { "x-api-key": process.env.CMS_API_KEY },
+});
+if (!res.ok) throw new Error(\`sitecms: HTTP \${res.status}\`);
+const content = await res.json();
+
+const hero = content.pages
+  .find((p) => p.slug === "home")
+  ?.blocks.find((b) => b.key === "hero.title");
+console.log(hero?.value);`;
 
 const TOC: { id: string; label: string; children?: { id: string; label: string }[] }[] = [
-  { id: "kom-igang", label: "Kom igång på 10 minuter" },
+  { id: "kom-igang", label: "Kom igång på en minut" },
   { id: "hur-det-fungerar", label: "Hur det hänger ihop" },
   {
     id: "npm",
-    label: "Koppla sajten med npm",
+    label: "Koppla sajten med sitecms-next",
     children: [
-      { id: "npm-installera", label: "1. Installera" },
-      { id: "npm-revalidate", label: "2. Revalidate-route" },
+      { id: "npm-init", label: "1. init" },
+      { id: "npm-webbhotell", label: "2. Variabeln hos webbhotellet" },
       { id: "npm-config", label: "3. sitecms.config.ts" },
-      { id: "npm-sync", label: "4. Synka i prebuild" },
-      { id: "npm-anvand", label: "5. Använd innehållet" },
+      { id: "npm-anvand", label: "4. Använd innehållet" },
+      { id: "npm-manuellt", label: "Utan init" },
     ],
   },
+  { id: "ai", label: "Med en AI-assistent" },
+  { id: "deploy-hooks", label: "Andra ramverk: deploy hooks" },
   { id: "cli", label: "CLI: sitecms-next" },
   { id: "schema", label: "Schema-format" },
   {
@@ -174,7 +238,8 @@ const TOC: { id: string; label: string; children?: { id: string; label: string }
       { id: "api-schema-get", label: "GET schema" },
       { id: "api-schema-post", label: "POST schema" },
       { id: "api-health", label: "GET health" },
-      { id: "api-webhook", label: "Revalidate-webhook" },
+      { id: "api-webhook", label: "Webhook och signatur" },
+      { id: "api-verifiera", label: "verifyWebhook()" },
       { id: "api-fel", label: "Felkoder" },
     ],
   },
@@ -188,57 +253,57 @@ const TOC: { id: string; label: string; children?: { id: string; label: string }
       { id: "kod-sync", label: SNIPPET_FILES.sync },
     ],
   },
+  { id: "uppgradera", label: "Uppgradera från 0.2" },
 ];
 
 const QUICKSTART = [
   {
     icon: UserPlus,
-    title: "Skapa konto",
+    title: "Skapa konto och sajt",
     body: (
       <>
-        Registrera dig på{" "}
-        <DocLink href="/signup">/signup</DocLink> och bekräfta e-postadressen. Inget kreditkort, ingen väntan.
+        Registrera dig på <DocLink href="/signup">/signup</DocLink>, välj <strong>Ny sajt</strong> och ange namn och
+        domän. API-nyckeln visas direkt, tillsammans med kommandot i nästa steg — färdigt att kopiera.
       </>
     ),
   },
   {
-    icon: Workflow,
-    title: "Skapa en sajt",
+    icon: Terminal,
+    title: "Kör init",
     body: (
       <>
-        Välj <strong>Ny sajt</strong> i panelen och ange namn och domän. Sajten får en <em>slug</em> (t.ex.{" "}
-        <code>jjbygg</code>) som ingår i alla API-adresser. Du blir sajtens ägare.
+        <code>{INIT_COMMAND} &lt;nyckel&gt;</code> i kundsajtens rotkatalog. Installerar paketet, sparar nyckeln i{" "}
+        <code>.env.local</code>, skapar revalidate-routen och <code>{SNIPPET_FILES.config}</code> och synkar fälten.
+      </>
+    ),
+  },
+  {
+    icon: Server,
+    title: "En variabel hos webbhotellet",
+    body: (
+      <>
+        Lägg <code>CMS_API_KEY</code> i miljövariablerna hos Vercel, Netlify, Cloudflare, Render eller din egen
+        server. Det är den enda variabeln.
+      </>
+    ),
+  },
+  {
+    icon: Rocket,
+    title: "Deklarera fälten och deploya",
+    body: (
+      <>
+        Beskriv vad kunden får ändra i <code>{SNIPPET_FILES.config}</code> och läs det med <code>getContent()</code>{" "}
+        i serverkomponenter. Vid build synkas fälten och revalidate-URL:en fylls i automatiskt.
       </>
     ),
   },
   {
     icon: KeyRound,
-    title: "Hämta nycklar",
+    title: "Testa anslutningen",
     body: (
       <>
-        Öppna <strong>Integration</strong> för sajten. Skapa en API-nyckel och generera en revalidate-hemlighet och
-        kopiera env-blocket till <code>.env.local</code> och till Vercel.
-      </>
-    ),
-  },
-  {
-    icon: Package,
-    title: "Installera sitecms-next",
-    body: (
-      <>
-        <code>{NPM_INSTALL}</code> i kundsajten. Lägg till revalidate-routen (en rad) och ange{" "}
-        <code>https://din-domän.se{REVALIDATE_ROUTE_PATH}</code> som revalidate-URL i panelen.
-      </>
-    ),
-  },
-  {
-    icon: RefreshCw,
-    title: "Deklarera fälten",
-    body: (
-      <>
-        Beskriv sidor och fält i <code>{SNIPPET_FILES.config}</code> och lägg{" "}
-        <code>&quot;prebuild&quot;: &quot;sitecms-next sync&quot;</code> i package.json. Fälten dyker upp i panelen
-        vid nästa build. Tryck sedan på <strong>Testa anslutningen</strong>.
+        Tryck på <strong>Testa anslutningen</strong> under Integration i panelen, eller kör{" "}
+        <code>{NPM_CHECK}</code>. Panelen visar status för varje webhook-anrop.
       </>
     ),
   },
@@ -248,7 +313,7 @@ const QUICKSTART = [
     body: (
       <>
         Under <strong>Medlemmar</strong> bjuder du in kunden som redaktör. Kunden väljer lösenord via mejlet och kan
-        börja redigera — ändringar syns på sajten inom några sekunder.
+        börja redigera — ändringar syns på sajten inom några sekunder, utan ny deploy.
       </>
     ),
   },
@@ -421,7 +486,7 @@ function Toc() {
   );
 }
 
-const DOCS_MODIFIED = "2026-10-18";
+const DOCS_MODIFIED = "2026-10-21";
 
 export default function DocsPage() {
   return (
@@ -432,7 +497,7 @@ export default function DocsPage() {
             "@type": "TechArticle",
             headline: "Koppla en Next.js-sajt till sitecms",
             description:
-              "Installera sitecms-next, deklarera fälten i sitecms.config.ts, synka i prebuild och hämta innehållet med en typad klient.",
+              "Koppla sajten med ett kommando (npx sitecms-next init) och en miljövariabel (CMS_API_KEY). Typad klient, schema-sync, signerad webhook och API-referens.",
             inLanguage: "sv-SE",
             dateModified: DOCS_MODIFIED,
             url: absoluteUrl("/docs"),
@@ -458,8 +523,8 @@ export default function DocsPage() {
             Koppla en Next.js-sajt till sitecms
           </h1>
           <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-ink-muted sm:text-lg">
-            Deklarera vilka fält sajten har, hämta innehållet med en typad klient utan beroenden och låt kunden
-            redigera själv. Allt går att sätta upp utan att prata med oss.
+            Ett kommando och en miljövariabel. Deklarera vilka fält sajten har, hämta innehållet med en typad klient och
+            låt kunden redigera själv — ändringar syns direkt, utan ny deploy.
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <a href="#kom-igang" className={pillClassName({ size: "lg", className: "w-full sm:w-auto" })}>
@@ -492,7 +557,7 @@ export default function DocsPage() {
           <Section
             id="kom-igang"
             eyebrow="Snabbstart"
-            title="Kom igång på 10 minuter"
+            title="Kom igång på en minut"
             intro="Från noll till en kundsajt som hämtar innehåll från sitecms och uppdateras när kunden sparar."
           >
             <ol className="grid gap-4 sm:grid-cols-2">
@@ -516,20 +581,30 @@ export default function DocsPage() {
             </ol>
 
             <Prose>
-              <p>Miljövariablerna som kundsajten behöver (värdena finns under Integration i panelen):</p>
+              <p>Kommandot (nyckeln finns under Integration i panelen):</p>
             </Prose>
-            <CodeBlock code={envSnippet(ctx)} filename={SNIPPET_FILES.env} language="env" maxHeight={null} />
-
+            <CodeBlock code={initCommand("<api-nyckel>")} language="bash" maxHeight={null} />
             <Prose>
-              <p>Kontrollera att nycklarna fungerar innan du skriver någon kod:</p>
+              <p>Och den enda miljövariabeln — i <code>.env.local</code> (det gör init) och hos webbhotellet:</p>
             </Prose>
-            <CodeBlock code={NPM_CHECK} language="bash" maxHeight={null} />
+            <CodeBlock code={envSnippet()} filename={SNIPPET_FILES.env} language="env" maxHeight={null} />
+            <Prose>
+              <p>
+                Bygger du med ChatGPT, Cursor eller Claude? Ge assistenten <DocLink href="#ai">prompten nedan</DocLink>{" "}
+                eller länka till <DocLink href="/llms.txt">/llms.txt</DocLink>. Inte Next.js? Se{" "}
+                <DocLink href="#deploy-hooks">deploy hooks</DocLink>.
+              </p>
+            </Prose>
           </Section>
 
           {/* Hur det hänger ihop */}
           <Section id="hur-det-fungerar" eyebrow="Översikt" title="Hur det hänger ihop">
             <Prose>
               <ol>
+                <li>
+                  <strong>Nyckeln är sajten.</strong> <code>CMS_API_KEY</code> avgör vilken sajt innehållet hämtas från.
+                  Ingen slug eller adress behöver konfigureras — standardadressen är <code>{DEFAULT_CMS_URL}</code>.
+                </li>
                 <li>
                   <strong>Kundsajten äger strukturen.</strong> <code>{SNIPPET_FILES.config}</code> beskriver vilka sidor
                   och fält som finns. <code>sitecms-next sync</code> skickar den till sitecms före varje build, och
@@ -544,9 +619,10 @@ export default function DocsPage() {
                   så sidorna kan vara statiska.
                 </li>
                 <li>
-                  <strong>sitecms säger till när något ändrats.</strong> Vid varje sparning POST:ar sitecms{" "}
-                  <code>{`{ "secret": "…" }`}</code> till din revalidate-URL, som kör{" "}
-                  <code>revalidateTag(&quot;sitecms&quot;)</code>. Ändringen syns inom några sekunder.
+                  <strong>sitecms säger till när något ändrats.</strong> Vid varje sparning skickar sitecms en signerad{" "}
+                  <code>POST</code> till sajtens revalidate-URL, som verifierar signaturen med <code>CMS_API_KEY</code>{" "}
+                  och kör <code>revalidateTag(&quot;sitecms&quot;)</code>. Ändringen syns inom några sekunder, och
+                  panelen visar om anropet gick fram.
                 </li>
               </ol>
             </Prose>
@@ -556,33 +632,52 @@ export default function DocsPage() {
           <Section
             id="npm"
             eyebrow="Rekommenderat"
-            title="Koppla sajten med npm"
+            title="Koppla sajten med sitecms-next"
             intro={
               <>
                 Next.js 14.2+ med App Router. Paketet <code className="font-mono text-sm">sitecms-next</code> har inga
-                beroenden och innehåller klienten, revalidate-routen och CLI:t för schema-sync.
+                beroenden och innehåller klienten, revalidate-routen och CLI:t för init och schema-sync.
               </>
             }
           >
-            <SubSection id="npm-installera" title="1. Installera">
-              <CodeBlock code={NPM_INSTALL} language="bash" maxHeight={null} />
+            <SubSection id="npm-init" title={<>1. <code className="font-mono">{INIT_COMMAND}</code></>}>
+              <CodeBlock code={initCommand("<api-nyckel>")} language="bash" maxHeight={null} />
               <Prose>
                 <p>
-                  Lägg miljövariablerna från <DocLink href="#kom-igang">Kom igång</DocLink> i <code>.env.local</code> och
-                  i Vercel (Production och Preview). Kör <code>{NPM_CHECK}</code> för att se att de stämmer.
+                  Utan argument läser kommandot nyckeln från <code>CMS_API_KEY</code> eller <code>.env.local</code>, och
+                  frågar annars efter den. Det går att köra flera gånger — befintliga filer skrivs inte över. Kommandot:
+                </p>
+                <ul>
+                  {INIT_STEPS.map((step) => (
+                    <li key={step}>{step}</li>
+                  ))}
+                </ul>
+                <p>
+                  I ett projekt utan Next.js App Router hoppar init över revalidate-routen — använd då en{" "}
+                  <DocLink href="#deploy-hooks">deploy hook</DocLink>.
                 </p>
               </Prose>
             </SubSection>
 
-            <SubSection id="npm-revalidate" title={<>2. <code className="break-all font-mono">{SNIPPET_FILES.revalidate}</code></>}>
+            <SubSection id="npm-webbhotell" title="2. Variabeln hos webbhotellet">
               <Prose>
                 <p>
-                  En rad. Routen jämför <code>secret</code> med <code>CMS_REVALIDATE_SECRET</code> i konstant tid och tömmer
-                  cachetaggen <code>sitecms</code>. Ange <code>https://din-domän.se{REVALIDATE_ROUTE_PATH}</code> som
-                  revalidate-URL under Integration i panelen.
+                  Lägg samma <code>CMS_API_KEY</code> under miljövariabler hos webbhotellet (för Production och
+                  Preview). Det fungerar likadant hos Vercel, Netlify, Cloudflare, Render och på en egen Node-server.
+                  Saknas variabeln vid build hoppar synken över med en varning — lägg till <code>--strict</code> om
+                  bygget ska stoppas då.
                 </p>
               </Prose>
-              <CodeBlock code={npmRevalidateSnippet()} filename={SNIPPET_FILES.revalidate} language="ts" maxHeight={null} />
+              <CodeBlock code={envSnippet()} filename="Miljövariabel" language="env" maxHeight={null} />
+              <Prose>
+                <p>
+                  <code>CMS_API_URL</code> behövs bara om du kör en egen installation av sitecms (standard{" "}
+                  <code>{DEFAULT_CMS_URL}</code>). Sync skickar sajtens publika adress (<code>SITE_URL</code>, eller
+                  webbhotellets egen variabel hos Vercel, Netlify och Render) så att sitecms kan fylla i
+                  revalidate-URL:en <code>https://din-domän.se{REVALIDATE_ROUTE_PATH}</code> om den saknas. Befintliga
+                  värden skrivs aldrig över.
+                </p>
+              </Prose>
             </SubSection>
 
             <SubSection id="npm-config" title={<>3. <code className="break-all font-mono">{SNIPPET_FILES.config}</code></>}>
@@ -590,37 +685,33 @@ export default function DocsPage() {
                 <p>
                   Vilka sidor och fält kunden ska kunna redigera, med etiketter och hjälptexter som syns i panelen.{" "}
                   <code>type</code> är <code>text</code> om det utelämnas. Formatet beskrivs under{" "}
-                  <DocLink href="#schema">Schema-format</DocLink>.
+                  <DocLink href="#schema">Schema-format</DocLink>. Init skapar filen från strukturen som redan finns i
+                  sitecms, eller med ett exempel.
                 </p>
               </Prose>
               <CodeBlock code={npmConfigSnippet(ctx)} filename={SNIPPET_FILES.config} language="ts" />
-            </SubSection>
-
-            <SubSection id="npm-sync" title="4. Synka i prebuild">
               <Prose>
                 <p>
-                  <code>sitecms-next sync</code> skickar configen till sitecms före varje build. Saknade sidor och fält
-                  skapas, kundens innehåll skrivs aldrig över, och bygget stoppas om configen är ogiltig. Saknas
-                  miljövariablerna hoppas steget över (lägg till <code>--strict</code> om bygget ska faila då).
+                  Init lägger till <code>&quot;prebuild&quot;: &quot;sitecms-next sync&quot;</code>, så fälten synkas
+                  före varje build. Vill du synka direkt: <code>{NPM_SYNC}</code>.
                 </p>
               </Prose>
-              <CodeBlock code={npmPackageJsonSnippet()} filename={SNIPPET_FILES.packageJson} language="json" maxHeight={null} />
-              <Prose>
-                <p>Vill du synka direkt utan att bygga:</p>
-              </Prose>
-              <CodeBlock code={NPM_SYNC} language="bash" maxHeight={null} />
             </SubSection>
 
-            <SubSection id="npm-anvand" title="5. Använd innehållet">
+            <SubSection id="npm-anvand" title="4. Använd innehållet">
               <Prose>
                 <p>
                   <code>getContent()</code>, <code>getPosts()</code> och <code>getPost(slug)</code> läser{" "}
-                  <code>CMS_API_URL</code>, <code>CMS_SITE</code> och <code>CMS_API_KEY</code> från miljön och cachar
-                  med taggen <code>sitecms</code>, så sidorna kan vara statiska. <code>block()</code> returnerar alltid
-                  strängar och är säker att rendera även om fältet saknas.
+                  <code>CMS_API_KEY</code> från miljön och cachar med taggen <code>sitecms</code>, så sidorna kan vara
+                  statiska. Använd dem bara i serverkomponenter. <code>block()</code> returnerar alltid strängar och är
+                  säker att rendera även om fältet saknas.
                 </p>
               </Prose>
               <CodeBlock code={npmUsageSnippet()} filename="app/page.tsx" language="tsx" />
+              <Prose>
+                <p>SEO per sida:</p>
+              </Prose>
+              <CodeBlock code={npmSeoSnippet()} filename="app/page.tsx" language="tsx" maxHeight={null} />
               <Prose>
                 <p>Inlägg:</p>
               </Prose>
@@ -629,7 +720,87 @@ export default function DocsPage() {
                 <p>Flera sajter i samma projekt, eller egna värden:</p>
               </Prose>
               <CodeBlock code={npmExplicitClientSnippet()} filename="lib/cms.ts" language="ts" maxHeight={null} />
+              <Prose>
+                <p>
+                  <strong>Undvik:</strong> att hämta innehållet i en klientkomponent eller i webbläsaren (API-nyckeln
+                  exponeras), och egen <code>fetch</code> mot sitecms utan cache-taggen <code>sitecms</code> — då kan
+                  webhooken inte tömma cachen och ändringar syns först efter nästa deploy.
+                </p>
+              </Prose>
             </SubSection>
+
+            <SubSection id="npm-manuellt" title="Utan init">
+              <Prose>
+                <p>Samma sak för hand, om du vill se varje del:</p>
+              </Prose>
+              <CodeBlock code={NPM_INSTALL} language="bash" maxHeight={null} />
+              <CodeBlock code={npmRevalidateSnippet()} filename={SNIPPET_FILES.revalidate} language="ts" maxHeight={null} />
+              <CodeBlock code={npmPackageJsonSnippet()} filename={SNIPPET_FILES.packageJson} language="json" maxHeight={null} />
+              <Prose>
+                <p>
+                  Lägg sedan <code>CMS_API_KEY</code> i <code>.env.local</code>, skapa <code>{SNIPPET_FILES.config}</code>{" "}
+                  och kör <code>{NPM_CHECK}</code>.
+                </p>
+              </Prose>
+            </SubSection>
+          </Section>
+
+          {/* AI */}
+          <Section
+            id="ai"
+            eyebrow="AI-assistenter"
+            title="Med en AI-assistent"
+            intro={
+              <>
+                ChatGPT, Cursor och Claude känner inte alltid till sitecms-next och skriver då gärna en egen klient — som
+                ofta gör att sajten måste deployas om för varje ändring. Ge assistenten den här prompten först.
+              </>
+            }
+          >
+            <CodeBlock code={aiPromptSnippet()} filename="Prompt" language="text" />
+            <Prose>
+              <p>
+                Prompten innehåller ingen nyckel. Hela integrationen — init, klienten, config-formatet, REST-API:t,
+                webhooken och vanliga misstag — finns i maskinläsbar form på{" "}
+                <DocLink href="/llms.txt">{`${DEFAULT_CMS_URL}/llms.txt`}</DocLink>. Samma prompt finns under
+                Integration i panelen.
+              </p>
+            </Prose>
+          </Section>
+
+          {/* Deploy hooks */}
+          <Section
+            id="deploy-hooks"
+            eyebrow="Alla ramverk"
+            title="Andra ramverk: deploy hooks"
+            intro="Använder sajten inte Next.js, eller är den helt statisk? Låt webbhotellet bygga om sajten varje gång kunden sparar."
+          >
+            <Prose>
+              <ol>
+                <li>
+                  Skapa en deploy hook (kallas build hook hos vissa) i webbhotellets inställningar. Du får en hemlig URL
+                  som startar ett nytt bygge när den tar emot en <code>POST</code>.
+                </li>
+                <li>
+                  Klistra in URL:en som <strong>revalidate-URL</strong> under Integration i panelen och tryck på{" "}
+                  <strong>Testa anslutningen</strong> — ett bygge ska starta.
+                </li>
+                <li>
+                  Hämta innehållet från <DocLink href="#api">REST-API:t</DocLink> vid build, med <code>CMS_API_KEY</code>{" "}
+                  som miljövariabel hos webbhotellet.
+                </li>
+              </ol>
+              <p>
+                sitecms skickar samma anrop som till en revalidate-route; hooken bryr sig inte om bodyn eller
+                signaturen. Ändringen syns när bygget är klart, oftast inom någon minut. Fälten kan synkas med{" "}
+                <code>{NPM_SYNC}</code> i vilket Node-projekt som helst, eller med <code>POST …/schema</code>.
+              </p>
+            </Prose>
+            <DocTable
+              head={["Webbhotell", "Heter"]}
+              rows={DEPLOY_HOOK_HOSTS.map((h) => [h.name, h.term])}
+            />
+            <CodeBlock code={BUILD_FETCH_EXAMPLE} filename="Exempel" language="js" />
           </Section>
 
           {/* CLI */}
@@ -637,7 +808,7 @@ export default function DocsPage() {
             id="cli"
             eyebrow="Verktyg"
             title="CLI: sitecms-next"
-            intro="Följer med paketet. Läser CMS_API_URL, CMS_SITE och CMS_API_KEY från miljön eller .env.local / .env."
+            intro="Följer med paketet. Läser CMS_API_KEY (och valfria CMS_API_URL och SITE_URL) från miljön eller .env.local / .env."
           >
             <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white">
               <table className="w-full min-w-[520px] text-left text-sm">
@@ -649,6 +820,10 @@ export default function DocsPage() {
                 </thead>
                 <tbody className="divide-y divide-neutral-100 text-neutral-700 [&_code]:font-mono [&_code]:text-[12.5px] [&_code]:text-neutral-900">
                   <tr>
+                    <td className="px-4 py-2.5 align-top whitespace-nowrap"><code>sitecms-next init [nyckel]</code></td>
+                    <td className="px-4 py-2.5">Kopplar projektet: verifierar nyckeln, sparar den i <code>.env.local</code>, installerar paketet, skapar revalidate-routen och <code>sitecms.config.ts</code>, lägger till prebuild och synkar. <code>--no-install</code> hoppar över installationen.</td>
+                  </tr>
+                  <tr>
                     <td className="px-4 py-2.5 align-top whitespace-nowrap"><code>sitecms-next sync</code></td>
                     <td className="px-4 py-2.5">Skickar <code>sitecms.config.ts</code> (eller .mjs/.js/.json) till sitecms och skriver ut vad som skapades. Exit 1 vid fel.</td>
                   </tr>
@@ -658,7 +833,7 @@ export default function DocsPage() {
                   </tr>
                   <tr>
                     <td className="px-4 py-2.5 align-top whitespace-nowrap"><code>--strict</code></td>
-                    <td className="px-4 py-2.5">Låter bygget faila om miljövariablerna saknas (annars hoppas synken över).</td>
+                    <td className="px-4 py-2.5">Låter bygget faila om <code>CMS_API_KEY</code> saknas (annars hoppas synken över med en varning).</td>
                   </tr>
                   <tr>
                     <td className="px-4 py-2.5 align-top whitespace-nowrap"><code>--config &lt;fil&gt;</code></td>
@@ -666,7 +841,7 @@ export default function DocsPage() {
                   </tr>
                   <tr>
                     <td className="px-4 py-2.5 align-top whitespace-nowrap"><code>sitecms-next check</code></td>
-                    <td className="px-4 py-2.5">Verifierar nycklarna och visar sajtens namn och senaste sync.</td>
+                    <td className="px-4 py-2.5">Verifierar nyckeln och visar sajtens namn, senaste sync och webhook-status.</td>
                   </tr>
                   <tr>
                     <td className="px-4 py-2.5 align-top whitespace-nowrap"><code>sitecms-next pull</code></td>
@@ -676,7 +851,6 @@ export default function DocsPage() {
               </table>
             </div>
           </Section>
-
 
           {/* Schema */}
           <Section
@@ -703,6 +877,7 @@ export default function DocsPage() {
                 [<code key="bd">blocks[].default</code>, "string?", "Startvärde när blocket skapas eller är tomt."],
                 [<code key="ba">blocks[].defaultAlt</code>, "string?", "Startvärde för alt-texten (image)."],
                 [<code key="pr">prune</code>, "boolean", <>Default <code>false</code>. <code>true</code> tar bort block och tomma sidor som inte finns i deklarationen.</>],
+                [<code key="su">siteUrl</code>, "string?", <>Sajtens publika https-adress. Fyller i revalidate-URL:en om den saknas (skriver aldrig över). Skickas automatiskt av <code>sitecms-next sync</code>.</>],
               ]}
             />
 
@@ -739,9 +914,10 @@ export default function DocsPage() {
             title="API-referens"
             intro={
               <>
-                Bas-URL: <code className="break-all font-mono text-sm">{BASE}</code>. Alla svar är JSON och cachas inte av
-                sitecms (<code className="break-words font-mono text-sm">Cache-Control: private, no-store</code>) — cacha på din sida
-                med <code className="font-mono text-sm">next.tags</code>.
+                Bas-URL: <code className="break-all font-mono text-sm">{BASE}</code>. Sajten avgörs av API-nyckeln. Alla
+                svar är JSON och cachas inte av sitecms (
+                <code className="break-words font-mono text-sm">Cache-Control: private, no-store</code>) — cacha på din
+                sida med <code className="font-mono text-sm">next.tags</code>.
               </>
             }
           >
@@ -752,9 +928,13 @@ export default function DocsPage() {
                   tas bort under Integration. Använd dem bara på serversidan — en nyckel ger läsåtkomst till allt
                   publicerat innehåll och kan synka struktur.
                 </p>
+                <p>
+                  De äldre adresserna med slug, <code className="break-all">{LEGACY_BASE}/…</code>, finns kvar och
+                  svarar likadant — befintliga integrationer behöver inte ändras.
+                </p>
               </Prose>
               <CodeBlock
-                code={`curl -H "x-api-key: $CMS_API_KEY" ${CMS_URL}/api/v1/sites/${PLACEHOLDER_SITE}/content`}
+                code={`curl -H "x-api-key: $CMS_API_KEY" ${BASE}/content`}
                 language="bash"
                 maxHeight={null}
               />
@@ -824,13 +1004,14 @@ export default function DocsPage() {
               description={
                 <p>
                   Body: ett schema enligt <DocLink href="#schema">Schema-format</DocLink> med{" "}
-                  <code>Content-Type: application/json</code>. Svaret berättar vad som skapades, uppdaterades och
-                  (med <code>prune</code>) togs bort. Uppdaterar sajtens &quot;Senaste schema-sync&quot; i panelen.
+                  <code>Content-Type: application/json</code>, och valfritt <code>siteUrl</code>. Svaret berättar vad som
+                  skapades, uppdaterades och (med <code>prune</code>) togs bort, samt sajtens <code>revalidateUrl</code>.
+                  Uppdaterar &quot;Senaste schema-sync&quot; i panelen.
                 </p>
               }
             >
               <CodeBlock
-                code={`curl -X POST ${CMS_URL}/api/v1/sites/${PLACEHOLDER_SITE}/schema \\
+                code={`curl -X POST ${BASE}/schema \\
   -H "x-api-key: $CMS_API_KEY" \\
   -H "Content-Type: application/json" \\
   --data @schema.json`}
@@ -845,10 +1026,12 @@ export default function DocsPage() {
               id="api-health"
               method="GET"
               path={`${BASE}/health`}
-              title="Kontrollera nyckeln"
+              title="Kontrollera nyckeln och webhooken"
               description={
                 <p>
-                  Snabb kontroll av att slug och nyckel stämmer, utan att hämta innehåll. Bra i CI och för övervakning.
+                  Snabb kontroll av att nyckeln stämmer, utan att hämta innehåll. Visar också revalidate-URL:en och hur
+                  det senaste webhook-anropet gick (<code>lastStatus</code> är <code>ok</code>, <code>failed</code>{" "}
+                  eller <code>null</code>). Bra i CI och för övervakning.
                 </p>
               }
             >
@@ -859,7 +1042,7 @@ export default function DocsPage() {
             <Card id="api-webhook" className="scroll-mt-28">
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <h3 className="text-lg font-semibold tracking-tight">Revalidate-webhook (sitecms → din sajt)</h3>
+                  <h3 className="text-lg font-semibold tracking-tight">Webhook (sitecms → din sajt)</h3>
                   <div className="flex flex-wrap items-center gap-2">
                     <MethodBadge method="POST" />
                     <code className="break-all font-mono text-sm text-neutral-800">
@@ -869,20 +1052,70 @@ export default function DocsPage() {
                 </div>
                 <Prose>
                   <p>
-                    Varje gång innehåll sparas i panelen skickar sitecms en <code>POST</code> med{" "}
-                    <code>Content-Type: application/json</code> och body <code>{`{ "secret": "<CMS_REVALIDATE_SECRET>" }`}</code>{" "}
-                    till sajtens revalidate-URL (timeout 5 s, inga omförsök). Svara <code>2xx</code> när hemligheten
-                    stämmer och <code>401</code> annars.
-                  </p>
-                  <p>
-                    <strong>Testa anslutningen</strong> på integrationssidan skickar exakt samma anrop (timeout 8 s) och
-                    visar statuskoden. Följer inte omdirigeringar — ange den slutliga adressen.
+                    Varje gång innehåll sparas i panelen skickar sitecms en <code>POST</code> till sajtens
+                    revalidate-URL (timeout 5 s, inga omförsök). <strong>Testa anslutningen</strong> skickar exakt samma
+                    anrop (timeout 8 s). Resultatet — ok eller misslyckat, tid och felorsak — visas under Integration och
+                    i <DocLink href="#api-health">health</DocLink>.
                   </p>
                 </Prose>
-                <CodeBlock code={revalidateCurlSnippet()} language="bash" maxHeight={null} />
+                <CodeBlock code={WEBHOOK_HEADERS} filename="Anrop" language="http" maxHeight={null} />
+                <Prose>
+                  <p>
+                    <strong>Signaturen.</strong> <code>x-sitecms-signature</code> innehåller en <code>v1=</code>-post per
+                    API-nyckel som sajten har (sitecms vet inte vilken nyckel din sajt använder). Varje post är
+                  </p>
+                  <ul>
+                    <li>
+                      HMAC-SHA256 med <strong>nyckeln</strong> = UTF-8-strängen <code>sha256hex(CMS_API_KEY)</code>{" "}
+                      (64 hextecken, gemener),
+                    </li>
+                    <li>
+                      över <strong>meddelandet</strong> <code>{"`${timestamp}.${rawBody}`"}</code> — tidsstämpeln från{" "}
+                      <code>x-sitecms-timestamp</code>, en punkt och exakt den mottagna bodyn,
+                    </li>
+                    <li>som hex.</li>
+                  </ul>
+                  <p>
+                    Godkänn anropet om någon <code>v1</code>-post matchar (jämför i konstant tid) och tidsstämpeln avviker
+                    högst 300 sekunder från klockan. Svara <code>2xx</code> när det stämmer och <code>401</code> annars.
+                    Läs bodyn som text innan du tolkar den — signaturen gäller de exakta bytes som skickades.
+                  </p>
+                  <p>
+                    Har sajten en revalidate-hemlighet (äldre integrationer) innehåller bodyn även{" "}
+                    <code>{`"secret"`}</code>, och mottagare som jämför den mot <code>CMS_REVALIDATE_SECRET</code>{" "}
+                    fortsätter fungera. Ange den slutliga adressen — en omdirigering med 301/302 gör om anropet till GET.
+                  </p>
+                </Prose>
+                <CodeBlock code={SIGNATURE_NODE} filename="Verifiera i Node (utan paketet)" language="ts" maxHeight={null} />
+                <Prose>
+                  <p>Skicka en korrekt signerad test-webhook från terminalen (bash + openssl):</p>
+                </Prose>
+                <CodeBlock code={signedWebhookCurlSnippet()} language="bash" maxHeight={null} />
                 <CodeBlock code={`{ "revalidated": true }`} filename="200 OK" language="json" maxHeight={null} />
               </CardContent>
             </Card>
+
+            <SubSection id="api-verifiera" title={<code className="font-mono">verifyWebhook()</code>}>
+              <Prose>
+                <p>
+                  <code>sitecms-next/revalidate</code> gör allt ovan. Behöver du en egen route-handler — för att tömma
+                  fler taggar eller sökvägar, eller i en Express- eller Edge-miljö — finns samma kontroll som{" "}
+                  <code>verifyWebhook()</code> i huvudpaketet. Den returnerar <code>true</code> om signaturen stämmer med{" "}
+                  <code>CMS_API_KEY</code>, eller om bodyns <code>secret</code> matchar <code>CMS_REVALIDATE_SECRET</code>.
+                </p>
+              </Prose>
+              <CodeBlock code={npmVerifyWebhookSnippet()} filename={SNIPPET_FILES.revalidate} language="ts" maxHeight={null} />
+              <DocTable
+                head={["Alternativ", "Typ", "Beskrivning"]}
+                rows={[
+                  [<code key="r">rawBody</code>, "string | Uint8Array | ArrayBuffer", "Exakt den mottagna bodyn."],
+                  [<code key="h">headers</code>, "Headers | objekt", <>Request-headers, t.ex. <code>request.headers</code> eller <code>req.headers</code> i Express.</>],
+                  [<code key="k">apiKey</code>, "string?", <>Default <code>process.env.CMS_API_KEY</code>.</>],
+                  [<code key="l">legacySecret</code>, "string?", <>Default <code>process.env.CMS_REVALIDATE_SECRET</code>. Tom sträng stänger av.</>],
+                  [<code key="t">toleranceSeconds</code>, "number?", "Default 300."],
+                ]}
+              />
+            </SubSection>
 
             <SubSection id="api-fel" title="Felkoder">
               <Prose>
@@ -895,8 +1128,8 @@ export default function DocsPage() {
                 head={["Status", "Betyder", "Vanlig orsak"]}
                 rows={[
                   [<code key="400">400</code>, "Ogiltig förfrågan", "Schemat följer inte formatet (fel slug/key, okänd typ, fler än 100 sidor eller 200 block per sida), eller body är inte giltig JSON. Se issues."],
-                  [<code key="401">401</code>, "Nyckel saknas eller är fel", <>Headern <code>x-api-key</code> saknas, nyckeln är borttagen eller hör till en annan sajt.</>],
-                  [<code key="404">404</code>, "Hittades inte", "Okänd sajt-slug, eller inlägget finns inte / är inte publicerat."],
+                  [<code key="401">401</code>, "Nyckel saknas eller är fel", <>Headern <code>x-api-key</code> saknas eller nyckeln är borttagen (med slug-adresserna även: nyckeln hör till en annan sajt).</>],
+                  [<code key="404">404</code>, "Hittades inte", "Inlägget finns inte eller är inte publicerat (med slug-adresserna även: okänd sajt-slug)."],
                   [<code key="413">413</code>, "För stort", "Request-bodyn är för stor för att tas emot. Kontrollera att schemat inte innehåller stora default-värden (t.ex. base64-bilder i stället för URL:er)."],
                 ]}
               />
@@ -912,8 +1145,8 @@ export default function DocsPage() {
             intro={
               <>
                 Samma funktionalitet som <code className="font-mono text-sm">sitecms-next</code>, som filer i ditt eget
-                repo. Inga beroenden utöver <code className="font-mono text-sm">tsx</code> för synkskriptet. På
-                integrationssidan i panelen är sajtens slug och CMS-adress redan ifyllda.
+                repo. Kräver bara <code className="font-mono text-sm">CMS_API_KEY</code> och inga beroenden utöver{" "}
+                <code className="font-mono text-sm">tsx</code> för synkskriptet.
               </>
             }
           >
@@ -936,8 +1169,9 @@ export default function DocsPage() {
             <SubSection id="kod-revalidate" title={<code className="break-all font-mono">{SNIPPET_FILES.revalidate}</code>}>
               <Prose>
                 <p>
-                  Tar emot webhooken från sitecms, jämför hemligheten i konstant tid och tömmer cachetaggen. Ange{" "}
-                  <code>https://din-domän.se{REVALIDATE_ROUTE_PATH}</code> som revalidate-URL i panelen.
+                  Tar emot webhooken, verifierar <DocLink href="#api-webhook">signaturen</DocLink> med Web Crypto
+                  (fungerar i Node och Edge) och tömmer cachetaggen. Godtar även en äldre{" "}
+                  <code>CMS_REVALIDATE_SECRET</code> om den är satt.
                 </p>
               </Prose>
               <CodeBlock code={revalidateRouteSnippet()} filename={SNIPPET_FILES.revalidate} language="ts" />
@@ -957,11 +1191,11 @@ export default function DocsPage() {
                 <p>
                   Läser <code>{SNIPPET_FILES.config}</code>, POST:ar den till <code>…/schema</code> och skriver ut vad som
                   skapades, uppdaterades och vilka fält som bara finns i CMS:et. Avslutar med felkod 1 vid fel, så att
-                  bygget stoppas innan en trasig struktur går ut. Läser env från miljön eller{" "}
-                  <code>.env.local</code>/<code>.env</code>.
+                  bygget stoppas innan en trasig struktur går ut. Saknas <code>CMS_API_KEY</code> hoppas synken över med
+                  en varning (<code>--strict</code> stoppar bygget i stället).
                 </p>
               </Prose>
-              <CodeBlock code={syncScriptSnippet()} filename={SNIPPET_FILES.sync} language="ts" />
+              <CodeBlock code={syncScriptSnippet(ctx)} filename={SNIPPET_FILES.sync} language="ts" />
               <Prose>
                 <p>
                   Installera <code>tsx</code> och kör synken före varje build. Utan tsx (Node 22.6 eller senare) fungerar{" "}
@@ -973,6 +1207,63 @@ export default function DocsPage() {
             </SubSection>
           </Section>
 
+          {/* Uppgradera */}
+          <Section
+            id="uppgradera"
+            eyebrow="Befintliga sajter"
+            title="Uppgradera från 0.2"
+            intro={
+              <>
+                Sajter som kopplades med sitecms-next 0.2 eller den tidigare copy-paste-koden fortsätter fungera utan
+                ändringar: slug-adresserna finns kvar och webhooken skickar fortfarande <code>secret</code> i bodyn. Med
+                0.3 räcker en variabel.
+              </>
+            }
+          >
+            <DocTable
+              head={["Variabel", "0.2", "0.3"]}
+              rows={[
+                [<code key="k">CMS_API_KEY</code>, "Krävs", "Krävs — den enda"],
+                [<code key="u">CMS_API_URL</code>, "Krävs", <>Valfri, default <code>{DEFAULT_CMS_URL}</code></>],
+                [<code key="s">CMS_SITE</code>, "Krävs", "Valfri — satt ger de gamla slug-adresserna"],
+                [<code key="r">CMS_REVALIDATE_SECRET</code>, "Krävs", "Valfri — godtas fortfarande om den är satt"],
+              ]}
+            />
+            <Prose>
+              <ol>
+                <li>
+                  Uppgradera paketet och deploya, med de gamla variablerna kvar. Allt fungerar som förut.
+                  <br />
+                  <code>{NPM_UPGRADE}</code> — eller <code>{INIT_COMMAND}</code>, som uppgraderar paketet och lägger till
+                  det som saknas utan att skriva över befintliga filer.
+                </li>
+                <li>
+                  Ta bort <code>CMS_SITE</code>, <code>CMS_REVALIDATE_SECRET</code> och <code>CMS_API_URL</code> (om den
+                  pekar på sitecms.se eller sitecms-zeta.vercel.app) från <code>.env.local</code> och hos webbhotellet,
+                  och deploya igen.
+                </li>
+                <li>
+                  Tryck på <strong>Testa anslutningen</strong> under Integration. Revalidate-hemligheten i panelen kan
+                  ligga kvar — den skadar inte.
+                </li>
+              </ol>
+              <p>
+                Ordningen är viktig: tar du bort <code>CMS_REVALIDATE_SECRET</code> medan sajten fortfarande kör 0.2
+                avvisas webhooken. Använder du copy-paste-koden byter du{" "}
+                <DocLink href="#kod-klient">{SNIPPET_FILES.client}</DocLink> och{" "}
+                <DocLink href="#kod-revalidate">revalidate-routen</DocLink> mot de nya versionerna, eller kör init.
+              </p>
+            </Prose>
+            <Prose>
+              <p>De fyra variablerna som äldre integrationer använder, för referens:</p>
+            </Prose>
+            <CodeBlock code={legacyEnvSnippet(ctx)} filename={SNIPPET_FILES.env} language="env" maxHeight={null} />
+            <Prose>
+              <p>Den äldre formen av webhooken (hemligheten i bodyn):</p>
+            </Prose>
+            <CodeBlock code={revalidateCurlSnippet()} language="bash" maxHeight={null} />
+          </Section>
+
           <aside className="relative isolate overflow-hidden rounded-2xl border border-white/10 bg-space-900 p-6 text-ink shadow-[0_30px_80px_-40px_rgba(4,6,15,0.8)] sm:p-8">
             <div aria-hidden className="sc-stars pointer-events-none absolute inset-0 -z-10 opacity-40" />
             <div
@@ -981,8 +1272,10 @@ export default function DocsPage() {
             />
             <div className="flex flex-col items-start justify-between gap-5 sm:flex-row sm:items-center">
               <div>
-                <h2 className="text-xl font-extrabold tracking-[-0.02em] sm:text-2xl">Redo att koppla din första sajt?</h2>
-                <p className="mt-1 text-sm text-ink-muted">Skapa ett konto — det tar under en minut.</p>
+                <h2 className="text-xl font-extrabold tracking-[-0.02em] sm:text-2xl">
+                  Redo att koppla din första sajt?
+                </h2>
+                <p className="mt-1 text-sm text-ink-muted">Skapa ett konto — sedan är det ett kommando.</p>
               </div>
               <Link href="/signup" className={pillClassName({ size: "lg" })}>
                 Skapa konto

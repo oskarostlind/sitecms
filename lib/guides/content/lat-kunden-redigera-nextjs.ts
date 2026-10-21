@@ -9,7 +9,7 @@ const guide: Guide = {
     "Så låter du kunden redigera innehållet på en Next.js-sajt: headless CMS, Payload, git-baserat eller eget. Ärlig jämförelse och revalidering med App Router.",
   primaryQuery: "låta kunden redigera innehåll next.js",
   published: "2026-10-18",
-  modified: "2026-10-18",
+  modified: "2026-10-21",
   intro: [
     "Flytta de texter och bilder kunden vill ändra ut ur koden och in i ett CMS med strukturerade fält, och låt CMS:et trigga en revalidering av sajten när kunden sparar. Layouten och komponenterna stannar i repot, innehållet hämtas via API.",
     "Vilket CMS som passar beror på var du vill att innehållet ska bo, hur mycket kunden ska kunna ändra och vad det får kosta. Nedan jämför vi alternativen ärligt och visar hur cachningen fungerar med App Router.",
@@ -174,12 +174,12 @@ export async function POST(request: Request) {
       blocks: [
         {
           type: "p",
-          text: "Så här ser samma mönster ut med sitecms, som bygger på just cache-taggar. Installera paketet och lägg in miljövariablerna från panelen.",
+          text: "Så här ser samma mönster ut med sitecms, som bygger på just cache-taggar. Ett kommando i projektets rot kopplar sajten: det sparar API-nyckeln från panelen i `.env.local`, installerar paketet, skapar revalidate-routen och `sitecms.config.ts` och lägger till schema-sync före varje build.",
         },
-        { type: "code", lang: "bash", code: "npm install sitecms-next" },
+        { type: "code", lang: "bash", code: "npx sitecms-next init <api-nyckel>" },
         {
           type: "p",
-          text: "Revalidate-routen är en rad. När kunden sparar töms cachetaggen `sitecms`.",
+          text: "Den enda miljövariabeln är `CMS_API_KEY`. Lägg samma värde hos webbhotellet, oavsett om det är Vercel, Netlify, Cloudflare eller en egen server. Revalidate-routen som skapas är en rad; den verifierar webhookens signatur med nyckeln och tömmer cachetaggen `sitecms` när kunden sparar.",
         },
         {
           type: "code",
@@ -210,7 +210,7 @@ export default defineConfig({
         },
         {
           type: "p",
-          text: "Synka strukturen före varje build. Kundens innehåll skrivs aldrig över, nya fält får sitt default-värde.",
+          text: "Init lägger till synken i package.json, så strukturen skickas till sitecms före varje build. Kundens innehåll skrivs aldrig över, nya fält får sitt default-värde.",
         },
         {
           type: "code",
@@ -239,7 +239,7 @@ export default async function Home() {
         },
         {
           type: "p",
-          text: "Sedan bjuder du in kunden som redaktör via e-post. Hela uppsättningen, med `getPosts()` för nyheter och `seo()` för metadata, finns i [dokumentationen](/docs).",
+          text: "Sedan bjuder du in kunden som redaktör via e-post. Hela uppsättningen, med `getPosts()` för nyheter, `seo()` för metadata och en färdig prompt till AI-assistenter, finns i [dokumentationen](/docs).",
         },
       ],
     },

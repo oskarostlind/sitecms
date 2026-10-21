@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { count, eq } from "drizzle-orm";
-import { db, pages, sites } from "@/lib/db";
 import { authenticateSite, CONTENT_CACHE_HEADERS } from "@/app/api/v1/_lib/auth";
+import { healthResponse } from "@/app/api/v1/_lib/health";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +12,9 @@ export const dynamic = "force-dynamic";
  *
  *   curl -H "x-api-key: $CMS_API_KEY" $CMS_API_URL/api/v1/sites/$CMS_SITE/health
  *
- * Svar 200: { ok: true, site: { name, slug }, pages: number, lastSchemaSyncAt: string | null }
+ * Svar 200: { ok: true, site: { name, slug }, pages: number, lastSchemaSyncAt: string | null,
+ *             revalidateUrl: string | null, webhook: { configured, lastStatus, lastAt, lastError } }
+ * (se app/api/v1/_lib/health.ts).
  */
 export async function GET(
   request: Request,
@@ -26,20 +27,5 @@ export async function GET(
     return NextResponse.json({ error: auth.error }, { status: auth.status, headers: CONTENT_CACHE_HEADERS });
   }
 
-  const { site } = auth;
-
-  const [[pageCount], [siteRow]] = await Promise.all([
-    db.select({ n: count() }).from(pages).where(eq(pages.siteId, site.id)),
-    db.select({ lastSchemaSyncAt: sites.lastSchemaSyncAt }).from(sites).where(eq(sites.id, site.id)).limit(1),
-  ]);
-
-  return NextResponse.json(
-    {
-      ok: true,
-      site: { name: site.name, slug: site.slug },
-      pages: Number(pageCount?.n ?? 0),
-      lastSchemaSyncAt: siteRow?.lastSchemaSyncAt ? siteRow.lastSchemaSyncAt.toISOString() : null,
-    },
-    { headers: CONTENT_CACHE_HEADERS },
-  );
+  return healthResponse(auth.site);
 }

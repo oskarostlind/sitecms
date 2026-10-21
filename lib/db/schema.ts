@@ -36,6 +36,12 @@ export const sites = pgTable("sites", {
   // Last connection check from the integration page: 'ok' | 'failed' | null.
   lastConnectionStatus: text("last_connection_status"),
   lastConnectionCheckedAt: timestamp("last_connection_checked_at", { withTimezone: true }),
+  // Outcome of the latest revalidate webhook (content save or "Testa
+  // anslutningen"): 'ok' | 'failed' | null (never sent). See lib/revalidate.ts.
+  lastWebhookStatus: text("last_webhook_status"),
+  lastWebhookAt: timestamp("last_webhook_at", { withTimezone: true }),
+  // Short Swedish description of why the latest webhook failed (null when ok).
+  lastWebhookError: text("last_webhook_error"),
   // Where new quote requests (offertförfrågningar) are e-mailed. Null = the
   // request is only stored and listed in the panel.
   notifyEmail: text("notify_email"),

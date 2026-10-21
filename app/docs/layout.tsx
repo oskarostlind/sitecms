@@ -4,7 +4,7 @@ import { GuideShell } from "@/components/guides/GuideShell";
 export const metadata: Metadata = {
   title: "Koppla Next.js till ett CMS – dokumentation",
   description:
-    "Koppla en Next.js-sajt till sitecms på tio minuter med npm-paketet sitecms-next: typad klient, schema-sync, revalidering och API-referens.",
+    "Koppla en Next.js-sajt till sitecms med ett kommando och en miljövariabel: npx sitecms-next init, typad klient, schema-sync, signerad webhook och API-referens.",
   alternates: { canonical: "/docs" },
 };
 

@@ -4,7 +4,7 @@ import { hashApiKey, maskApiKey } from "@/lib/api-keys";
 import { ConsumeReveal } from "@/components/admin/ConsumeReveal";
 import { notFound } from "next/navigation";
 import { count, desc, eq } from "drizzle-orm";
-import { BookOpen, Circle, CircleCheck, KeyRound, Plug, UserPlus } from "lucide-react";
+import { BookOpen, Bot, Circle, CircleCheck, KeyRound, Plug, Server, Terminal, UserPlus, Webhook } from "lucide-react";
 import { db } from "@/lib/db";
 import { apiKeys, pages, sites } from "@/lib/db/schema";
 import { requireSiteOwner } from "@/lib/guard";
@@ -14,20 +14,22 @@ import { checkConnection } from "@/lib/actions/integration";
 import { formatDateTime, relativeTime } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import {
+  aiPromptSnippet,
   clientSnippet,
   configSnippet,
+  DEPLOY_HOOK_HOSTS,
   envSnippet,
   healthCurlSnippet,
+  initCommand,
+  INIT_STEPS,
+  isDefaultCmsUrl,
+  legacyEnvSnippet,
+  NPM_SYNC,
+  npmUsageSnippet,
   packageJsonSnippet,
   revalidateRouteSnippet,
+  snippetApiUrl,
   SNIPPET_FILES,
-  NPM_CHECK,
-  npmConfigSnippet,
-  NPM_INSTALL,
-  NPM_PACKAGE,
-  npmPackageJsonSnippet,
-  npmRevalidateSnippet,
-  npmUsageSnippet,
   STRIP_TYPES_COMMAND,
   suggestedRevalidateUrl,
   syncScriptSnippet,
@@ -36,7 +38,6 @@ import {
 } from "@/lib/integration-snippets";
 import { ConfirmButton } from "@/components/content/ConfirmButton";
 import { CodeBlock } from "@/components/admin/CodeBlock";
-import { CopyButton } from "@/components/admin/CopyButton";
 import {
   Alert,
   Badge,
@@ -62,6 +63,8 @@ const ERROR_MESSAGES: Record<string, string> = {
   missing: "Sajten saknar namn — fyll i det under Inställningar och försök igen.",
 };
 
+const linkClassName = "text-brand-700 underline-offset-2 hover:text-brand-800 hover:underline";
+
 function StepTitle({ number, children }: { number: number; children: React.ReactNode }) {
   return (
     <CardTitle className="flex items-center gap-3">
@@ -79,27 +82,99 @@ function StepTitle({ number, children }: { number: number; children: React.React
   );
 }
 
-function ValueRow({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function IconTitle({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-neutral-100 py-2.5 last:border-b-0">
-      <div className="min-w-0">
-        <p className="font-mono text-xs font-medium text-neutral-500">{label}</p>
-        <p className="break-all font-mono text-sm text-neutral-900">{value}</p>
-        {hint ? <p className="mt-0.5 text-xs text-neutral-500">{hint}</p> : null}
-      </div>
-      <CopyButton value={value} variant="ghost" aria-label={`Kopiera ${label}`} />
-    </div>
+    <CardTitle className="flex items-center gap-3">
+      <span
+        aria-hidden
+        className="flex size-7 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-600 [&>svg]:size-4"
+      >
+        {icon}
+      </span>
+      <span>{children}</span>
+    </CardTitle>
   );
 }
 
 function SubHeading({ file, children }: { file?: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-1">
-      <h3 className="text-sm font-semibold text-neutral-900">
-        {file ? <code className="font-mono">{file}</code> : null}
-        {file && children ? " — " : null}
-        {children}
-      </h3>
+    <h3 className="text-sm font-semibold text-neutral-900">
+      {file ? <code className="font-mono">{file}</code> : null}
+      {file && children ? " — " : null}
+      {children}
+    </h3>
+  );
+}
+
+function Collapsible({
+  id,
+  summary,
+  badge,
+  defaultOpen,
+  children,
+}: {
+  id: string;
+  summary: React.ReactNode;
+  badge?: React.ReactNode;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <details id={id} open={defaultOpen} className="group scroll-mt-6 rounded-xl border border-neutral-200 bg-white">
+      <summary className="flex cursor-pointer select-none flex-wrap items-center gap-x-3 gap-y-1 px-5 py-4 text-sm font-medium text-neutral-800 hover:text-neutral-950">
+        <span>{summary}</span>
+        {badge}
+      </summary>
+      <div className="space-y-6 border-t border-neutral-200 px-5 py-5">{children}</div>
+    </details>
+  );
+}
+
+function WebhookStatus({
+  status,
+  at,
+  error,
+  hasUrl,
+}: {
+  status: string | null;
+  at: Date | null;
+  error: string | null;
+  hasUrl: boolean;
+}) {
+  const when = at ? (
+    <span className="text-neutral-500" title={formatDateTime(at)}>
+      {relativeTime(at)}
+    </span>
+  ) : null;
+
+  return (
+    <div className="rounded-lg border border-neutral-200 px-4 py-3 text-sm">
+      <p className="text-xs font-medium text-neutral-500">Senaste webhook-anrop</p>
+      <div className="mt-1 flex flex-wrap items-center gap-2">
+        {status === "ok" ? (
+          <Badge tone="success" dot>
+            Fungerar
+          </Badge>
+        ) : status === "failed" ? (
+          <Badge tone="danger" dot>
+            Misslyckades
+          </Badge>
+        ) : (
+          <Badge tone="neutral">{hasUrl ? "Inget anrop ännu" : "Ingen adress"}</Badge>
+        )}
+        {when}
+      </div>
+      {status === "failed" && error ? <p className="mt-2 break-words text-red-700">{error}</p> : null}
+      {status === "failed" ? (
+        <p className="mt-1 text-xs text-neutral-500">
+          Kontrollera att adressen stämmer, att sajten är deployad med revalidate-routen och att{" "}
+          <code className="font-mono">CMS_API_KEY</code> finns hos webbhotellet. Testa sedan igen i steg 3.
+        </p>
+      ) : status === null && hasUrl ? (
+        <p className="mt-1 text-xs text-neutral-500">
+          Skickas när kunden sparar något, eller när du trycker på Testa anslutningen.
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -136,31 +211,39 @@ export default async function IntegrationPage({
     appUrl(),
   ]);
 
-  const ctx = { apiUrl: cmsUrl, site: site.slug, domain: site.domain };
-  const env = envSnippet({ ...ctx, apiKey: newKey, revalidateSecret: newSecret });
+  // Körs panelen på en annan adress än sitecms.se (t.ex. lokalt) behöver
+  // kundsajten även CMS_API_URL.
+  const apiUrl = snippetApiUrl(cmsUrl);
+  const customApiUrl = !isDefaultCmsUrl(cmsUrl);
+  const ctx = { apiUrl, site: site.slug, domain: site.domain };
+  const env = envSnippet({ apiKey: newKey }) + (customApiUrl ? `\nCMS_API_URL=${apiUrl}` : "");
+  const legacyEnv = legacyEnvSnippet({ ...ctx, apiKey: newKey, revalidateSecret: newSecret });
 
   const hasKey = keys.length > 0;
-  const hasWebhook = Boolean(site.revalidateUrl && site.revalidateSecret);
+  const hasRevalidateUrl = Boolean(site.revalidateUrl);
   const hasSync = Boolean(site.lastSchemaSyncAt);
-  const connectionOk = site.lastConnectionStatus === "ok";
+  // Senaste riktiga webhook-anropet säger mest; annars senaste test.
+  const connectionOk = (site.lastWebhookStatus ?? site.lastConnectionStatus) === "ok";
+  const pageTotal = Number(pageCount?.n ?? 0);
 
   const checklist = [
-    { done: hasKey, label: "API-nyckel skapad", href: "#nycklar" },
-    { done: hasWebhook, label: "Revalidate-URL och hemlighet", href: "#nycklar" },
-    { done: hasSync, label: "Schema synkat från sajten", href: "#kod" },
+    { done: hasKey, label: "API-nyckel", href: "#nycklar" },
+    { done: hasRevalidateUrl, label: "Revalidate-URL", href: "#revalidate" },
+    { done: hasSync, label: "Schema synkat från sajten", href: "#koppla" },
     { done: connectionOk, label: "Anslutningen testad", href: "#testa" },
   ];
   const doneCount = checklist.filter((c) => c.done).length;
 
   const errorMessage = error ? (ERROR_MESSAGES[error] ?? "Något gick fel. Försök igen.") : null;
   const membersHref = `/admin/sites/${siteId}/medlemmar`;
+  const suggestedUrl = suggestedRevalidateUrl(site.domain);
 
   return (
     <div className="max-w-3xl">
       {reveal ? <ConsumeReveal /> : null}
       <PageHeader
         title="Integration"
-        description={`Koppla ${site.name} till sitecms: nycklar, kod att klistra in, test av anslutningen och inbjudan till kunden.`}
+        description={`Koppla ${site.name} till sitecms: ett kommando, en miljövariabel, test av anslutningen och inbjudan till kunden.`}
         actions={
           <ButtonLink href="/docs" variant="secondary" icon={<BookOpen />}>
             Utvecklardokumentation
@@ -176,8 +259,7 @@ export default async function IntegrationPage({
               {doneCount === checklist.length ? "Sajten är kopplad" : `${doneCount} av ${checklist.length} klara`}
             </CardTitle>
             <CardDescription>
-              Gå igenom stegen nedan i ordning. Allt kan göras av utvecklaren själv — ingen på sitecms behöver göra
-              något.
+              Allt kan göras av utvecklaren själv — ingen på sitecms behöver göra något.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -202,301 +284,261 @@ export default async function IntegrationPage({
           </CardContent>
         </Card>
 
-        {/* Steg 1 — Nycklar */}
-        <Card id="nycklar" className="scroll-mt-6">
+        {/* Steg 1 — Koppla sajten */}
+        <Card id="koppla" className="scroll-mt-6">
           <CardHeader>
-            <StepTitle number={1}>Nycklar och miljövariabler</StepTitle>
+            <StepTitle number={1}>Koppla sajten</StepTitle>
             <CardDescription>
-              Kundsajten behöver fyra miljövariabler. Lägg dem i <code className="font-mono">.env.local</code> lokalt
-              och under Environment Variables hos Vercel (eller motsvarande).
+              För Next.js 14.2+ med App Router. Kör kommandot i kundsajtens rotkatalog — det sätter upp allt som
+              behövs.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {errorMessage ? <Alert tone="danger">{errorMessage}</Alert> : null}
-
-            <div className="rounded-lg border border-neutral-200 px-4">
-              <ValueRow label="CMS_API_URL" value={cmsUrl} hint="Adressen till sitecms." />
-              <ValueRow label="CMS_SITE" value={site.slug} hint="Sajtens slug — en del av alla API-adresser." />
+            <div className="space-y-3">
+              {newKey ? (
+                <Alert tone="warning" title={`Nyckeln "${newKeyName ?? ""}" är ifylld`}>
+                  Kommandot och miljövariabeln nedan innehåller nyckeln i klartext. Kopiera dem nu — nyckeln visas inte
+                  igen när du lämnar sidan.
+                </Alert>
+              ) : null}
+              <CodeBlock code={initCommand(newKey)} language="bash" maxHeight={null} />
+              {newKey ? null : (
+                <p className="text-sm text-neutral-500">
+                  Lägg API-nyckeln efter kommandot, eller låt det fråga efter den. Har du inte nyckeln kvar:{" "}
+                  <a href="#nycklar" className={linkClassName}>
+                    skapa en ny
+                  </a>{" "}
+                  så fylls den i här.
+                </p>
+              )}
+              <div className="rounded-lg border border-neutral-200 bg-neutral-50/60 px-4 py-3 text-sm text-neutral-700">
+                <p className="font-medium text-neutral-800">Kommandot</p>
+                <ul className="mt-1.5 list-disc space-y-1 pl-5 marker:text-neutral-400">
+                  {INIT_STEPS.map((step) => (
+                    <li key={step}>{step}</li>
+                  ))}
+                </ul>
+              </div>
             </div>
 
-            {/* API-nycklar */}
-            <section aria-labelledby="api-nycklar" className="space-y-3">
+            <section aria-labelledby="webbhotell" className="space-y-3 border-t border-neutral-100 pt-6">
               <div className="flex items-center gap-2">
-                <KeyRound aria-hidden className="size-4 text-neutral-500" />
-                <h3 id="api-nycklar" className="text-sm font-semibold text-neutral-900">
-                  API-nycklar
+                <Server aria-hidden className="size-4 text-neutral-500" />
+                <h3 id="webbhotell" className="text-sm font-semibold text-neutral-900">
+                  Lägg <code className="font-mono">CMS_API_KEY</code> hos ditt webbhotell
                 </h3>
               </div>
               <p className="text-sm text-neutral-500">
-                Skickas i headern <code className="font-mono">x-api-key</code>. Nyckeln visas i klartext bara precis
-                när den skapats — skapa en ny om du tappat bort den och ta bort den gamla.
+                Samma värde som i <code className="font-mono">{SNIPPET_FILES.env}</code>, under miljövariabler hos
+                webbhotellet — Vercel, Netlify, Cloudflare, Render eller din egen server. Det är den enda variabeln
+                sajten behöver.
+                {customApiUrl ? (
+                  <>
+                    {" "}
+                    Den här installationen av sitecms körs på <code className="font-mono">{apiUrl}</code>, så lägg
+                    även till <code className="font-mono">CMS_API_URL</code>.
+                  </>
+                ) : null}
               </p>
-
-              {deleted === "1" ? <Alert tone="success">API-nyckeln togs bort.</Alert> : null}
-              {newKey ? (
-                <Alert tone="warning" title={`Nyckeln "${newKeyName ?? ""}" skapades`}>
-                  Den finns nu i klartext i miljövariablerna nedan. Kopiera dem nu — nyckeln visas inte igen.
-                </Alert>
-              ) : null}
-
-              {keys.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-neutral-300 px-4 py-3 text-sm text-neutral-500">
-                  Inga API-nycklar ännu. Skapa en nedan.
-                </p>
-              ) : (
-                <Table>
-                  <Thead>
-                    <Tr hover={false}>
-                      <Th>Namn</Th>
-                      <Th>Nyckel</Th>
-                      <Th>Skapad</Th>
-                      <Th />
-                    </Tr>
-                  </Thead>
-                  <Tbody>
-                    {keys.map((k) => (
-                      <Tr key={k.id}>
-                        <Td className="max-w-[180px] truncate" title={k.name}>
-                          {k.name}
-                        </Td>
-                        <Td>
-                          <code className="font-mono text-xs text-neutral-700">
-                            {newKey && newKeyHash === k.keyHash ? newKey : maskApiKey(k.keyHint)}
-                          </code>
-                        </Td>
-                        <Td className="whitespace-nowrap text-neutral-500" title={formatDateTime(k.createdAt)}>
-                          {relativeTime(k.createdAt)}
-                        </Td>
-                        <Td className="text-right">
-                          <form action={deleteApiKey.bind(null, siteId, k.id)}>
-                            <input type="hidden" name="returnTo" value="integration" />
-                            <ConfirmButton
-                              variant="danger"
-                              size="sm"
-                              confirmText={`Ta bort nyckeln "${k.name}"? Integrationer som använder den slutar fungera omedelbart.`}
-                            >
-                              Ta bort
-                            </ConfirmButton>
-                          </form>
-                        </Td>
-                      </Tr>
-                    ))}
-                  </Tbody>
-                </Table>
-              )}
-
-              <form action={createApiKey.bind(null, siteId)} className="flex flex-wrap items-end gap-3">
-                <input type="hidden" name="returnTo" value="integration" />
-                <Field htmlFor="keyName" label="Namn på ny nyckel" className="min-w-[200px] flex-1">
-                  <Input id="keyName" name="name" type="text" required placeholder="T.ex. Produktion" />
-                </Field>
-                <SubmitButton variant="secondary" pendingText="Skapar…">
-                  + Skapa nyckel
-                </SubmitButton>
-              </form>
+              <CodeBlock code={env} filename="Miljövariabel" language="env" maxHeight={null} />
             </section>
 
-            {/* Revalidate */}
-            <section aria-labelledby="revalidate" className="space-y-3 border-t border-neutral-100 pt-6">
-              <h3 id="revalidate" className="text-sm font-semibold text-neutral-900">
-                Revalidate-webhook
+            <section aria-labelledby="anvand" className="space-y-3 border-t border-neutral-100 pt-6">
+              <h3 id="anvand" className="text-sm font-semibold text-neutral-900">
+                Använd innehållet och deploya
               </h3>
               <p className="text-sm text-neutral-500">
-                När kunden sparar något POST:ar sitecms <code className="font-mono">{"{ secret }"}</code> till den här
-                adressen, så att sajten hämtar nytt innehåll inom några sekunder.
+                Deklarera fälten i <code className="font-mono">{SNIPPET_FILES.config}</code> (
+                <Link href="/docs#schema" className={linkClassName}>
+                  om formatet
+                </Link>
+                ) och hämta dem i serverkomponenter. Vid nästa build synkas fälten till panelen, och revalidate-URL:en i
+                steg 2 fylls i automatiskt om den saknas.
               </p>
-
-              {success === "1" ? <Alert tone="success">Revalidate-URL:en har sparats.</Alert> : null}
-
-              <form action={updateSiteSettings.bind(null, siteId)} className="flex flex-wrap items-end gap-3">
-                <input type="hidden" name="returnTo" value="integration" />
-                <input type="hidden" name="name" value={site.name} />
-                <input type="hidden" name="domain" value={site.domain ?? ""} />
-                <Field
-                  htmlFor="revalidateUrl"
-                  label="Revalidate-URL"
-                  hint={`Med koden i steg 2 blir den ${suggestedRevalidateUrl(site.domain)}`}
-                  className="min-w-[260px] flex-1"
-                >
-                  <Input
-                    id="revalidateUrl"
-                    name="revalidateUrl"
-                    type="url"
-                    defaultValue={site.revalidateUrl ?? ""}
-                    placeholder={suggestedRevalidateUrl(site.domain)}
-                    className="font-mono"
-                    aria-describedby="revalidateUrl-hint"
-                  />
-                </Field>
-                <SubmitButton variant="secondary" pendingText="Sparar…">
-                  Spara revalidate-URL
-                </SubmitButton>
-              </form>
-
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-neutral-200 px-4 py-3">
-                <div className="text-sm">
-                  <p className="font-medium text-neutral-800">Revalidate-hemlighet</p>
-                  <p className="text-neutral-500">
-                    {newSecret
-                      ? "Ny hemlighet genererad — den finns i miljövariablerna nedan. Den gamla slutade fungera."
-                      : site.revalidateSecret
-                        ? "Konfigurerad. Visas bara när den genereras — regenerera om du behöver se den igen."
-                        : "Ingen hemlighet ännu."}
-                  </p>
-                </div>
-                <form action={regenerateRevalidateSecret.bind(null, siteId)}>
-                  <input type="hidden" name="returnTo" value="integration" />
-                  {site.revalidateSecret ? (
-                    <ConfirmButton
-                      variant="secondary"
-                      size="sm"
-                      confirmText="Regenerera hemligheten? Den gamla slutar fungera omedelbart och måste bytas på kundsajten."
-                    >
-                      Regenerera hemlighet
-                    </ConfirmButton>
-                  ) : (
-                    <SubmitButton variant="secondary" size="sm" pendingText="Genererar…">
-                      Generera hemlighet
-                    </SubmitButton>
-                  )}
-                </form>
-              </div>
+              <CodeBlock code={npmUsageSnippet()} filename="app/page.tsx" language="tsx" />
             </section>
 
-            {/* Env-block */}
-            <section aria-labelledby="env" className="space-y-3 border-t border-neutral-100 pt-6">
-              <h3 id="env" className="text-sm font-semibold text-neutral-900">
-                Miljövariabler att kopiera
+            <aside
+              aria-labelledby="inte-nextjs"
+              className="rounded-lg border border-neutral-200 bg-neutral-50/60 px-4 py-4 text-sm text-neutral-700"
+            >
+              <h3 id="inte-nextjs" className="font-semibold text-neutral-900">
+                Inte Next.js?
               </h3>
-              {newKey || newSecret ? (
-                <Alert tone="warning">
-                  Blocket innehåller {newKey && newSecret ? "nyckeln och hemligheten" : newKey ? "nyckeln" : "hemligheten"}{" "}
-                  i klartext. Kopiera det nu — det visas inte igen när du lämnar sidan.
-                </Alert>
-              ) : (
-                <p className="text-sm text-neutral-500">
-                  Nyckel och hemlighet visas bara direkt efter att de skapats. Skapa en ny nyckel eller generera en ny
-                  hemlighet ovan så fylls de i här.
-                </p>
-              )}
-              <CodeBlock code={env} filename={SNIPPET_FILES.env} language="env" maxHeight={null} />
-            </section>
+              <p className="mt-1.5">
+                Hämta innehållet från REST-API:t med <code className="font-mono">x-api-key</code> (se{" "}
+                <Link href="/docs#api" className={linkClassName}>
+                  API-referensen
+                </Link>
+                ) och klistra in webbhotellets deploy hook som revalidate-URL i steg 2. Då byggs sajten om automatiskt
+                varje gång kunden sparar — {DEPLOY_HOOK_HOSTS.map((h) => h.name).join(", ").replace(/, ([^,]*)$/, " och $1")}{" "}
+                har det, liksom de flesta andra.{" "}
+                <Link href="/docs#deploy-hooks" className={linkClassName}>
+                  Så gör du
+                </Link>
+                .
+              </p>
+            </aside>
           </CardContent>
         </Card>
 
-        {/* Steg 2 — Kod */}
-        <Card id="kod" className="scroll-mt-6">
+        {/* AI-assistent */}
+        <Card id="ai" className="scroll-mt-6">
           <CardHeader>
-            <StepTitle number={2}>Koppla sajten</StepTitle>
+            <IconTitle icon={<Bot />}>Prompt till din AI-assistent</IconTitle>
             <CardDescription>
-              För Next.js 14.2+ med App Router. Paketet <code className="font-mono">{NPM_PACKAGE}</code> innehåller
-              klienten, revalidate-routen och schema-sync — inga andra beroenden.
+              Bygger du sajten med ChatGPT, Cursor eller Claude? Klistra in det här först, så använder assistenten
+              sitecms-next i stället för att skriva egen kod som kräver en ny deploy för varje ändring. Prompten
+              innehåller ingen nyckel.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <SubHeading>Installera paketet</SubHeading>
-              <CodeBlock code={NPM_INSTALL} language="bash" maxHeight={null} />
-              <p className="text-sm text-neutral-500">
-                Kör sedan <code className="font-mono">{NPM_CHECK}</code> för att verifiera nycklarna från steg 1.
+          <CardContent className="space-y-3">
+            <CodeBlock code={aiPromptSnippet()} filename="Prompt" language="text" />
+            <p className="text-sm text-neutral-500">
+              Hela integrationen i maskinläsbar form finns på{" "}
+              <a href="/llms.txt" className={linkClassName}>
+                /llms.txt
+              </a>
+              .
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* API-nycklar */}
+        <Card id="nycklar" className="scroll-mt-6">
+          <CardHeader>
+            <IconTitle icon={<KeyRound />}>API-nycklar</IconTitle>
+            <CardDescription>
+              Nyckeln avgör vilken sajt innehållet hämtas från och används för att verifiera webhooken. Den visas i
+              klartext bara precis när den skapats — skapa en ny om du tappat bort den och ta bort den gamla.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {errorMessage ? <Alert tone="danger">{errorMessage}</Alert> : null}
+            {deleted === "1" ? <Alert tone="success">API-nyckeln togs bort.</Alert> : null}
+            {newKey ? (
+              <Alert tone="warning" title={`Nyckeln "${newKeyName ?? ""}" skapades`}>
+                Den är ifylld i kommandot i{" "}
+                <a href="#koppla" className="font-medium underline underline-offset-2">
+                  steg 1
+                </a>
+                . Kopiera den nu — den visas inte igen.
+              </Alert>
+            ) : null}
+
+            {keys.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-neutral-300 px-4 py-3 text-sm text-neutral-500">
+                Inga API-nycklar ännu. Skapa en nedan.
+              </p>
+            ) : (
+              <Table>
+                <Thead>
+                  <Tr hover={false}>
+                    <Th>Namn</Th>
+                    <Th>Nyckel</Th>
+                    <Th>Skapad</Th>
+                    <Th />
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {keys.map((k) => (
+                    <Tr key={k.id}>
+                      <Td className="max-w-[180px] truncate" title={k.name}>
+                        {k.name}
+                      </Td>
+                      <Td>
+                        <code className="font-mono text-xs text-neutral-700">
+                          {newKey && newKeyHash === k.keyHash ? newKey : maskApiKey(k.keyHint)}
+                        </code>
+                      </Td>
+                      <Td className="whitespace-nowrap text-neutral-500" title={formatDateTime(k.createdAt)}>
+                        {relativeTime(k.createdAt)}
+                      </Td>
+                      <Td className="text-right">
+                        <form action={deleteApiKey.bind(null, siteId, k.id)}>
+                          <input type="hidden" name="returnTo" value="integration" />
+                          <ConfirmButton
+                            variant="danger"
+                            size="sm"
+                            confirmText={`Ta bort nyckeln "${k.name}"? Integrationer som använder den slutar fungera omedelbart.`}
+                          >
+                            Ta bort
+                          </ConfirmButton>
+                        </form>
+                      </Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+              </Table>
+            )}
+
+            <form action={createApiKey.bind(null, siteId)} className="flex flex-wrap items-end gap-3">
+              <input type="hidden" name="returnTo" value="integration" />
+              <Field htmlFor="keyName" label="Namn på ny nyckel" className="min-w-[200px] flex-1">
+                <Input id="keyName" name="name" type="text" required placeholder="T.ex. Produktion" />
+              </Field>
+              <SubmitButton variant="secondary" pendingText="Skapar…">
+                + Skapa nyckel
+              </SubmitButton>
+            </form>
+          </CardContent>
+        </Card>
+
+        {/* Steg 2 — Revalidate-URL */}
+        <Card id="revalidate" className="scroll-mt-6">
+          <CardHeader>
+            <StepTitle number={2}>Revalidate-URL</StepTitle>
+            <CardDescription>
+              När kunden sparar skickar sitecms en signerad webhook hit, så att sajten visar ändringen inom några
+              sekunder — utan ny deploy. Sajter med domän får adressen automatiskt, och första synken från en publik
+              https-adress fyller i den om den saknas.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {success === "1" ? <Alert tone="success">Revalidate-URL:en har sparats.</Alert> : null}
+
+            <form action={updateSiteSettings.bind(null, siteId)} className="flex flex-wrap items-end gap-3">
+              <input type="hidden" name="returnTo" value="integration" />
+              <input type="hidden" name="name" value={site.name} />
+              <input type="hidden" name="domain" value={site.domain ?? ""} />
+              <input type="hidden" name="notifyEmail" value={site.notifyEmail ?? ""} />
+              <Field
+                htmlFor="revalidateUrl"
+                label="Revalidate-URL"
+                hint={`Med sitecms-next blir den ${suggestedUrl}. Inte Next.js? Klistra in webbhotellets deploy hook.`}
+                className="min-w-[260px] flex-1"
+              >
+                <Input
+                  id="revalidateUrl"
+                  name="revalidateUrl"
+                  type="url"
+                  defaultValue={site.revalidateUrl ?? ""}
+                  placeholder={suggestedUrl}
+                  className="font-mono"
+                  aria-describedby="revalidateUrl-hint"
+                />
+              </Field>
+              <SubmitButton variant="secondary" pendingText="Sparar…">
+                Spara revalidate-URL
+              </SubmitButton>
+            </form>
+
+            <WebhookStatus
+              status={site.lastWebhookStatus}
+              at={site.lastWebhookAt}
+              error={site.lastWebhookError}
+              hasUrl={hasRevalidateUrl}
+            />
+
+            <div id="deploy-hook" className="flex gap-3 rounded-lg border border-neutral-200 px-4 py-3 text-sm">
+              <Webhook aria-hidden className="mt-0.5 size-4 shrink-0 text-neutral-500" />
+              <p className="text-neutral-600">
+                <span className="font-medium text-neutral-800">Deploy hook i stället:</span> en build hook-URL från
+                webbhotellet ({DEPLOY_HOOK_HOSTS.map((h) => h.name).join(", ")} m.fl.) tar emot samma anrop och bygger
+                om sajten när kunden sparar. Det tar någon minut i stället för några sekunder, men fungerar med alla
+                ramverk och helt statiska sajter.
               </p>
             </div>
-
-            <div className="space-y-2">
-              <SubHeading file={SNIPPET_FILES.revalidate}>tar emot webhooken</SubHeading>
-              <p className="text-sm text-neutral-500">
-                En rad. Tömmer cachetaggen <code className="font-mono">sitecms</code> när kunden sparar.
-              </p>
-              <CodeBlock code={npmRevalidateSnippet()} filename={SNIPPET_FILES.revalidate} language="ts" maxHeight={null} />
-            </div>
-
-            <div className="space-y-2">
-              <SubHeading file={SNIPPET_FILES.config}>sajtens sidor och fält</SubHeading>
-              <p className="text-sm text-neutral-500">
-                Deklarera vad kunden ska kunna redigera. Etiketterna och hjälptexterna syns i panelen.{" "}
-                <Link href="/docs#schema" className="text-brand-700 underline-offset-2 hover:text-brand-800 hover:underline">
-                  Om formatet
-                </Link>
-                .
-              </p>
-              <CodeBlock code={npmConfigSnippet(ctx)} filename={SNIPPET_FILES.config} language="ts" />
-            </div>
-
-            <div className="space-y-2">
-              <SubHeading file={SNIPPET_FILES.packageJson}>synka före varje build</SubHeading>
-              <p className="text-sm text-neutral-500">
-                Skapar sidor och fält som saknas, skriver aldrig över kundens innehåll och stoppar bygget om configen är
-                ogiltig.
-              </p>
-              <CodeBlock code={npmPackageJsonSnippet()} filename={SNIPPET_FILES.packageJson} language="json" maxHeight={null} />
-            </div>
-
-            <div className="space-y-2">
-              <SubHeading>Använd innehållet</SubHeading>
-              <CodeBlock code={npmUsageSnippet()} filename="app/page.tsx" language="tsx" />
-            </div>
-
-            <details className="group rounded-lg border border-neutral-200 bg-neutral-50/60">
-              <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium text-neutral-700 hover:text-neutral-900">
-                Utan npm-paket — kopiera koden till repot i stället
-              </summary>
-              <div className="space-y-6 border-t border-neutral-200 px-4 py-5">
-            <div className="space-y-2">
-              <SubHeading file={SNIPPET_FILES.client}>klienten</SubHeading>
-              <p className="text-sm text-neutral-500">
-                <code className="font-mono">getContent()</code>, <code className="font-mono">getPosts()</code>,{" "}
-                <code className="font-mono">getPost(slug)</code> och <code className="font-mono">block(content, sida, nyckel)</code>{" "}
-                som alltid returnerar <code className="font-mono">{"{ value, html, alt }"}</code>.
-              </p>
-              <CodeBlock code={clientSnippet(ctx)} filename={SNIPPET_FILES.client} language="ts" />
-            </div>
-
-            <div className="space-y-2">
-              <SubHeading file={SNIPPET_FILES.revalidate}>tar emot webhooken</SubHeading>
-              <p className="text-sm text-neutral-500">
-                Jämför hemligheten i konstant tid och tömmer cachetaggen <code className="font-mono">sitecms</code>.
-              </p>
-              <CodeBlock code={revalidateRouteSnippet()} filename={SNIPPET_FILES.revalidate} language="ts" />
-            </div>
-
-            <div className="space-y-2">
-              <SubHeading file={SNIPPET_FILES.config}>sajtens sidor och fält</SubHeading>
-              <p className="text-sm text-neutral-500">
-                Deklarera vad kunden ska kunna redigera. Etiketterna och hjälptexterna syns i panelen.{" "}
-                <Link href="/docs#schema" className="text-brand-700 underline-offset-2 hover:text-brand-800 hover:underline">
-                  Om formatet
-                </Link>
-                .
-              </p>
-              <CodeBlock code={configSnippet(ctx)} filename={SNIPPET_FILES.config} language="ts" />
-            </div>
-
-            <div className="space-y-2">
-              <SubHeading file={SNIPPET_FILES.sync}>skickar configen till sitecms</SubHeading>
-              <p className="text-sm text-neutral-500">
-                Skapar sidor och fält som saknas och skriver ut en rapport. Avslutar med felkod 1 om något gick fel, så
-                att bygget stoppas.
-              </p>
-              <CodeBlock code={syncScriptSnippet()} filename={SNIPPET_FILES.sync} language="ts" />
-            </div>
-
-            <div className="space-y-2">
-              <SubHeading file={SNIPPET_FILES.packageJson}>kör synken före varje build</SubHeading>
-              <p className="text-sm text-neutral-500">
-                Installera <code className="font-mono">tsx</code> som dev-beroende i kundsajten och lägg till
-                skripten. Utan tsx (Node 22.6+) går det att köra{" "}
-                <code className="font-mono">{STRIP_TYPES_COMMAND}</code> i stället.
-              </p>
-              <CodeBlock code={TSX_INSTALL} language="bash" maxHeight={null} />
-              <CodeBlock code={packageJsonSnippet()} filename={SNIPPET_FILES.packageJson} language="json" maxHeight={null} />
-            </div>
-
-            <div className="space-y-2">
-              <SubHeading>Använd innehållet</SubHeading>
-              <CodeBlock code={usageSnippet()} filename="app/page.tsx" language="tsx" />
-            </div>
-              </div>
-            </details>
           </CardContent>
         </Card>
 
@@ -505,7 +547,7 @@ export default async function IntegrationPage({
           <CardHeader>
             <StepTitle number={3}>Testa anslutningen</StepTitle>
             <CardDescription>
-              Skickar samma anrop som när kunden sparar och förväntar sig ett 2xx-svar från revalidate-URL:en.
+              Skickar samma signerade anrop som när kunden sparar och förväntar sig ett 2xx-svar från revalidate-URL:en.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -550,24 +592,28 @@ export default async function IntegrationPage({
                     </span>
                   ) : (
                     <span>
-                      Ingen sync ännu — kör <code className="font-mono text-xs">npx sitecms-next sync</code>
+                      Ingen sync ännu — kör <code className="font-mono text-xs">{NPM_SYNC}</code>
                     </span>
                   )}
                   <span className="block text-xs text-neutral-500">
-                    {Number(pageCount?.n ?? 0)} {Number(pageCount?.n ?? 0) === 1 ? "sida" : "sidor"} i CMS:et
+                    {pageTotal} {pageTotal === 1 ? "sida" : "sidor"} i CMS:et
                   </span>
                 </dd>
               </div>
             </dl>
 
-            {!site.revalidateUrl || !site.revalidateSecret ? (
-              <Alert tone="info">
-                Ange revalidate-URL och generera en hemlighet i steg 1 innan du testar.
-              </Alert>
-            ) : (
+            {site.revalidateUrl ? (
               <p className="text-sm text-neutral-500">
                 Testar <code className="break-all font-mono text-xs">{site.revalidateUrl}</code>
               </p>
+            ) : (
+              <Alert tone="info">
+                Ange en revalidate-URL i{" "}
+                <a href="#revalidate" className="font-medium underline underline-offset-2">
+                  steg 2
+                </a>{" "}
+                innan du testar.
+              </Alert>
             )}
 
             <form action={checkConnection.bind(null, siteId)}>
@@ -578,7 +624,7 @@ export default async function IntegrationPage({
 
             <div className="space-y-2 border-t border-neutral-100 pt-4">
               <p className="text-sm text-neutral-500">
-                Kontrollera nyckeln från terminalen — svarar med sajtens namn och antal sidor:
+                Kontrollera nyckeln från terminalen — svarar med sajtens namn, antal sidor och webhook-status:
               </p>
               <CodeBlock code={healthCurlSnippet(ctx)} language="bash" maxHeight={null} />
             </div>
@@ -603,6 +649,147 @@ export default async function IntegrationPage({
             </ButtonLink>
           </CardContent>
         </Card>
+
+        {/* Utan npm */}
+        <Collapsible id="utan-npm" summary="Utan npm-paket — kopiera koden till repot i stället">
+          <p className="text-sm text-neutral-500">
+            Samma sak som <code className="font-mono">sitecms-next</code> gör, som filer i ditt eget repo. Kräver bara{" "}
+            <code className="font-mono">CMS_API_KEY</code>, och revalidate-routen verifierar webhookens signatur med
+            Web Crypto.
+          </p>
+
+          <div className="space-y-2">
+            <SubHeading file={SNIPPET_FILES.client}>klienten</SubHeading>
+            <p className="text-sm text-neutral-500">
+              <code className="font-mono">getContent()</code>, <code className="font-mono">getPosts()</code>,{" "}
+              <code className="font-mono">getPost(slug)</code> och{" "}
+              <code className="font-mono">block(content, sida, nyckel)</code> som alltid returnerar{" "}
+              <code className="font-mono">{"{ value, html, alt }"}</code>.
+            </p>
+            <CodeBlock code={clientSnippet(ctx)} filename={SNIPPET_FILES.client} language="ts" />
+          </div>
+
+          <div className="space-y-2">
+            <SubHeading file={SNIPPET_FILES.revalidate}>tar emot webhooken</SubHeading>
+            <p className="text-sm text-neutral-500">
+              Verifierar signaturen med <code className="font-mono">CMS_API_KEY</code> (godtar även en äldre{" "}
+              <code className="font-mono">CMS_REVALIDATE_SECRET</code>) och tömmer cachetaggen{" "}
+              <code className="font-mono">sitecms</code>.
+            </p>
+            <CodeBlock code={revalidateRouteSnippet()} filename={SNIPPET_FILES.revalidate} language="ts" />
+          </div>
+
+          <div className="space-y-2">
+            <SubHeading file={SNIPPET_FILES.config}>sajtens sidor och fält</SubHeading>
+            <CodeBlock code={configSnippet(ctx)} filename={SNIPPET_FILES.config} language="ts" />
+          </div>
+
+          <div className="space-y-2">
+            <SubHeading file={SNIPPET_FILES.sync}>skickar configen till sitecms</SubHeading>
+            <p className="text-sm text-neutral-500">
+              Skapar sidor och fält som saknas och skriver ut en rapport. Avslutar med felkod 1 om något gick fel, så
+              att bygget stoppas.
+            </p>
+            <CodeBlock code={syncScriptSnippet(ctx)} filename={SNIPPET_FILES.sync} language="ts" />
+          </div>
+
+          <div className="space-y-2">
+            <SubHeading file={SNIPPET_FILES.packageJson}>kör synken före varje build</SubHeading>
+            <p className="text-sm text-neutral-500">
+              Installera <code className="font-mono">tsx</code> som dev-beroende i kundsajten. Utan tsx (Node 22.6+)
+              går det att köra <code className="font-mono">{STRIP_TYPES_COMMAND}</code> i stället.
+            </p>
+            <CodeBlock code={TSX_INSTALL} language="bash" maxHeight={null} />
+            <CodeBlock code={packageJsonSnippet()} filename={SNIPPET_FILES.packageJson} language="json" maxHeight={null} />
+          </div>
+
+          <div className="space-y-2">
+            <SubHeading>Använd innehållet</SubHeading>
+            <CodeBlock code={usageSnippet()} filename="app/page.tsx" language="tsx" />
+          </div>
+        </Collapsible>
+
+        {/* Äldre integrationer */}
+        <Collapsible
+          id="aldre"
+          summary="Äldre integrationer (före sitecms-next 0.3)"
+          defaultOpen={Boolean(newSecret)}
+          badge={
+            site.revalidateSecret ? (
+              <Badge tone="success" dot>
+                Hemlighet konfigurerad
+              </Badge>
+            ) : null
+          }
+        >
+          <div className="space-y-2 text-sm text-neutral-600">
+            <p>
+              Sajter som kopplades med sitecms-next 0.2 eller den tidigare copy-paste-koden använder fyra
+              miljövariabler och en revalidate-hemlighet. De fortsätter fungera som förut: sitecms skickar hemligheten
+              i webhooken så länge den finns här, och API-adresserna med slug svarar likadant.
+            </p>
+            <p>
+              Efter uppgradering till 0.3 (kör <code className="font-mono">{initCommand()}</code>) räcker{" "}
+              <code className="font-mono">CMS_API_KEY</code> —{" "}
+              <code className="font-mono">CMS_API_URL</code>, <code className="font-mono">CMS_SITE</code> och{" "}
+              <code className="font-mono">CMS_REVALIDATE_SECRET</code> kan tas bort.{" "}
+              <Link href="/docs#uppgradera" className={linkClassName}>
+                Uppgradera från 0.2
+              </Link>
+              .
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-neutral-200 px-4 py-3">
+            <div className="text-sm">
+              <p className="font-medium text-neutral-800">Revalidate-hemlighet</p>
+              <p className="text-neutral-500">
+                {newSecret
+                  ? "Ny hemlighet genererad — den finns i miljövariablerna nedan. Den gamla slutade fungera."
+                  : site.revalidateSecret
+                    ? "Konfigurerad. Visas bara när den genereras — regenerera om du behöver se den igen."
+                    : "Ingen hemlighet. Behövs bara för integrationer före sitecms-next 0.3."}
+              </p>
+            </div>
+            <form action={regenerateRevalidateSecret.bind(null, siteId)}>
+              <input type="hidden" name="returnTo" value="integration" />
+              {site.revalidateSecret ? (
+                <ConfirmButton
+                  variant="secondary"
+                  size="sm"
+                  confirmText="Regenerera hemligheten? Den gamla slutar fungera omedelbart och måste bytas på kundsajten."
+                >
+                  Regenerera hemlighet
+                </ConfirmButton>
+              ) : (
+                <SubmitButton variant="secondary" size="sm" pendingText="Genererar…">
+                  Generera hemlighet
+                </SubmitButton>
+              )}
+            </form>
+          </div>
+
+          <div className="space-y-2">
+            <SubHeading>De fyra variablerna</SubHeading>
+            {newKey || newSecret ? (
+              <Alert tone="warning">
+                Blocket innehåller{" "}
+                {newKey && newSecret ? "nyckeln och hemligheten" : newKey ? "nyckeln" : "hemligheten"} i klartext.
+                Kopiera det nu — det visas inte igen när du lämnar sidan.
+              </Alert>
+            ) : (
+              <p className="text-sm text-neutral-500">
+                Nyckel och hemlighet visas bara direkt efter att de skapats.
+              </p>
+            )}
+            <CodeBlock code={legacyEnv} filename={SNIPPET_FILES.env} language="env" maxHeight={null} />
+          </div>
+        </Collapsible>
+
+        <p className="flex items-center gap-2 text-xs text-neutral-500">
+          <Terminal aria-hidden className="size-3.5" />
+          Kör <code className="font-mono">npx sitecms-next check</code> på kundsajten för att se att nyckeln fungerar.
+        </p>
       </div>
     </div>
   );

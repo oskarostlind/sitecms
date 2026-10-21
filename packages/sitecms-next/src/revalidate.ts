@@ -4,33 +4,51 @@
  *   // app/api/sitecms/revalidate/route.ts
  *   export { POST } from "sitecms-next/revalidate";
  *
- * sitecms anropar routen (POST { secret }) varje gång kunden sparar.
- * Hemligheten jämförs med CMS_REVALIDATE_SECRET och cache-taggen "sitecms"
- * töms, så sajten visar det nya innehållet direkt.
+ * sitecms anropar routen varje gång kunden sparar. Anropet är signerat
+ * (x-sitecms-signature) med sajtens API-nyckel, så det räcker att
+ * CMS_API_KEY finns på sajten. Äldre sajter som skickar `secret` i bodyn
+ * godkänns också om CMS_REVALIDATE_SECRET är satt. Därefter töms
+ * cache-taggen "sitecms" och sajten visar det nya innehållet direkt.
  */
 import { revalidateTag } from "next/cache.js";
-import { verifyRevalidateSecret } from "./index.js";
+import { verifyWebhook } from "./index.js";
 
 export type RevalidateHandlerOptions = {
-  /** Default: process.env.CMS_REVALIDATE_SECRET. */
+  /** Äldre revalidate-hemlighet. Default: process.env.CMS_REVALIDATE_SECRET. */
   secret?: string;
+  /** API-nyckel som signaturen kontrolleras mot. Default: process.env.CMS_API_KEY. */
+  apiKey?: string;
   /** Cache-tagg att tömma. Default "sitecms" (samma som klienten). */
   tag?: string;
 };
 
+function env(name: string): string {
+  return (typeof process !== "undefined" && process.env?.[name]?.trim()) || "";
+}
+
 export function createRevalidateHandler(options: RevalidateHandlerOptions = {}) {
   return async function POST(request: Request): Promise<Response> {
-    const expected = options.secret ?? process.env.CMS_REVALIDATE_SECRET;
-    if (!expected) {
+    const apiKey = (options.apiKey ?? env("CMS_API_KEY")).trim();
+    const secret = (options.secret ?? env("CMS_REVALIDATE_SECRET")).trim();
+    if (!apiKey && !secret) {
       return Response.json(
-        { revalidated: false, error: "CMS_REVALIDATE_SECRET saknas på kundsajten." },
+        {
+          revalidated: false,
+          error:
+            "CMS_API_KEY saknas på kundsajten. Lägg in den som miljövariabel hos webbhotellet och deploya om (eller sätt CMS_REVALIDATE_SECRET för äldre sajter).",
+        },
         { status: 500 },
       );
     }
 
-    const body = (await request.json().catch(() => null)) as { secret?: unknown } | null;
-    if (!(await verifyRevalidateSecret(body?.secret, expected))) {
-      return Response.json({ revalidated: false, error: "Fel hemlighet." }, { status: 401 });
+    // Läs bodyn exakt en gång: signaturen gäller de råa bytena.
+    const rawBody = await request.text().catch(() => "");
+    const ok = await verifyWebhook({ rawBody, headers: request.headers, apiKey, legacySecret: secret });
+    if (!ok) {
+      return Response.json(
+        { revalidated: false, error: "Ogiltig signatur eller hemlighet (kontrollera CMS_API_KEY)." },
+        { status: 401 },
+      );
     }
 
     // Next.js 16+: { expire: 0 } gör att nästa anrop väntar på färskt innehåll
@@ -43,5 +61,5 @@ export function createRevalidateHandler(options: RevalidateHandlerOptions = {}) 
   };
 }
 
-/** Route-handler med standardinställningar (läser CMS_REVALIDATE_SECRET). */
+/** Route-handler med standardinställningar (läser CMS_API_KEY och CMS_REVALIDATE_SECRET). */
 export const POST = createRevalidateHandler();

@@ -17,5 +17,5 @@ export async function appUrl(): Promise<string> {
     // headers() is unavailable outside a request (scripts) — fall through.
   }
 
-  return "https://sitecms-zeta.vercel.app";
+  return "https://sitecms.se";
 }

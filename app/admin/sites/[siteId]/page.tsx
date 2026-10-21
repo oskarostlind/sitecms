@@ -8,6 +8,7 @@ import {
   FilePenLine,
   FileText,
   Image as ImageIcon,
+  Info,
   ImageOff,
   Newspaper,
   PenLine,
@@ -18,11 +19,12 @@ import {
 } from "lucide-react";
 import { db } from "@/lib/db";
 import { auditLogs, blocks, media, pages, posts, seoMeta, services, sites, users } from "@/lib/db/schema";
-import { requireSiteAccess } from "@/lib/guard";
+import { requireSiteAccessWithRole } from "@/lib/guard";
 import { describeActivity } from "@/lib/audit-labels";
 import { formatDateTime, relativeTime } from "@/lib/format";
 import { displayDomain, siteUrl } from "@/lib/site-url";
 import {
+  Alert,
   Avatar,
   ButtonLink,
   Card,
@@ -40,7 +42,7 @@ const countSql = sql<number>`count(*)::int`;
 
 export default async function SiteOverviewPage({ params }: { params: Promise<{ siteId: string }> }) {
   const { siteId } = await params;
-  await requireSiteAccess(siteId);
+  const { isOwner } = await requireSiteAccessWithRole(siteId);
 
   const [
     [site],
@@ -125,6 +127,16 @@ export default async function SiteOverviewPage({ params }: { params: Promise<{ s
   const mediaCount = mediaCountRow?.count ?? 0;
   const missingAltCount = missingAltRows.reduce((sum, row) => sum + row.count, 0);
   const seoMissingCount = seoMissingRow?.count ?? 0;
+
+  // Når ändringarna sajten direkt? Saknas revalidate-URL syns de först vid
+  // nästa deploy; misslyckades senaste webhooken har sajten inte fått veta.
+  const hasRevalidateUrl = Boolean(site.revalidateUrl?.trim());
+  const webhookFailed = hasRevalidateUrl && site.lastWebhookStatus === "failed";
+  const deliveryProblem: string | null = !hasRevalidateUrl
+    ? "Ändringar syns inte direkt på sajten — de dyker upp först vid nästa deploy."
+    : webhookFailed
+      ? `Senaste uppdateringen nådde inte sajten: ${site.lastWebhookError?.trim() || "okänt fel."}`
+      : null;
 
   const editStartHref = firstPage ? `${base}/pages/${firstPage.id}` : `${base}/pages`;
 
@@ -214,6 +226,26 @@ export default async function SiteOverviewPage({ params }: { params: Promise<{ s
           </>
         }
       />
+
+      {deliveryProblem ? (
+        isOwner ? (
+          <Alert
+            tone="warning"
+            actions={
+              <ButtonLink href={`${base}/integration`} variant="secondary" size="sm">
+                Gå till integration
+              </ButtonLink>
+            }
+          >
+            <span className="[overflow-wrap:anywhere]">{deliveryProblem}</span>
+          </Alert>
+        ) : (
+          <p className="flex items-center gap-2 text-sm text-neutral-500">
+            <Info aria-hidden className="size-4 shrink-0 text-neutral-400" />
+            Det kan dröja innan ändringar syns på sajten.
+          </p>
+        )
+      ) : null}
 
       {/* Statistik */}
       <ul className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">

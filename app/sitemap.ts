@@ -14,7 +14,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "monthly" as const,
       priority: 0.8,
     })),
-    { url: absoluteUrl("/docs"), lastModified: "2026-10-18", changeFrequency: "monthly", priority: 0.7 },
+    { url: absoluteUrl("/docs"), lastModified: "2026-10-21", changeFrequency: "monthly", priority: 0.7 },
     { url: absoluteUrl("/signup"), lastModified: "2026-10-18", changeFrequency: "yearly", priority: 0.5 },
     { url: absoluteUrl("/integritet"), lastModified: "2026-10-18", changeFrequency: "yearly", priority: 0.2 },
   ];

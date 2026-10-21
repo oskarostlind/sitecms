@@ -1,15 +1,24 @@
+import { ArrowRight } from "lucide-react";
 import { requireUser } from "@/lib/guard";
 import { createSite } from "@/lib/actions/sites";
+import { appUrl } from "@/lib/app-url";
 import { AdminSiteForm } from "@/components/admin/AdminSiteForm";
 import { AdminRevealSecret } from "@/components/admin/AdminRevealSecret";
+import { CodeBlock } from "@/components/admin/CodeBlock";
 import { ConsumeReveal } from "@/components/admin/ConsumeReveal";
 import { readReveal } from "@/lib/reveal-flash";
-import { Alert, ButtonLink, Card, CardContent, PageHeader } from "@/components/ui";
+import { envSnippet, initCommand, INIT_STEPS, isDefaultCmsUrl, snippetApiUrl } from "@/lib/integration-snippets";
+import { Alert, ButtonLink, Card, CardContent, CardDescription, CardHeader, CardTitle, PageHeader } from "@/components/ui";
 
 const ERROR_MESSAGES: Record<string, string> = {
   missing: "Fyll i ett namn för sajten.",
   "invalid-slug": "Kunde inte generera en giltig slug från namnet. Ange en slug manuellt.",
 };
+
+/** Visar nyckeln maskerad i kodrutorna; kopiera-knappen kopierar det riktiga värdet. */
+function maskKey(key: string): string {
+  return `${key.slice(0, 5)}${"•".repeat(12)}`;
+}
 
 export default async function NewSitePage({
   searchParams,
@@ -30,6 +39,11 @@ export default async function NewSitePage({
 
   const errorMessage = error ? (ERROR_MESSAGES[error] ?? "Något gick fel. Försök igen.") : null;
   const showCreated = created === "1" && Boolean(siteId);
+  const integrationHref = `/admin/sites/${siteId}/integration`;
+
+  // Körs panelen på en annan adress än sitecms.se behöver kundsajten även CMS_API_URL.
+  const cmsUrl = key ? await appUrl() : null;
+  const extraEnv = cmsUrl && !isDefaultCmsUrl(cmsUrl) ? `\nCMS_API_URL=${snippetApiUrl(cmsUrl)}` : "";
 
   return (
     <div className="max-w-2xl">
@@ -50,9 +64,53 @@ export default async function NewSitePage({
               <ConsumeReveal />
               <AdminRevealSecret
                 title="API-nyckel"
-                description={`Standardnyckel för "${siteName ?? "sajten"}". Ge den till kundens frontend-integration.`}
+                description={`Standardnyckel för "${siteName ?? "sajten"}". Den är det enda kundsajten behöver — den finns redan ifylld nedan.`}
                 value={key}
               />
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Koppla sajten på en minut</CardTitle>
+                  <CardDescription>
+                    För Next.js 14.2+ med App Router. Kopiera allt nu — nyckeln visas inte igen när du lämnar sidan.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-5">
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold text-neutral-900">1. Kör i kundsajtens rotkatalog</h3>
+                    <CodeBlock
+                      code={initCommand(maskKey(key))}
+                      copyValue={initCommand(key)}
+                      language="bash"
+                      maxHeight={null}
+                    />
+                    <ul className="list-disc space-y-0.5 pl-5 text-sm text-neutral-500 marker:text-neutral-300">
+                      {INIT_STEPS.map((step) => (
+                        <li key={step}>{step}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold text-neutral-900">2. Lägg samma variabel hos webbhotellet</h3>
+                    <p className="text-sm text-neutral-500">
+                      Under miljövariabler hos Vercel, Netlify, Cloudflare, Render eller din egen server.
+                    </p>
+                    <CodeBlock
+                      code={envSnippet({ apiKey: maskKey(key) }) + extraEnv}
+                      copyValue={envSnippet({ apiKey: key }) + extraEnv}
+                      filename="Miljövariabel"
+                      language="env"
+                      maxHeight={null}
+                    />
+                  </div>
+
+                  <p className="text-sm text-neutral-500">
+                    Bygger du med en AI-assistent, eller använder du inte Next.js? Integrationssidan har en färdig
+                    prompt och en väg med deploy hooks.
+                  </p>
+                </CardContent>
+              </Card>
             </>
           ) : (
             <Alert tone="info">
@@ -61,9 +119,14 @@ export default async function NewSitePage({
             </Alert>
           )}
 
-          <ButtonLink href={`/admin/sites/${siteId}/installningar`} variant="secondary">
-            Gå till sajtens inställningar
-          </ButtonLink>
+          <div className="flex flex-wrap gap-3">
+            <ButtonLink href={integrationHref} icon={<ArrowRight />}>
+              Fortsätt till Integration
+            </ButtonLink>
+            <ButtonLink href={`/admin/sites/${siteId}/installningar`} variant="secondary">
+              Gå till sajtens inställningar
+            </ButtonLink>
+          </div>
         </div>
       ) : (
         <Card>
