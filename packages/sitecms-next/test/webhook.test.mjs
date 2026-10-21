@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash, createHmac } from "node:crypto";
-import { apiBase, createSitecms, verifyRevalidateSecret, verifyWebhook } from "../dist/index.js";
+import { apiBase, createSitecms, getContent, verifyRevalidateSecret, verifyWebhook, verifyWebhookDetailed } from "../dist/index.js";
 import { createRevalidateHandler } from "../dist/revalidate.js";
 
 const KEY = "sk_test_9f8e7d6c5b4a";
@@ -225,4 +225,108 @@ test("klient: URL:er med och utan CMS_SITE", async () => {
   assert.throws(() => createSitecms({ fetch: fakeFetch }), /apiKey saknas/);
   assert.equal(apiBase(undefined), "https://sitecms.se/api/v1/site");
   assert.equal(apiBase("", "a b"), "https://sitecms.se/api/v1/sites/a%20b");
+});
+
+test("verifyWebhookDetailed: orsaker, och klockfel skiljs från fel nyckel", async () => {
+  const ts = nowSeconds();
+  const body = payload(ts);
+  const good = await verifyWebhookDetailed({ rawBody: body, headers: headersFor(ts, `v1=${sign(KEY, ts, body)}`), apiKey: KEY });
+  assert.deepEqual(good, { ok: true, method: "signature" });
+
+  // Rätt signatur, men 10 min gammal → timestamp-out-of-range med avvikelsen.
+  const old = ts - 600;
+  const oldBody = payload(old);
+  const skew = await verifyWebhookDetailed({ rawBody: oldBody, headers: headersFor(old, `v1=${sign(KEY, old, oldBody)}`), apiKey: KEY });
+  assert.equal(skew.ok, false);
+  assert.equal(skew.reason, "timestamp-out-of-range");
+  assert.ok(skew.skewSeconds >= 600 && skew.skewSeconds < 610, String(skew.skewSeconds));
+  assert.match(skew.message, /tidsstämpeln ligger utanför ±5 min/);
+  assert.match(skew.message, /kontrollera serverns klocka/);
+  // Klockan före: negativ avvikelse.
+  const future = ts + 900;
+  const futureBody = payload(future);
+  const ahead = await verifyWebhookDetailed({ rawBody: futureBody, headers: headersFor(future, `v1=${sign(KEY, future, futureBody)}`), apiKey: KEY });
+  assert.equal(ahead.reason, "timestamp-out-of-range");
+  assert.ok(ahead.skewSeconds <= -890);
+
+  // Fel nyckel och gammal tidsstämpel → invalid-signature (inte klockfel).
+  const wrongOld = await verifyWebhookDetailed({ rawBody: oldBody, headers: headersFor(old, `v1=${sign(OTHER_KEY, old, oldBody)}`), apiKey: KEY });
+  assert.equal(wrongOld.reason, "invalid-signature");
+
+  const noSig = await verifyWebhookDetailed({ rawBody: body, headers: new Headers(), apiKey: KEY });
+  assert.equal(noSig.reason, "missing-signature");
+  const badTs = await verifyWebhookDetailed({ rawBody: body, headers: headersFor("abc", "v1=00"), apiKey: KEY });
+  assert.equal(badTs.reason, "invalid-timestamp");
+  const none = await verifyWebhookDetailed({ rawBody: body, headers: new Headers(), apiKey: "", legacySecret: "" });
+  assert.equal(none.reason, "no-credentials");
+
+  // Legacy-hemlighet godkänns även vid klockfel (som förut).
+  const legacyBody = payload(old, { secret: "hemligt" });
+  const legacy = await verifyWebhookDetailed({
+    rawBody: legacyBody,
+    headers: headersFor(old, `v1=${sign(KEY, old, legacyBody)}`),
+    apiKey: KEY,
+    legacySecret: "hemligt",
+  });
+  assert.deepEqual(legacy, { ok: true, method: "secret" });
+
+  // verifyWebhook är fortfarande en boolean.
+  assert.equal(await verifyWebhook({ rawBody: oldBody, headers: headersFor(old, `v1=${sign(KEY, old, oldBody)}`), apiKey: KEY }), false);
+});
+
+test("revalidate-route: klockfel ger tydligt felmeddelande", async () => {
+  const old = nowSeconds() - 420;
+  const body = payload(old);
+  const res = await createRevalidateHandler({ apiKey: KEY })(
+    new Request("https://kund.se/api/sitecms/revalidate", { method: "POST", body, headers: headersFor(old, `v1=${sign(KEY, old, body)}`) }),
+  );
+  assert.equal(res.status, 401);
+  const json = await res.json();
+  assert.equal(json.revalidated, false);
+  assert.equal(json.reason, "timestamp-out-of-range");
+  assert.match(json.error, /tidsstämpeln ligger utanför ±5 min/);
+  assert.match(json.error, /kontrollera serverns klocka/);
+
+  // Fel nyckel: samma meddelande som tidigare.
+  const wrong = await createRevalidateHandler({ apiKey: KEY })(
+    new Request("https://kund.se/x", { method: "POST", body, headers: headersFor(old, `v1=${sign(OTHER_KEY, old, body)}`) }),
+  );
+  assert.equal((await wrong.json()).error, "Ogiltig signatur eller hemlighet (kontrollera CMS_API_KEY).");
+});
+
+test("createSitecms: explicit apiKey utan site ignorerar CMS_SITE; utan argument som 0.2", async () => {
+  const calls = [];
+  const fakeFetch = async (url) => {
+    calls.push(url);
+    return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
+  };
+  process.env.CMS_API_KEY = KEY;
+  process.env.CMS_SITE = "norrhed";
+  process.env.CMS_API_URL = "https://sitecms-zeta.vercel.app";
+  const realFetch = globalThis.fetch;
+  try {
+    // 0.2: allt från miljön → slug-routes.
+    await createSitecms({ fetch: fakeFetch }).getContent();
+    // Ny nyckel för en annan sajt → nyckel-routes (CMS_SITE från miljön ignoreras, CMS_API_URL används).
+    await createSitecms({ apiKey: OTHER_KEY, fetch: fakeFetch }).getContent();
+    // Explicit site → slug-routes som förut.
+    await createSitecms({ apiKey: OTHER_KEY, site: "annan", fetch: fakeFetch }).getContent();
+    // Explicit tom site → nyckel-routes.
+    await createSitecms({ site: "", fetch: fakeFetch }).getContent();
+    // Standardklienten (getContent utan klient) → som 0.2.
+    globalThis.fetch = fakeFetch;
+    await getContent();
+  } finally {
+    globalThis.fetch = realFetch;
+    delete process.env.CMS_API_KEY;
+    delete process.env.CMS_SITE;
+    delete process.env.CMS_API_URL;
+  }
+  assert.deepEqual(calls, [
+    "https://sitecms-zeta.vercel.app/api/v1/sites/norrhed/content",
+    "https://sitecms-zeta.vercel.app/api/v1/site/content",
+    "https://sitecms-zeta.vercel.app/api/v1/sites/annan/content",
+    "https://sitecms-zeta.vercel.app/api/v1/site/content",
+    "https://sitecms-zeta.vercel.app/api/v1/sites/norrhed/content",
+  ]);
 });

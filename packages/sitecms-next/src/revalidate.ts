@@ -11,7 +11,7 @@
  * cache-taggen "sitecms" och sajten visar det nya innehållet direkt.
  */
 import { revalidateTag } from "next/cache.js";
-import { verifyWebhook } from "./index.js";
+import { verifyWebhookDetailed } from "./index.js";
 
 export type RevalidateHandlerOptions = {
   /** Äldre revalidate-hemlighet. Default: process.env.CMS_REVALIDATE_SECRET. */
@@ -43,12 +43,15 @@ export function createRevalidateHandler(options: RevalidateHandlerOptions = {}) 
 
     // Läs bodyn exakt en gång: signaturen gäller de råa bytena.
     const rawBody = await request.text().catch(() => "");
-    const ok = await verifyWebhook({ rawBody, headers: request.headers, apiKey, legacySecret: secret });
-    if (!ok) {
-      return Response.json(
-        { revalidated: false, error: "Ogiltig signatur eller hemlighet (kontrollera CMS_API_KEY)." },
-        { status: 401 },
-      );
+    const result = await verifyWebhookDetailed({ rawBody, headers: request.headers, apiKey, legacySecret: secret });
+    if (!result.ok) {
+      // Klockfel får ett eget meddelande (sitecms visar det i panelens felrad);
+      // övriga fel samma svar som tidigare.
+      const error =
+        result.reason === "timestamp-out-of-range"
+          ? result.message
+          : "Ogiltig signatur eller hemlighet (kontrollera CMS_API_KEY).";
+      return Response.json({ revalidated: false, error, reason: result.reason }, { status: 401 });
     }
 
     // Next.js 16+: { expire: 0 } gör att nästa anrop väntar på färskt innehåll

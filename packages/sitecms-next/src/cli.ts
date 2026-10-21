@@ -2,7 +2,7 @@
 /**
  * sitecms-next CLI
  *
- *   sitecms-next init [nyckel]                                Koppla projektet till sitecms (en gång)
+ *   sitecms-next init [nyckel] [--force] [--no-install]       Koppla projektet till sitecms (en gång)
  *   sitecms-next sync [--prune] [--strict] [--config <fil>]   Synka sajtens fält till sitecms
  *   sitecms-next pull                                         Visa strukturen som finns i sitecms
  *   sitecms-next check                                        Kontrollera nyckeln och webhooken
@@ -20,6 +20,18 @@ import { spawnSync } from "node:child_process";
 import { createInterface } from "node:readline/promises";
 import { DEFAULT_API_URL, apiBase } from "./index.js";
 import type { Health, SitecmsConfig } from "./index.js";
+import {
+  addSyncToPrebuild,
+  envFileValues,
+  maskRevalidateUrl,
+  maskUrlsInText,
+  parseEnvValue,
+  parsePackageJson,
+  resolveSiteUrl,
+  shortKey,
+  upsertEnvText,
+} from "./cli-helpers.js";
+import type { JsonObject } from "./cli-helpers.js";
 
 const CONFIG_NAMES = [
   "sitecms.config.ts",
@@ -34,6 +46,8 @@ const CLI_FILE = fileURLToPath(import.meta.url);
 
 const cwd = process.cwd();
 const args = process.argv.slice(2);
+/** Variabler som var satta innan .env.local/.env lästes in. */
+const shellEnv = new Set(Object.keys(process.env).filter((k) => (process.env[k] ?? "").trim() !== ""));
 const VALUE_OPTIONS = new Set(["config"]);
 const positionals: string[] = [];
 for (let i = 0; i < args.length; i++) {
@@ -71,14 +85,6 @@ const rel = (path: string) => relative(cwd, path).split("\\").join("/") || ".";
 
 function envVar(name: string): string {
   return (process.env[name] ?? "").trim();
-}
-
-function parseEnvValue(rawValue: string): string {
-  let value = rawValue.trim();
-  if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-    return value.slice(1, -1);
-  }
-  return value.replace(/\s+#.*$/, "");
 }
 
 /** Laddar .env.local och .env utan att skriva över befintliga variabler. */
@@ -153,31 +159,6 @@ function isCI(): boolean {
     const value = envVar(name).toLowerCase();
     return value !== "" && value !== "false" && value !== "0";
   });
-}
-
-/**
- * Sajtens publika adress, om byggmiljön anger den. Skickas med vid sync så
- * att sitecms kan sätta revalidate-URL:en automatiskt (skriver aldrig över).
- */
-function siteUrlFromEnv(): { url: string; source: string } | null {
-  const candidates: [string, string][] = [
-    ["CMS_SITE_URL", envVar("CMS_SITE_URL")],
-    ["SITE_URL", envVar("SITE_URL")],
-    ["NEXT_PUBLIC_SITE_URL", envVar("NEXT_PUBLIC_SITE_URL")],
-    ["VERCEL_PROJECT_PRODUCTION_URL", envVar("VERCEL_PROJECT_PRODUCTION_URL")],
-    ["URL", envVar("NETLIFY") ? envVar("URL") : ""],
-    ["RENDER_EXTERNAL_URL", envVar("RENDER_EXTERNAL_URL")],
-  ];
-  for (const [source, value] of candidates) {
-    if (!value) continue;
-    const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(value) ? value : `https://${value}`;
-    try {
-      return { url: new URL(withScheme).origin, source };
-    } catch {
-      // Ogiltigt värde — prova nästa.
-    }
-  }
-  return null;
 }
 
 /** Tydlig ruta på stderr, syns även i långa bygg-loggar. */
@@ -268,7 +249,10 @@ async function sync() {
   }
   const configPath = findConfig();
   const config = await loadConfig(configPath);
-  const site = siteUrlFromEnv();
+  // Sajtens adress skickas bara från produktionsbyggen: sitecms sätter
+  // revalidate-URL:en från den när den är tom, och en preview-adress skulle
+  // annars bli kvar för alltid.
+  const { siteUrl: site, skipped } = resolveSiteUrl(process.env);
   const body = {
     version: 1,
     ...config,
@@ -276,11 +260,10 @@ async function sync() {
     ...(site ? { siteUrl: site.url } : {}),
   };
 
-  log(
-    c.dim(
-      `sitecms: synkar ${rel(configPath)} → ${describeTarget(env)}` + (site ? ` · sajt ${site.url} (${site.source})` : ""),
-    ),
-  );
+  log(c.dim(`sitecms: synkar ${rel(configPath)} → ${describeTarget(env)}`));
+  if (site) log(c.dim(`sitecms: sajtens adress ${site.url} (från ${site.source})`));
+  for (const s of skipped) log(c.dim(`sitecms: ${s.source} skickas inte som sajtens adress (${s.reason}).`));
+  const previewSkipped = !site && skipped.some((s) => s.reason !== "ogiltig adress");
   const { status, json } = await api(env, "POST", "/schema", body);
 
   if (status !== 200 || !json?.ok) {
@@ -307,14 +290,18 @@ async function sync() {
   }
 
   if (typeof json!.revalidateUrl === "string" && json!.revalidateUrl) {
-    log(c.green("✔ ") + `Revalidate-URL: ${json!.revalidateUrl}`);
+    // Maskas: en deploy hook-URL är en hemlighet och byggloggar kan vara publika.
+    log(c.green("✔ ") + `Revalidate-URL: ${maskRevalidateUrl(json!.revalidateUrl)}`);
   } else if (json!.revalidateUrl === null && (site || isCI())) {
     log(c.yellow("⚠ Ingen revalidate-URL i sitecms — ändringar syns först vid nästa deploy."));
     log(
       c.dim(
         site
           ? `  ${site.url} godtogs inte (måste vara en publik https-adress). Fyll i URL:en under Integration i panelen.`
-          : "  Sätt SITE_URL=https://din-domän.se i byggmiljön, eller fyll i URL:en under Integration i panelen.",
+          : previewSkipped
+            ? "  Preview-bygge: sajtens adress skickas bara från produktionsbygget. Sätt SITE_URL=https://din-domän.se\n" +
+              "  i produktionsmiljön, eller fyll i URL:en under Integration i panelen."
+            : "  Sätt SITE_URL=https://din-domän.se i byggmiljön, eller fyll i URL:en under Integration i panelen.",
       ),
     );
   }
@@ -339,8 +326,9 @@ function printWebhookStatus(health: Partial<Health>) {
   const w = health.webhook;
   let last = "inget anrop ännu";
   if (w?.lastStatus === "ok") last = `ok${w.lastAt ? ` (${w.lastAt})` : ""}`;
-  else if (w?.lastStatus === "failed") last = `failed${w.lastError ? ` (${w.lastError})` : ""}`;
-  const line = `Revalidate-URL: ${url} — senaste anrop: ${last}`;
+  else if (w?.lastStatus === "failed") last = `failed${w.lastError ? ` (${maskUrlsInText(w.lastError)})` : ""}`;
+  // Maskas: en deploy hook-URL är en hemlighet och loggar kan vara publika.
+  const line = `Revalidate-URL: ${maskRevalidateUrl(url)} — senaste anrop: ${last}`;
   log(w?.lastStatus === "failed" ? c.yellow(`⚠ ${line}`) : c.green("✔ ") + line);
 }
 
@@ -362,14 +350,15 @@ async function check() {
 // init
 // ---------------------------------------------------------------------------
 
-type JsonObject = Record<string, unknown>;
-
 function readPackageJson(path: string): JsonObject | null {
   if (!existsSync(path)) return null;
   try {
-    return JSON.parse(readFileSync(path, "utf8")) as JsonObject;
-  } catch {
-    return fail(`${rel(path)} är inte giltig JSON.`);
+    return parsePackageJson(readFileSync(path, "utf8")).data;
+  } catch (err) {
+    return fail(
+      `${rel(path)} är inte giltig JSON (${err instanceof Error ? err.message : String(err)}).\n` +
+        "  Rätta filen och kör init igen — inget har ändrats.",
+    );
   }
 }
 
@@ -406,33 +395,19 @@ async function promptKey(): Promise<string> {
   }
 }
 
-/** Skriver/uppdaterar NAME=value i en env-fil utan att röra andra rader. */
-function upsertEnvValue(path: string, name: string, value: string): "created" | "appended" | "updated" | "unchanged" {
-  if (!existsSync(path)) {
-    writeFileSync(path, `${name}=${value}\n`);
-    return "created";
+async function confirm(question: string): Promise<boolean> {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    return /^(j|ja|y|yes)$/i.test((await rl.question(`${question} [j/N] `)).trim());
+  } finally {
+    rl.close();
   }
-  const text = readFileSync(path, "utf8");
-  const eol = text.includes("\r\n") ? "\r\n" : "\n";
-  const re = new RegExp(`^(\\s*(?:export\\s+)?)${name}\\s*=(.*)$`);
-  let found = false;
-  let changed = false;
-  const lines = text.split(/\r?\n/).map((line) => {
-    const m = line.match(re);
-    if (!m) return line;
-    found = true;
-    if (parseEnvValue(m[2]) === value) return line;
-    changed = true;
-    return `${m[1]}${name}=${value}`;
-  });
-  if (found) {
-    if (!changed) return "unchanged";
-    writeFileSync(path, lines.join(eol));
-    return "updated";
-  }
-  const sep = text === "" || text.endsWith("\n") ? "" : eol;
-  writeFileSync(path, `${text}${sep}${name}=${value}${eol}`);
-  return "appended";
+}
+
+function today(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 /** Enkel .gitignore-matchning för filer i projektroten. */
@@ -463,36 +438,6 @@ function ensureGitignore(path: string): "created" | "appended" | "ok" {
   const sep = text === "" || text.endsWith("\n") ? "" : eol;
   writeFileSync(path, `${text}${sep}.env.local${eol}`);
   return "appended";
-}
-
-/** Lägger till `sitecms-next sync` i prebuild och bevarar filens formatering. */
-function ensurePrebuild(path: string): "added" | "extended" | "ok" {
-  const text = readFileSync(path, "utf8");
-  const pkg = JSON.parse(text) as JsonObject;
-  const scripts = (pkg.scripts as Record<string, string> | undefined) ?? {};
-  const current = scripts.prebuild;
-  if (typeof current === "string" && /\bsitecms-next\s+sync\b/.test(current)) return "ok";
-
-  const value = typeof current === "string" && current.trim() ? `${current} && sitecms-next sync` : "sitecms-next sync";
-  let nextScripts: Record<string, string>;
-  if (current !== undefined || !("build" in scripts)) {
-    nextScripts = { ...scripts, prebuild: value };
-  } else {
-    // Lägg prebuild direkt före build.
-    nextScripts = {};
-    for (const [k, v] of Object.entries(scripts)) {
-      if (k === "build") nextScripts.prebuild = value;
-      nextScripts[k] = v;
-    }
-  }
-  pkg.scripts = nextScripts;
-
-  const indent = text.match(/^[ \t]+(?=")/m)?.[0] ?? 2;
-  const eol = text.includes("\r\n") ? "\r\n" : "\n";
-  let out = JSON.stringify(pkg, null, indent);
-  if (/\r?\n$/.test(text)) out += "\n";
-  writeFileSync(path, eol === "\r\n" ? out.replace(/\n/g, "\r\n") : out);
-  return current === undefined ? "added" : "extended";
 }
 
 type SchemaPageLike = {
@@ -554,15 +499,41 @@ function installCommand(): { cmd: string; args: string[] } {
   return { cmd: "npm", args: ["install", spec] };
 }
 
+/** Var CMS_SITE kommer ifrån: miljön, eller .env.local/.env. */
+function cmsSiteSource(): string {
+  if (shellEnv.has("CMS_SITE")) return "miljön";
+  const where: string[] = [];
+  for (const file of [".env.local", ".env"]) {
+    const path = resolve(cwd, file);
+    if (existsSync(path) && envFileValues(readFileSync(path, "utf8"), "CMS_SITE").some(Boolean)) where.push(file);
+  }
+  return where.length ? where.join(" och ") : "miljön";
+}
+
 async function init() {
   const done: string[] = [];
   const skipped: string[] = [];
   const notes: string[] = [];
+  const force = flag("force");
 
-  // 1. Nyckel: argument → CMS_API_KEY (miljö/.env.local) → fråga.
+  // 1. package.json kontrolleras (och parsas) innan något skrivs, så att ett
+  //    fel aldrig lämnar ett halvfärdigt resultat efter sig.
+  const pkgPath = resolve(cwd, "package.json");
+  let pkg = readPackageJson(pkgPath);
+  if (!pkg && !force) {
+    fail(
+      `Hittar ingen package.json i ${cwd}.\n` +
+        "  Kör `npx sitecms-next init` i projektets rotkatalog (där package.json finns).\n" +
+        "  Vill du ändå bara spara CMS_API_KEY i .env.local här: lägg till --force.",
+    );
+  }
+
+  // 2. Nyckel: argument → CMS_API_KEY (miljö/.env.local) → fråga.
   const key = (positionals[1] ?? "").trim() || envVar("CMS_API_KEY") || (await promptKey());
 
-  // 2. Validera mot sitecms (nyckel-routen; ingen slug behövs).
+  // 3. Validera mot sitecms. Allt init gör använder nyckel-routerna
+  //    (/api/v1/site/…), aldrig CMS_SITE: en ny nyckel för en annan sajt får
+  //    inte krocka med en gammal CMS_SITE.
   const keyEnv: Env = { apiUrl: (envVar("CMS_API_URL") || DEFAULT_API_URL).replace(/\/+$/, ""), site: "", apiKey: key };
   log(c.dim(`sitecms: kontrollerar nyckeln mot ${keyEnv.apiUrl} …`));
   const health = await api(keyEnv, "GET", "/health");
@@ -578,29 +549,70 @@ async function init() {
   }
   const info = health.json as unknown as Health;
   log(c.green("✔ ") + `Nyckeln gäller sajten "${info.site.name}" (${info.site.slug}).`);
+
+  // 4. 0.2-projekt: CMS_SITE gör att sajten använder slug-routerna.
+  const cmsSite = envVar("CMS_SITE");
+  if (cmsSite) {
+    const where = cmsSiteSource();
+    const lines =
+      cmsSite === info.site.slug
+        ? [
+            `⚠  CMS_SITE=${cmsSite} är satt (${where}).`,
+            "",
+            "Den behövs inte längre — nyckeln identifierar sajten. Med CMS_SITE satt",
+            "använder sajten de äldre slug-routerna (fungerar, men ta gärna bort",
+            `CMS_SITE från ${where} och hos webbhotellet).`,
+          ]
+        : [
+            `⚠  CMS_SITE=${cmsSite} är satt (${where}), men nyckeln gäller sajten "${info.site.slug}".`,
+            "",
+            "Med CMS_SITE satt hämtar sajten innehåll via /api/v1/sites/" + cmsSite + "/…,",
+            "och den nya nyckeln godkänns inte där. Ta bort CMS_SITE från",
+            `${where} och hos webbhotellet — nyckeln identifierar sajten.`,
+            "(init använder nyckeln och påverkas inte.)",
+          ];
+    warnBox(lines);
+    notes.push(`Ta bort CMS_SITE (${where} och hos webbhotellet) — nyckeln identifierar sajten.`);
+  }
+
+  // 5. En annan CMS_API_KEY i .env.local ersätts bara efter bekräftelse.
+  const envPath = resolve(cwd, ".env.local");
+  const envText = existsSync(envPath) ? readFileSync(envPath, "utf8") : null;
+  const otherKeys = envText === null ? [] : envFileValues(envText, "CMS_API_KEY").filter((v) => v !== key);
+  if (otherKeys.length && !force) {
+    const question = `.env.local har redan en annan CMS_API_KEY (${shortKey(otherKeys[0])}). Ersätta den? Den gamla raden kommenteras ut.`;
+    if (!process.stdin.isTTY) {
+      fail(
+        `.env.local har redan en annan CMS_API_KEY (${shortKey(otherKeys[0])}).\n` +
+          "  Kör med --force för att ersätta den (den gamla raden kommenteras ut, inget raderas).\n" +
+          "  Inget har ändrats.",
+      );
+    }
+    if (!(await confirm(question))) fail("Avbrutet — inget har ändrats.");
+  }
+
   process.env.CMS_API_KEY = key;
 
-  // 3. .env.local
-  const envResult = upsertEnvValue(resolve(cwd, ".env.local"), "CMS_API_KEY", key);
-  if (envResult === "created") done.push(".env.local (CMS_API_KEY)");
-  else if (envResult === "appended") done.push("CMS_API_KEY i .env.local");
-  else if (envResult === "updated") done.push("CMS_API_KEY i .env.local (ny nyckel)");
+  // 6. .env.local
+  const envEdit = upsertEnvText(envText, "CMS_API_KEY", key, today());
+  if (envEdit.result !== "unchanged") writeFileSync(envPath, envEdit.text);
+  if (envEdit.result === "created") done.push(".env.local (CMS_API_KEY)");
+  else if (envEdit.result === "appended") done.push("CMS_API_KEY i .env.local");
+  else if (envEdit.result === "replaced") done.push("CMS_API_KEY i .env.local (ny nyckel; den gamla raden är utkommenterad)");
   else skipped.push("CMS_API_KEY i .env.local (fanns redan)");
 
-  // 4. .gitignore
+  // 7. .gitignore
   const gitResult = ensureGitignore(resolve(cwd, ".gitignore"));
   if (gitResult === "created") done.push(".gitignore (med .env.local)");
   else if (gitResult === "appended") done.push(".env.local i .gitignore");
   else skipped.push(".gitignore (täcker redan .env.local)");
 
-  // 5. Projekttyp
-  const pkgPath = resolve(cwd, "package.json");
-  let pkg = readPackageJson(pkgPath);
+  // 8. Projekttyp
   const appDir = existsSync(resolve(cwd, "src/app")) ? "src/app" : existsSync(resolve(cwd, "app")) ? "app" : null;
   const isAppRouter = Boolean(dependencies(pkg).next) && appDir !== null;
   const useTs = existsSync(resolve(cwd, "tsconfig.json"));
 
-  // 6. Paketet (behövs för revalidate-routen och configen)
+  // 9. Paketet (behövs för revalidate-routen och configen)
   if (pkg) {
     const current = dependencies(pkg)["sitecms-next"];
     const outdated = typeof current === "string" && /^[\^~>=v\s]*0\.[0-2](\.|$)/.test(current);
@@ -621,7 +633,7 @@ async function init() {
     }
   }
 
-  // 7. Revalidate-route (bara Next.js App Router)
+  // 10. Revalidate-route (bara Next.js App Router)
   if (isAppRouter) {
     const routeDir = resolve(cwd, appDir!, "api/sitecms/revalidate");
     const existing = ["route.ts", "route.tsx", "route.js", "route.jsx", "route.mjs"].find((f) => existsSync(join(routeDir, f)));
@@ -643,16 +655,16 @@ async function init() {
     }
   }
 
-  // 8. sitecms.config (+ prebuild + sync) — bara i Node-projekt
+  // 11. sitecms.config (+ prebuild + sync) — bara i Node-projekt
   let configPath = findConfigPath();
   let syncOk: boolean | null = null;
   if (!pkg) {
-    notes.push("Ingen package.json — hoppade över sitecms.config, prebuild och sync.");
+    notes.push("Ingen package.json (--force) — hoppade över paketet, revalidate-routen, sitecms.config, prebuild och sync.");
   } else {
     if (configPath) {
       skipped.push(`${rel(configPath)} (fanns redan)`);
     } else {
-      const schema = await api(readEnv() ?? keyEnv, "GET", "/schema").catch(() => null);
+      const schema = await api(keyEnv, "GET", "/schema").catch(() => null);
       const pages = schema?.status === 200 && Array.isArray(schema.json?.pages) ? (schema.json!.pages as SchemaPageLike[]) : [];
       const fromSchema = pages.length > 0;
       configPath = resolve(cwd, useTs ? "sitecms.config.ts" : "sitecms.config.mjs");
@@ -662,25 +674,32 @@ async function init() {
       );
     }
 
-    const prebuild = ensurePrebuild(pkgPath);
-    if (prebuild === "added") done.push('"prebuild": "sitecms-next sync" i package.json');
-    else if (prebuild === "extended") done.push("sitecms-next sync i befintlig prebuild");
-    else skipped.push("prebuild (kör redan sitecms-next sync)");
-    if (existsSync(resolve(cwd, ".yarnrc.yml"))) {
+    const prebuild = addSyncToPrebuild(readFileSync(pkgPath, "utf8"));
+    if (prebuild.result === "ok") {
+      skipped.push(`prebuild (scripts.${prebuild.foundIn} kör redan sitecms-next sync)`);
+    } else {
+      writeFileSync(pkgPath, prebuild.text);
+      done.push(
+        prebuild.result === "added" ? '"prebuild": "sitecms-next sync" i package.json' : "sitecms-next sync i befintlig prebuild",
+      );
+    }
+    if (existsSync(resolve(cwd, ".yarnrc.yml")) && (prebuild.result !== "ok" || prebuild.foundIn === "prebuild")) {
       notes.push('Yarn 2+ kör inte prebuild — ändra build till "sitecms-next sync && next build".');
     }
 
-    // 9. Synka direkt (egen process: läser .env.local och configen som ett vanligt bygge).
+    // 12. Synka direkt (egen process: läser .env.local och configen som ett
+    //     vanligt bygge). CMS_SITE="" → nyckel-routerna även om en gammal
+    //     CMS_SITE finns kvar (en tom variabel skrivs inte över från .env.local).
     log("");
     const r = spawnSync(process.execPath, [CLI_FILE, "sync"], {
       stdio: "inherit",
-      env: { ...process.env, CMS_API_KEY: key },
+      env: { ...process.env, CMS_API_KEY: key, CMS_SITE: "" },
     });
     syncOk = r.status === 0;
     if (!syncOk) notes.push("Synken misslyckades (se ovan). Rätta och kör `npx sitecms-next sync`.");
   }
 
-  // 10. Sammanfattning
+  // 13. Sammanfattning
   log("");
   log(c.bold(`sitecms är kopplat till "${info.site.name}".`));
   if (done.length) {
@@ -700,13 +719,13 @@ async function init() {
   log("");
   if (isAppRouter) {
     if (info.revalidateUrl) {
-      log(`  Revalidate-URL i sitecms: ${info.revalidateUrl}`);
+      log(`  Revalidate-URL i sitecms: ${maskRevalidateUrl(info.revalidateUrl)}`);
     } else {
-      log("  Revalidate-URL:en sätts automatiskt när bygget körs hos webbhotellet (om det anger");
-      log("  sajtens adress; annars sätt SITE_URL=https://din-domän.se eller fyll i");
+      log("  Revalidate-URL:en sätts automatiskt när produktionsbygget körs hos webbhotellet (om det");
+      log("  anger sajtens adress; annars sätt SITE_URL=https://din-domän.se eller fyll i");
       log("  https://din-domän.se/api/sitecms/revalidate under Integration i panelen).");
     }
-  } else {
+  } else if (pkg) {
     log("  Det här ser inte ut som ett Next.js-projekt med App Router (ingen next i package.json");
     log("  eller ingen app-katalog), så ingen revalidate-route skapades. Skapa i stället en");
     log("  deploy hook (build hook) hos ditt webbhotell och klistra in dess URL som revalidate-URL");
@@ -723,11 +742,16 @@ async function init() {
 function help() {
   log(`sitecms-next — koppla en sajt till sitecms
 
-  sitecms-next init [nyckel]
+  sitecms-next init [nyckel] [--force] [--no-install]
       Kopplar projektet: verifierar API-nyckeln, sparar CMS_API_KEY i
       .env.local, skapar revalidate-routen (Next.js App Router) och
       sitecms.config.ts, lägger till "prebuild": "sitecms-next sync" och synkar.
-      Kan köras flera gånger; befintliga filer skrivs inte över.
+      Körs i katalogen med package.json (--force: spara ändå bara nyckeln).
+      Kan köras flera gånger. Revalidate-routen och sitecms.config skrivs
+      aldrig över; .env.local, .gitignore och package.json kompletteras med
+      en rad var utan att annat ändras. En annan CMS_API_KEY i .env.local
+      ersätts bara efter bekräftelse eller med --force, och den gamla raden
+      kommenteras ut i stället för att raderas.
   sitecms-next sync [--prune] [--strict] [--config <fil>]
       Skickar sitecms.config.ts till sitecms. Saknade sidor och fält skapas,
       kundens innehåll skrivs aldrig över. Saknas CMS_API_KEY hoppas steget
@@ -741,7 +765,12 @@ Miljövariabler
   CMS_SITE               Valfri (äldre slug-routes, som 0.2.x).
   CMS_REVALIDATE_SECRET  Valfri (äldre revalidate-hemlighet).
   SITE_URL               Valfri. Sajtens adress; skickas vid sync så att
-                         sitecms kan sätta revalidate-URL:en.
+                         sitecms kan sätta revalidate-URL:en (om den är tom).
+                         Utan SITE_URL/CMS_SITE_URL används webbhotellets
+                         adress, men bara i produktionsbyggen:
+                         VERCEL_PROJECT_PRODUCTION_URL (VERCEL_ENV=production),
+                         URL på Netlify (CONTEXT=production) och
+                         RENDER_EXTERNAL_URL (inte pull request-previews).
 
 Dokumentation: ${DOCS_URL}`);
 }

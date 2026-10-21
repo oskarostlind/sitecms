@@ -779,7 +779,8 @@ export default function DocsPage() {
               <ol>
                 <li>
                   Skapa en deploy hook (kallas build hook hos vissa) i webbhotellets inställningar. Du får en hemlig URL
-                  som startar ett nytt bygge när den tar emot en <code>POST</code>.
+                  som startar ett nytt bygge när den tar emot en <code>POST</code>. sitecms behandlar den som en
+                  hemlighet — health-API:t och CLI:t visar den maskerad.
                 </li>
                 <li>
                   Klistra in URL:en som <strong>revalidate-URL</strong> under Integration i panelen och tryck på{" "}
@@ -1031,7 +1032,9 @@ export default function DocsPage() {
                 <p>
                   Snabb kontroll av att nyckeln stämmer, utan att hämta innehåll. Visar också revalidate-URL:en och hur
                   det senaste webhook-anropet gick (<code>lastStatus</code> är <code>ok</code>, <code>failed</code>{" "}
-                  eller <code>null</code>). Bra i CI och för övervakning.
+                  eller <code>null</code>). Bra i CI och för övervakning. En revalidate-URL med annan sökväg än{" "}
+                  <code>/api/sitecms/revalidate</code> (t.ex. en deploy hook) visas maskerad som{" "}
+                  <code>https://värd/••••</code>.
                 </p>
               }
             >
@@ -1084,6 +1087,16 @@ export default function DocsPage() {
                     Har sajten en revalidate-hemlighet (äldre integrationer) innehåller bodyn även{" "}
                     <code>{`"secret"`}</code>, och mottagare som jämför den mot <code>CMS_REVALIDATE_SECRET</code>{" "}
                     fortsätter fungera. Ange den slutliga adressen — en omdirigering med 301/302 gör om anropet till GET.
+                    Högst 3 omdirigeringar följs, och adresser som pekar på interna nät (localhost, privata IP-adresser)
+                    avvisas.
+                  </p>
+                  <p>
+                    <strong>Säkerhet.</strong> HMAC-nyckeln är <code>sha256hex(CMS_API_KEY)</code> — det värde som
+                    sitecms lagrar (aldrig själva nyckeln). Den som kan läsa sitecms databas kan alltså signera
+                    webhooks, men inte hämta innehåll med nyckeln. Ett uppfångat anrop kan spelas upp igen inom 300
+                    sekunder; det ger bara en extra revalidering av samma innehåll. Deploy hook-URL:er behandlas som
+                    hemligheter: API:t och CLI:t visar bara <code>https://värd/••••</code> för andra adresser än{" "}
+                    <code>/api/sitecms/revalidate</code>.
                   </p>
                 </Prose>
                 <CodeBlock code={SIGNATURE_NODE} filename="Verifiera i Node (utan paketet)" language="ts" maxHeight={null} />

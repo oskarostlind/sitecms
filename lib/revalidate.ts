@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db, sites } from "@/lib/db";
 import { deliverSiteWebhook } from "@/lib/webhook-send";
+import { errorForLog } from "@/lib/webhook-url";
 
 const TIMEOUT_MS = 5000;
 
@@ -37,9 +38,11 @@ export async function triggerSiteRevalidation(siteId: string): Promise<void> {
 
     const result = await deliverSiteWebhook({ ...site, revalidateUrl: site.revalidateUrl }, { timeoutMs: TIMEOUT_MS });
     if (!result.ok) {
+      // detail är redan tvättad från URL:er (lib/webhook-http.ts).
       console.warn(`triggerSiteRevalidation: ${site.slug} — ${result.detail}`);
     }
   } catch (err) {
-    console.error(`triggerSiteRevalidation failed for site ${siteId}:`, err);
+    // Logga aldrig revalidate-URL:en (kan vara en hemlig deploy hook) — errorForLog maskerar URL:er.
+    console.error(`triggerSiteRevalidation failed for site ${siteId}: ${errorForLog(err)}`);
   }
 }

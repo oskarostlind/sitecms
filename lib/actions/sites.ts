@@ -11,7 +11,7 @@ import { logActivity } from "@/lib/audit";
 import { slugify } from "@/components/content/slugify";
 import { apiKeyColumns, generateApiKey } from "@/lib/api-keys";
 import { setReveal } from "@/lib/reveal-flash";
-import { revalidateUrlForDomain } from "@/lib/webhook-url";
+import { revalidateUrlForDomain, revalidateUrlProblem } from "@/lib/webhook-url";
 
 function readString(formData: FormData, key: string): string {
   const value = formData.get(key);
@@ -150,6 +150,10 @@ export async function createSite(formData: FormData): Promise<void> {
  * (neither in the form nor on the site), the standard
  * https://<domain>/api/sitecms/revalidate is filled in. An existing revalidate
  * URL is never overwritten automatically.
+ *
+ * A new revalidate URL is validated (revalidateUrlProblem): http(s) only, no
+ * credentials, no localhost/private IP literal. Errors redirect back with
+ * `?error=revalidate-url-…`.
  */
 export async function updateSiteSettings(siteId: string, formData: FormData): Promise<void> {
   const user = await requireSiteOwner(siteId);
@@ -174,6 +178,17 @@ export async function updateSiteSettings(siteId: string, formData: FormData): Pr
 
   const hasDomainField = formData.has("domain");
   const hasRevalidateField = formData.has("revalidateUrl");
+
+  // Ett NYTT värde måste vara en publik http(s)-adress utan inloggningsuppgifter
+  // (SSRF-skydd; DNS kontrolleras dessutom vid varje anrop i lib/webhook-http.ts).
+  // Ett oförändrat värde godtas som det är, så att befintliga sajter alltid kan
+  // spara sina övriga inställningar.
+  if (hasRevalidateField && revalidateUrl && revalidateUrl !== (current?.revalidateUrl ?? "").trim()) {
+    const problem = revalidateUrlProblem(revalidateUrl);
+    if (problem) {
+      redirect(`${settingsPath(siteId, formData)}?error=${problem}`);
+    }
+  }
 
   let autoRevalidateUrl = false;
   if (

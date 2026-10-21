@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { count, eq } from "drizzle-orm";
 import { db, pages, sites } from "@/lib/db";
 import { CONTENT_CACHE_HEADERS, type ApiSite } from "@/app/api/v1/_lib/auth";
+import { maskRevalidateUrl, redactUrls } from "@/lib/webhook-url";
 
 export type HealthWebhook = {
   /** true när sajten har en revalidate-URL (webhooken skickas). */
@@ -20,6 +21,10 @@ export type HealthWebhook = {
  *     webhook: { configured, lastStatus: "ok" | "failed" | null, lastAt, lastError } }
  *
  * `revalidateUrl` och `webhook` är additiva fält (äldre klienter ignorerar dem).
+ * `revalidateUrl` är maskerad (maskRevalidateUrl): standardsökvägen
+ * /api/sitecms/revalidate visas som origin + sökväg, allt annat — t.ex. en
+ * deploy hook, som är en hemlighet — som `<origin>/••••`. Hela adressen syns
+ * bara för sajtägare i panelen.
  */
 export async function healthResponse(site: ApiSite): Promise<Response> {
   const [[pageCount], [siteRow]] = await Promise.all([
@@ -37,13 +42,13 @@ export async function healthResponse(site: ApiSite): Promise<Response> {
       .limit(1),
   ]);
 
-  const revalidateUrl = siteRow?.revalidateUrl || null;
+  const revalidateUrl = maskRevalidateUrl(siteRow?.revalidateUrl);
   const lastStatus = siteRow?.lastWebhookStatus;
   const webhook: HealthWebhook = {
     configured: Boolean(revalidateUrl),
     lastStatus: lastStatus === "ok" || lastStatus === "failed" ? lastStatus : null,
     lastAt: siteRow?.lastWebhookAt ? siteRow.lastWebhookAt.toISOString() : null,
-    lastError: siteRow?.lastWebhookError ?? null,
+    lastError: siteRow?.lastWebhookError ? redactUrls(siteRow.lastWebhookError) : null,
   };
 
   return NextResponse.json(

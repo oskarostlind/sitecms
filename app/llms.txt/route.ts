@@ -115,7 +115,7 @@ Bas-URL: \`${API}\`. Autentisering: headern \`x-api-key: <CMS_API_KEY>\` — nyc
 - \`GET ${SITE_API_PATH}/posts/<postSlug>\` → \`{ "post": { …, "body", "bodyHtml" } }\`, 404 om inlägget saknas eller inte är publicerat.
 - \`GET ${SITE_API_PATH}/schema\` → nuvarande struktur, med \`hasValue\` per block.
 - \`POST ${SITE_API_PATH}/schema\` → synka struktur. Body: \`{ "version": 1, "pages": [...], "prune"?: false, "siteUrl"?: "https://kund.se" }\`. Svar: \`{ "ok": true, "created": { "pages", "blocks" }, "updated": { "pages", "blocks" }, "orphans": [{ "pageSlug", "key" }], "revalidateUrl": string | null }\`. Ogiltigt schema → 400 \`{ "error", "issues": [...] }\`. \`siteUrl\` (publik https-adress) används för att fylla i revalidate-URL:en om den saknas — befintliga värden skrivs aldrig över.
-- \`GET ${SITE_API_PATH}/health\` → \`{ "ok": true, "site": { "name", "slug" }, "pages", "lastSchemaSyncAt", "revalidateUrl", "webhook": { "configured", "lastStatus": "ok" | "failed" | null, "lastAt", "lastError" } }\`
+- \`GET ${SITE_API_PATH}/health\` → \`{ "ok": true, "site": { "name", "slug" }, "pages", "lastSchemaSyncAt", "revalidateUrl", "webhook": { "configured", "lastStatus": "ok" | "failed" | null, "lastAt", "lastError" } }\` — \`revalidateUrl\` visas i sin helhet bara när sökvägen är \`/api/sitecms/revalidate\`, annars maskerad som \`https://värd/••••\`.
 - \`POST ${SITE_API_PATH}/quote-requests\` → offertförfrågan från sajtens formulär (server-till-server).
 - Fel: \`{ "error": "…" }\` med 400 (ogiltig förfrågan), 401 (nyckel saknas/ogiltig), 404 (hittades inte), 413 (för stor body).
 - Äldre slug-routes \`${LEGACY_SITE_API_PATH}/<slug>/…\` finns kvar med identiska svar.
@@ -130,12 +130,13 @@ När kunden sparar skickar sitecms \`POST\` till sajtens revalidate-URL (timeout
 - Body: ${"`"}${webhookBodyExample()}${"`"} (plus \`"secret"\` för äldre sajter som har en revalidate-hemlighet)
 - \`<hex>\` = HMAC-SHA256 där nyckeln är UTF-8-strängen \`sha256hex(CMS_API_KEY)\` och meddelandet är \`\${timestamp}.\${rawBody}\` (exakt den mottagna bodyn). En \`v1=\`-post per API-nyckel som sajten har; godkänn om någon matchar.
 - Avvisa om |nu − timestamp| > 300 sekunder. Jämför i konstant tid. Svara 2xx när signaturen stämmer, annars 401.
+- Säkerhet: HMAC-nyckeln är sha256 av API-nyckeln — det värde sitecms lagrar, aldrig klartextnyckeln. Ett uppfångat anrop kan spelas upp igen inom 300 s men ger bara en extra revalidering. Högst 3 omdirigeringar följs; revalidate-URL:er som pekar på interna adresser (localhost, privata nät) avvisas.
 
 sitecms-next gör allt detta i \`sitecms-next/revalidate\` och \`verifyWebhook()\`. Panelen visar senaste anropets status (ok/failed, tid, fel).
 
 ## Andra ramverk och helt statiska sajter: deploy hooks
 
-Webbhotellens deploy hooks / build hooks tar emot vilken POST som helst. Klistra in hookens URL som revalidate-URL under Integration i panelen, så byggs sajten om automatiskt varje gång kunden sparar (tar någon minut). Fungerar med alla ramverk (Astro, SvelteKit, Nuxt, Eleventy, Hugo …) som hämtar innehållet från REST-API:t vid build. Exempel: ${DEPLOY_HOOK_HOSTS.map((h) => `${h.name} (${h.term})`).join(", ")}.
+Webbhotellens deploy hooks / build hooks tar emot vilken POST som helst. Klistra in hookens URL som revalidate-URL under Integration i panelen, så byggs sajten om automatiskt varje gång kunden sparar (tar någon minut). Hook-URL:en är en hemlighet: sitecms visar den bara maskerad (\`https://värd/••••\`) i health-API:t, schema-svaret och CLI:t. Fungerar med alla ramverk (Astro, SvelteKit, Nuxt, Eleventy, Hugo …) som hämtar innehållet från REST-API:t vid build. Exempel: ${DEPLOY_HOOK_HOSTS.map((h) => `${h.name} (${h.term})`).join(", ")}.
 
 ## Prompt att ge en AI-assistent
 

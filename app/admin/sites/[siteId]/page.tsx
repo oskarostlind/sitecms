@@ -128,15 +128,26 @@ export default async function SiteOverviewPage({ params }: { params: Promise<{ s
   const missingAltCount = missingAltRows.reduce((sum, row) => sum + row.count, 0);
   const seoMissingCount = seoMissingRow?.count ?? 0;
 
-  // Når ändringarna sajten direkt? Saknas revalidate-URL syns de först vid
-  // nästa deploy; misslyckades senaste webhooken har sajten inte fått veta.
+  // Når ändringarna sajten direkt? Ägaren får en mjuk påminnelse när ingen
+  // revalidate-URL är satt (sajten kan ha tidsbaserad ISR och fungera ändå)
+  // och en varning när senaste webhooken misslyckades. Redaktörer ser bara en
+  // neutral rad, och bara när webhooken faktiskt misslyckats.
   const hasRevalidateUrl = Boolean(site.revalidateUrl?.trim());
   const webhookFailed = hasRevalidateUrl && site.lastWebhookStatus === "failed";
-  const deliveryProblem: string | null = !hasRevalidateUrl
-    ? "Ändringar syns inte direkt på sajten — de dyker upp först vid nästa deploy."
-    : webhookFailed
-      ? `Senaste uppdateringen nådde inte sajten: ${site.lastWebhookError?.trim() || "okänt fel."}`
-      : null;
+  const ownerDeliveryNotice: { tone: "info" | "warning"; text: string } | null = !isOwner
+    ? null
+    : !hasRevalidateUrl
+      ? {
+          tone: "info",
+          text: "Ingen revalidate-URL är inställd — ändringar visas på sajten först när den hämtar nytt innehåll eller byggs om.",
+        }
+      : webhookFailed
+        ? {
+            tone: "warning",
+            text: `Senaste uppdateringen nådde inte sajten: ${site.lastWebhookError?.trim() || "okänt fel."}`,
+          }
+        : null;
+  const showEditorDelayNote = !isOwner && webhookFailed;
 
   const editStartHref = firstPage ? `${base}/pages/${firstPage.id}` : `${base}/pages`;
 
@@ -227,24 +238,22 @@ export default async function SiteOverviewPage({ params }: { params: Promise<{ s
         }
       />
 
-      {deliveryProblem ? (
-        isOwner ? (
-          <Alert
-            tone="warning"
-            actions={
-              <ButtonLink href={`${base}/integration`} variant="secondary" size="sm">
-                Gå till integration
-              </ButtonLink>
-            }
-          >
-            <span className="[overflow-wrap:anywhere]">{deliveryProblem}</span>
-          </Alert>
-        ) : (
-          <p className="flex items-center gap-2 text-sm text-neutral-500">
-            <Info aria-hidden className="size-4 shrink-0 text-neutral-400" />
-            Det kan dröja innan ändringar syns på sajten.
-          </p>
-        )
+      {ownerDeliveryNotice ? (
+        <Alert
+          tone={ownerDeliveryNotice.tone}
+          actions={
+            <ButtonLink href={`${base}/integration#revalidate`} variant="secondary" size="sm">
+              Gå till integration
+            </ButtonLink>
+          }
+        >
+          <span className="[overflow-wrap:anywhere]">{ownerDeliveryNotice.text}</span>
+        </Alert>
+      ) : showEditorDelayNote ? (
+        <p className="flex items-center gap-2 text-sm text-neutral-500">
+          <Info aria-hidden className="size-4 shrink-0 text-neutral-400" />
+          Det kan dröja innan ändringar syns på sajten.
+        </p>
       ) : null}
 
       {/* Statistik */}

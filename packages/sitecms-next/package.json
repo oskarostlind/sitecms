@@ -50,7 +50,7 @@
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run clean && npm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build && node --test test/webhook.test.mjs test/cli.test.mjs"
+    "test": "npm run build && node --test test/webhook.test.mjs test/helpers.test.mjs test/cli.test.mjs"
   },
   "devDependencies": {
     "typescript": "^5.6.0",

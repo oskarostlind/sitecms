@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { readReveal } from "@/lib/reveal-flash";
 import { maskApiKey } from "@/lib/api-keys";
+import { REVALIDATE_URL_ERROR_MESSAGES } from "@/lib/webhook-url";
 import { ConsumeReveal } from "@/components/admin/ConsumeReveal";
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
@@ -39,6 +40,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   missing: "Fyll i ett namn för sajten.",
   "confirm-name": "Skriv sajtens namn exakt som det står för att bekräfta borttagningen.",
   "notify-email": "E-postadressen för förfrågningar ser inte giltig ut.",
+  ...REVALIDATE_URL_ERROR_MESSAGES,
 };
 
 export default async function SiteSettingsPage({

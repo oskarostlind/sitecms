@@ -80,6 +80,15 @@ export function snippetApiUrl(cmsUrl: string): string {
 export const API_KEY_PLACEHOLDER = "<klistra-in-api-nyckeln>";
 export const SECRET_PLACEHOLDER = "<klistra-in-revalidate-hemligheten>";
 
+/**
+ * Nyckeln som den visas i kodrutor i panelen: början + punkter. Kopiera-
+ * knappen kopierar det riktiga värdet (CodeBlock copyValue), så att nyckeln
+ * inte syns i klartext på skärmen (skärmdelning, skärmdumpar).
+ */
+export function maskKeyForDisplay(key: string): string {
+  return `${key.slice(0, 5)}${"•".repeat(12)}`;
+}
+
 /** Den enda variabeln en ny integration behöver. */
 export function envSnippet({ apiKey }: { apiKey?: string | null } = {}): string {
   return `CMS_API_KEY=${apiKey || API_KEY_PLACEHOLDER}`;
@@ -283,7 +292,8 @@ export function clientSnippet({ apiUrl = DEFAULT_CMS_URL }: { apiUrl?: string } 
 // cache-taggen "sitecms" och töms av app/api/sitecms/revalidate/route.ts när
 // innehåll sparas i panelen. Använd bara i serverkomponenter.
 
-const API_URL = (process.env.CMS_API_URL ?? "${trimUrl(apiUrl)}").replace(/\\/+$/, "");
+// || (inte ??) så att en tom CMS_API_URL också ger standardadressen.
+const API_URL = (process.env.CMS_API_URL?.trim() || "${trimUrl(apiUrl)}").replace(/\\/+$/, "");
 
 export type BlockType = "text" | "richtext" | "image";
 
@@ -353,7 +363,8 @@ export class SitecmsError extends Error {
 }
 
 async function request<T>(path: string): Promise<T | null> {
-  const apiKey = process.env.CMS_API_KEY;
+  // trim(): en nyckel inklistrad hos webbhotellet får ofta med ett radbyte.
+  const apiKey = process.env.CMS_API_KEY?.trim();
   if (!apiKey) throw new SitecmsError("sitecms: CMS_API_KEY saknas i miljön.", 500);
 
   const res = await fetch(\`\${API_URL}/api/v1/site\${path}\`, {
@@ -503,7 +514,8 @@ async function hasValidLegacySecret(rawBody: string, expected: string): Promise<
 }
 
 export async function POST(request: Request) {
-  const apiKey = process.env.CMS_API_KEY;
+  // trim(): en nyckel inklistrad hos webbhotellet får ofta med ett radbyte.
+  const apiKey = process.env.CMS_API_KEY?.trim();
   const legacySecret = process.env.CMS_REVALIDATE_SECRET;
   if (!apiKey && !legacySecret) {
     return Response.json({ revalidated: false, error: "CMS_API_KEY saknas på kundsajten" }, { status: 500 });
@@ -600,7 +612,7 @@ export function syncScriptSnippet({ apiUrl = DEFAULT_CMS_URL }: { apiUrl?: strin
 // Kör: npx tsx scripts/sitecms-sync.ts [--strict]
 //  (eller node --experimental-strip-types scripts/sitecms-sync.ts)
 // Läser CMS_API_KEY (och valfritt CMS_API_URL, SITE_URL) från miljön eller .env.local / .env.
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { SitecmsConfig } from "../sitecms.config";
@@ -616,14 +628,20 @@ type SyncReport = {
 
 type SyncError = { error?: string; issues?: unknown[] };
 
+/**
+ * Läser KEY=värde från .env.local och .env (enkel läsare — fungerar i alla
+ * Node-versioner, till skillnad från process.loadEnvFile som kräver 20.12+).
+ * Skriver aldrig över variabler som redan finns i miljön, och .env.local
+ * vinner över .env.
+ */
 function loadEnv(): void {
   for (const file of [".env.local", ".env"]) {
-    if (existsSync(file)) {
-      try {
-        process.loadEnvFile(file);
-      } catch {
-        // Ogiltig rad i filen — variablerna kan fortfarande komma från miljön.
-      }
+    if (!existsSync(file)) continue;
+    for (const line of readFileSync(file, "utf8").split(/\\r?\\n/)) {
+      const match = /^\\s*(?:export\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(.*?)\\s*$/.exec(line);
+      if (!match || process.env[match[1]] !== undefined) continue;
+      const quoted = /^(["'])(.*)\\1$/.exec(match[2]);
+      process.env[match[1]] = quoted ? quoted[2] : match[2].replace(/\\s+#.*$/, "");
     }
   }
 }
@@ -671,8 +689,9 @@ function fail(message: string): never {
 
 async function main(): Promise<void> {
   loadEnv();
-  const apiUrl = (process.env.CMS_API_URL ?? "${trimUrl(apiUrl)}").replace(/\\/+$/, "");
-  const apiKey = process.env.CMS_API_KEY;
+  // || (inte ??) så att en tom CMS_API_URL också ger standardadressen.
+  const apiUrl = (process.env.CMS_API_URL?.trim() || "${trimUrl(apiUrl)}").replace(/\\/+$/, "");
+  const apiKey = process.env.CMS_API_KEY?.trim();
   if (!apiKey) {
     const message = "CMS_API_KEY saknas — fälten synkades INTE till sitecms.";
     if (process.argv.includes("--strict")) fail(message);

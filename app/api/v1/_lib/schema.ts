@@ -5,7 +5,7 @@ import { db, sites } from "@/lib/db";
 import { CONTENT_CACHE_HEADERS, type ApiSite } from "@/app/api/v1/_lib/auth";
 import { API_ACTOR, applySchema, readCurrentSchema, validateSchema } from "@/lib/schema-sync";
 import { logActivity } from "@/lib/audit";
-import { revalidateUrlFromSiteUrl } from "@/lib/webhook-url";
+import { errorForLog, maskRevalidateUrl, revalidateUrlFromSiteUrl } from "@/lib/webhook-url";
 
 /** Max storlek på ett schema i bytes (2 MB). Större → 413. */
 const MAX_SCHEMA_BYTES = 2 * 1024 * 1024;
@@ -34,7 +34,8 @@ function isUniqueViolation(err: unknown): boolean {
  * Skriver aldrig över befintliga värden — villkoret ligger i själva UPDATE:n,
  * så två samtidiga synkar kan inte heller skriva över varandra. Kastar
  * aldrig: schemat är redan sparat, så ett fel här får inte ge 500.
- * Returnerar sajtens revalidate-URL efteråt (eller null).
+ * Returnerar sajtens revalidate-URL efteråt, maskerad (maskRevalidateUrl —
+ * en deploy hook-URL är en hemlighet och skickas inte tillbaka), eller null.
  */
 async function adoptSiteUrl(siteId: string, siteUrl: unknown): Promise<string | null> {
   try {
@@ -64,9 +65,9 @@ async function adoptSiteUrl(siteId: string, siteUrl: unknown): Promise<string | 
     }
 
     const [row] = await db.select({ revalidateUrl: sites.revalidateUrl }).from(sites).where(eq(sites.id, siteId)).limit(1);
-    return row?.revalidateUrl || null;
+    return maskRevalidateUrl(row?.revalidateUrl);
   } catch (err) {
-    console.error(`schema sync: kunde inte sätta revalidate-URL för sajt ${siteId}:`, err);
+    console.error(`schema sync: kunde inte sätta revalidate-URL för sajt ${siteId}: ${errorForLog(err)}`);
     return null;
   }
 }
@@ -92,7 +93,8 @@ export async function schemaGetResponse(site: ApiSite): Promise<Response> {
  * Valfritt `siteUrl` ("https://kund.se") i bodyn: om sajten saknar
  * revalidate-URL och siteUrl är en publik https-adress sätts
  * revalidate-URL:en till `<origin>/api/sitecms/revalidate` (se adoptSiteUrl).
- * Svaret får det additiva fältet `revalidateUrl` (string | null).
+ * Svaret får det additiva fältet `revalidateUrl` (string | null, maskerad
+ * som i health).
  */
 export async function schemaPostResponse(site: ApiSite, request: Request): Promise<Response> {
   const declaredLength = Number(request.headers.get("content-length"));

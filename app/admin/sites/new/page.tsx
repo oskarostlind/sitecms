@@ -7,18 +7,20 @@ import { AdminRevealSecret } from "@/components/admin/AdminRevealSecret";
 import { CodeBlock } from "@/components/admin/CodeBlock";
 import { ConsumeReveal } from "@/components/admin/ConsumeReveal";
 import { readReveal } from "@/lib/reveal-flash";
-import { envSnippet, initCommand, INIT_STEPS, isDefaultCmsUrl, snippetApiUrl } from "@/lib/integration-snippets";
+import {
+  envSnippet,
+  initCommand,
+  INIT_STEPS,
+  isDefaultCmsUrl,
+  maskKeyForDisplay as maskKey,
+  snippetApiUrl,
+} from "@/lib/integration-snippets";
 import { Alert, ButtonLink, Card, CardContent, CardDescription, CardHeader, CardTitle, PageHeader } from "@/components/ui";
 
 const ERROR_MESSAGES: Record<string, string> = {
   missing: "Fyll i ett namn för sajten.",
   "invalid-slug": "Kunde inte generera en giltig slug från namnet. Ange en slug manuellt.",
 };
-
-/** Visar nyckeln maskerad i kodrutorna; kopiera-knappen kopierar det riktiga värdet. */
-function maskKey(key: string): string {
-  return `${key.slice(0, 5)}${"•".repeat(12)}`;
-}
 
 export default async function NewSitePage({
   searchParams,
@@ -89,6 +91,10 @@ export default async function NewSitePage({
                         <li key={step}>{step}</li>
                       ))}
                     </ul>
+                    <p className="text-xs text-neutral-500">
+                      Nyckeln som argument sparas i terminalens historik. Vill du undvika det, kör{" "}
+                      <code className="font-mono">{initCommand()}</code> utan nyckel så frågar kommandot efter den.
+                    </p>
                   </div>
 
                   <div className="space-y-2">

@@ -24,6 +24,7 @@ import {
   INIT_STEPS,
   isDefaultCmsUrl,
   legacyEnvSnippet,
+  maskKeyForDisplay,
   NPM_SYNC,
   npmUsageSnippet,
   packageJsonSnippet,
@@ -36,6 +37,7 @@ import {
   TSX_INSTALL,
   usageSnippet,
 } from "@/lib/integration-snippets";
+import { REVALIDATE_URL_ERROR_MESSAGES } from "@/lib/webhook-url";
 import { ConfirmButton } from "@/components/content/ConfirmButton";
 import { CodeBlock } from "@/components/admin/CodeBlock";
 import {
@@ -61,6 +63,7 @@ import {
 
 const ERROR_MESSAGES: Record<string, string> = {
   missing: "Sajten saknar namn — fyll i det under Inställningar och försök igen.",
+  ...REVALIDATE_URL_ERROR_MESSAGES,
 };
 
 const linkClassName = "text-brand-700 underline-offset-2 hover:text-brand-800 hover:underline";
@@ -216,7 +219,11 @@ export default async function IntegrationPage({
   const apiUrl = snippetApiUrl(cmsUrl);
   const customApiUrl = !isDefaultCmsUrl(cmsUrl);
   const ctx = { apiUrl, site: site.slug, domain: site.domain };
-  const env = envSnippet({ apiKey: newKey }) + (customApiUrl ? `\nCMS_API_URL=${apiUrl}` : "");
+  const extraEnv = customApiUrl ? `\nCMS_API_URL=${apiUrl}` : "";
+  // Nyckeln visas maskerad i kodrutorna; kopiera-knappen kopierar det riktiga värdet.
+  const shownKey = newKey ? maskKeyForDisplay(newKey) : undefined;
+  const env = envSnippet({ apiKey: shownKey }) + extraEnv;
+  const envCopy = envSnippet({ apiKey: newKey }) + extraEnv;
   const legacyEnv = legacyEnvSnippet({ ...ctx, apiKey: newKey, revalidateSecret: newSecret });
 
   const hasKey = keys.length > 0;
@@ -235,6 +242,9 @@ export default async function IntegrationPage({
   const doneCount = checklist.filter((c) => c.done).length;
 
   const errorMessage = error ? (ERROR_MESSAGES[error] ?? "Något gick fel. Försök igen.") : null;
+  // Fel från formuläret för revalidate-URL visas i steg 2, övriga vid nycklarna.
+  const revalidateErrorMessage = error?.startsWith("revalidate-url") ? errorMessage : null;
+  const keysErrorMessage = revalidateErrorMessage ? null : errorMessage;
   const membersHref = `/admin/sites/${siteId}/medlemmar`;
   const suggestedUrl = suggestedRevalidateUrl(site.domain);
 
@@ -297,12 +307,22 @@ export default async function IntegrationPage({
             <div className="space-y-3">
               {newKey ? (
                 <Alert tone="warning" title={`Nyckeln "${newKeyName ?? ""}" är ifylld`}>
-                  Kommandot och miljövariabeln nedan innehåller nyckeln i klartext. Kopiera dem nu — nyckeln visas inte
-                  igen när du lämnar sidan.
+                  Kommandot och miljövariabeln nedan innehåller nyckeln (maskerad här, men kopiera-knappen kopierar den
+                  riktiga). Kopiera dem nu — nyckeln visas inte igen när du lämnar sidan.
                 </Alert>
               ) : null}
-              <CodeBlock code={initCommand(newKey)} language="bash" maxHeight={null} />
-              {newKey ? null : (
+              <CodeBlock
+                code={initCommand(shownKey)}
+                copyValue={initCommand(newKey)}
+                language="bash"
+                maxHeight={null}
+              />
+              {newKey ? (
+                <p className="text-sm text-neutral-500">
+                  Nyckeln som argument sparas i terminalens historik. Vill du undvika det, kör{" "}
+                  <code className="font-mono">{initCommand()}</code> utan nyckel så frågar kommandot efter den.
+                </p>
+              ) : (
                 <p className="text-sm text-neutral-500">
                   Lägg API-nyckeln efter kommandot, eller låt det fråga efter den. Har du inte nyckeln kvar:{" "}
                   <a href="#nycklar" className={linkClassName}>
@@ -340,7 +360,7 @@ export default async function IntegrationPage({
                   </>
                 ) : null}
               </p>
-              <CodeBlock code={env} filename="Miljövariabel" language="env" maxHeight={null} />
+              <CodeBlock code={env} copyValue={envCopy} filename="Miljövariabel" language="env" maxHeight={null} />
             </section>
 
             <section aria-labelledby="anvand" className="space-y-3 border-t border-neutral-100 pt-6">
@@ -414,7 +434,7 @@ export default async function IntegrationPage({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {errorMessage ? <Alert tone="danger">{errorMessage}</Alert> : null}
+            {keysErrorMessage ? <Alert tone="danger">{keysErrorMessage}</Alert> : null}
             {deleted === "1" ? <Alert tone="success">API-nyckeln togs bort.</Alert> : null}
             {newKey ? (
               <Alert tone="warning" title={`Nyckeln "${newKeyName ?? ""}" skapades`}>
@@ -495,13 +515,13 @@ export default async function IntegrationPage({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {revalidateErrorMessage ? <Alert tone="danger">{revalidateErrorMessage}</Alert> : null}
             {success === "1" ? <Alert tone="success">Revalidate-URL:en har sparats.</Alert> : null}
 
             <form action={updateSiteSettings.bind(null, siteId)} className="flex flex-wrap items-end gap-3">
               <input type="hidden" name="returnTo" value="integration" />
               <input type="hidden" name="name" value={site.name} />
               <input type="hidden" name="domain" value={site.domain ?? ""} />
-              <input type="hidden" name="notifyEmail" value={site.notifyEmail ?? ""} />
               <Field
                 htmlFor="revalidateUrl"
                 label="Revalidate-URL"

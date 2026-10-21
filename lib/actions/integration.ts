@@ -8,6 +8,7 @@ import { sites } from "@/lib/db/schema";
 import { requireSiteOwner } from "@/lib/guard";
 import { logActivity } from "@/lib/audit";
 import { deliverSiteWebhook } from "@/lib/webhook-send";
+import { maskRevalidateUrl, redactUrls } from "@/lib/webhook-url";
 
 const TIMEOUT_MS = 8000;
 
@@ -54,6 +55,10 @@ export async function checkConnection(siteId: string): Promise<void> {
   }
 
   const status = result.ok ? "ok" : "failed";
+  // Aktivitetsloggen syns för alla med tillgång till sajten (även redaktörer)
+  // — visa bara den maskerade adressen (deploy hooks är hemliga URL:er).
+  const shownUrl = maskRevalidateUrl(site.revalidateUrl);
+  const detail = redactUrls(result.detail);
 
   await db
     .update(sites)
@@ -66,12 +71,12 @@ export async function checkConnection(siteId: string): Promise<void> {
     siteId,
     action: "sites.connection_check",
     detail: result.ok
-      ? `Testade anslutningen till ${site.revalidateUrl} — fungerar (${result.detail})`
-      : `Testade anslutningen${site.revalidateUrl ? ` till ${site.revalidateUrl}` : ""} — misslyckades: ${result.detail}`,
+      ? `Testade anslutningen till ${shownUrl} — fungerar (${detail})`
+      : `Testade anslutningen${shownUrl ? ` till ${shownUrl}` : ""} — misslyckades: ${detail}`,
   });
 
   revalidatePath(target);
 
-  const query = new URLSearchParams({ check: status, detail: result.detail });
+  const query = new URLSearchParams({ check: status, detail });
   redirect(`${target}?${query.toString()}`);
 }

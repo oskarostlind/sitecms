@@ -185,12 +185,19 @@ export function apiBase(apiUrl: string | undefined, site?: string | null): strin
  * Skapar en klient. Utelämnade värden läses från miljövariablerna
  * CMS_API_KEY (krävs), CMS_API_URL (default https://sitecms.se) och
  * CMS_SITE (valfri).
+ *
+ * Undantag: anges `apiKey` men inte `site` läses CMS_SITE **inte** från
+ * miljön — nyckeln identifierar då sajten (`/api/v1/site/…`). Så kan en
+ * extra klient för en annan sajt (`createSitecms({ apiKey: … })`) användas i
+ * ett projekt som fortfarande har CMS_SITE för sin egen sajt.
+ * `createSitecms()` utan argument använder CMS_SITE precis som 0.2.x.
  */
 export function createSitecms(input: Partial<SitecmsOptions> = {}) {
+  const explicitKey = input.apiKey !== undefined;
   const options: SitecmsOptions = {
     ...input,
     apiUrl: input.apiUrl ?? env("CMS_API_URL"),
-    site: input.site ?? env("CMS_SITE"),
+    site: input.site ?? (explicitKey ? "" : env("CMS_SITE")),
     apiKey: input.apiKey ?? env("CMS_API_KEY"),
   };
   const tag = options.tag ?? "sitecms";
@@ -357,30 +364,61 @@ function safeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
+/** Varför ett webhook-anrop inte godkändes (se `verifyWebhookDetailed`). */
+export type WebhookFailureReason =
+  /** Varken API-nyckel eller legacy-hemlighet finns att kontrollera mot. */
+  | "no-credentials"
+  /** Ingen `x-sitecms-signature` (och ingen matchande legacy-hemlighet). */
+  | "missing-signature"
+  /** `x-sitecms-timestamp` saknas eller är inte ett heltal. */
+  | "invalid-timestamp"
+  /** Signaturen stämmer men tidsstämpeln ligger utanför toleransen — klockfel eller gammalt anrop. */
+  | "timestamp-out-of-range"
+  /** Signaturen stämmer inte (fel nyckel eller ändrad body), och ingen legacy-hemlighet matchade. */
+  | "invalid-signature";
+
+export type WebhookVerification =
+  | { ok: true; method: "signature" | "secret" }
+  | {
+      ok: false;
+      reason: WebhookFailureReason;
+      /** Kort förklaring på svenska, lämplig att skicka tillbaka i felsvaret. */
+      message: string;
+      /** Vid "timestamp-out-of-range": mottagarens klocka minus tidsstämpeln, i sekunder. */
+      skewSeconds?: number;
+    };
+
+function formatTolerance(seconds: number): string {
+  return seconds % 60 === 0 ? `±${seconds / 60} min` : `±${seconds} s`;
+}
+
 /**
- * Verifierar ett webhook-anrop från sitecms. Fungerar i Node 18+ (med Web
- * Crypto) och Edge.
+ * Som `verifyWebhook`, men returnerar även orsaken när anropet inte godkänns.
+ * Användbart för att svara med ett begripligt fel, t.ex. vid klockfel:
  *
- * Godkänt om något av följande gäller:
- * - `x-sitecms-signature` innehåller en `v1=`-signatur som stämmer:
- *   HMAC-SHA256 med nyckeln sha256hex(apiKey) över `${timestamp}.${rawBody}`,
- *   och `x-sitecms-timestamp` ligger inom ±toleranceSeconds från nu.
- * - `legacySecret` är satt och JSON-bodyns `secret` matchar (äldre sajter).
- *
- *   const rawBody = await request.text();
- *   if (!(await verifyWebhook({ rawBody, headers: request.headers }))) return new Response(null, { status: 401 });
+ *   const result = await verifyWebhookDetailed({ rawBody, headers: request.headers });
+ *   if (!result.ok) return Response.json({ error: result.message }, { status: 401 });
  */
-export async function verifyWebhook(options: VerifyWebhookOptions): Promise<boolean> {
+export async function verifyWebhookDetailed(options: VerifyWebhookOptions): Promise<WebhookVerification> {
   const apiKey = (options.apiKey ?? env("CMS_API_KEY")).trim();
   const legacySecret = (options.legacySecret ?? env("CMS_REVALIDATE_SECRET")).trim();
   const tolerance = options.toleranceSeconds ?? WEBHOOK_TOLERANCE_SECONDS;
   const raw = toBytes(options.rawBody);
 
+  let failure: Exclude<WebhookVerification, { ok: true }> | null = null;
+
   if (apiKey) {
     const signature = readHeader(options.headers, "x-sitecms-signature");
     const timestamp = readHeader(options.headers, "x-sitecms-timestamp")?.trim() ?? "";
     const nowSeconds = Math.floor(Date.now() / 1000);
-    if (signature && /^\d{1,15}$/.test(timestamp) && Math.abs(nowSeconds - Number(timestamp)) <= tolerance) {
+    if (!signature) {
+      failure = { ok: false, reason: "missing-signature", message: "Anropet saknar signatur (x-sitecms-signature)." };
+    } else if (!/^\d{1,15}$/.test(timestamp)) {
+      failure = { ok: false, reason: "invalid-timestamp", message: "Anropet saknar giltig tidsstämpel (x-sitecms-timestamp)." };
+    } else {
+      // Signaturen kontrolleras även när tidsstämpeln ligger utanför fönstret,
+      // så att ett klockfel kan skiljas från fel nyckel. Godkänns ändå inte.
+      const skew = nowSeconds - Number(timestamp);
       const subtle = subtleCrypto();
       const enc = new TextEncoder();
       const keyHash = toHex(await subtle.digest("SHA-256", enc.encode(apiKey)));
@@ -400,7 +438,17 @@ export async function verifyWebhook(options: VerifyWebhookOptions): Promise<bool
         // Gå igenom alla poster utan att avbryta tidigt.
         if (safeEqual(entry.slice(3).trim().toLowerCase(), expected)) match = true;
       }
-      if (match) return true;
+      if (match && Math.abs(skew) <= tolerance) return { ok: true, method: "signature" };
+      failure = match
+        ? {
+            ok: false,
+            reason: "timestamp-out-of-range",
+            skewSeconds: skew,
+            message:
+              `Signaturen stämmer, men tidsstämpeln ligger utanför ${formatTolerance(tolerance)} ` +
+              `(kundsajtens klocka avviker ${Math.abs(skew)} s från sitecms) — kontrollera serverns klocka.`,
+          }
+        : { ok: false, reason: "invalid-signature", message: "Ogiltig signatur (kontrollera CMS_API_KEY)." };
     }
   }
 
@@ -412,10 +460,36 @@ export async function verifyWebhook(options: VerifyWebhookOptions): Promise<bool
       body = null;
     }
     const secret = body && typeof body === "object" ? (body as { secret?: unknown }).secret : undefined;
-    if (await verifyRevalidateSecret(secret, legacySecret)) return true;
+    if (await verifyRevalidateSecret(secret, legacySecret)) return { ok: true, method: "secret" };
+    failure ??= { ok: false, reason: "invalid-signature", message: "Fel hemlighet (kontrollera CMS_REVALIDATE_SECRET)." };
   }
 
-  return false;
+  return (
+    failure ?? {
+      ok: false,
+      reason: "no-credentials",
+      message: "Varken CMS_API_KEY eller CMS_REVALIDATE_SECRET är satt på kundsajten.",
+    }
+  );
+}
+
+/**
+ * Verifierar ett webhook-anrop från sitecms. Fungerar i Node 18+ (med Web
+ * Crypto) och Edge.
+ *
+ * Godkänt om något av följande gäller:
+ * - `x-sitecms-signature` innehåller en `v1=`-signatur som stämmer:
+ *   HMAC-SHA256 med nyckeln sha256hex(apiKey) över `${timestamp}.${rawBody}`,
+ *   och `x-sitecms-timestamp` ligger inom ±toleranceSeconds från nu.
+ * - `legacySecret` är satt och JSON-bodyns `secret` matchar (äldre sajter).
+ *
+ *   const rawBody = await request.text();
+ *   if (!(await verifyWebhook({ rawBody, headers: request.headers }))) return new Response(null, { status: 401 });
+ *
+ * Behöver du veta varför ett anrop avvisades: `verifyWebhookDetailed`.
+ */
+export async function verifyWebhook(options: VerifyWebhookOptions): Promise<boolean> {
+  return (await verifyWebhookDetailed(options)).ok;
 }
 
 // ---------------------------------------------------------------------------
