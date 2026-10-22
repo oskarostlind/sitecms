@@ -132,6 +132,8 @@ export const INIT_STEPS: readonly string[] = [
   "kontrollerar nyckeln mot sitecms och sparar CMS_API_KEY i .env.local (som läggs i .gitignore)",
   "installerar sitecms-next i projektet",
   `skapar ${SNIPPET_FILES.revalidate}, som tar emot webhooken när kunden sparar`,
+  // Literal sökvägar: PREVIEW_FILES/ANALYTICS_FILES definieras längre ner i filen.
+  "skapar app/api/sitecms/preview/route.ts (live-förhandsgranskning) och app/api/sitecms/events/route.ts (trafik) — layouten rörs inte",
   `skapar ${SNIPPET_FILES.config} — från strukturen som redan finns i sitecms, annars ett exempel`,
   'lägger till "prebuild": "sitecms-next sync" i package.json och synkar fälten direkt',
 ];
@@ -1008,4 +1010,71 @@ export function quoteRequestCurlSnippet({ apiUrl = DEFAULT_CMS_URL }: { apiUrl?:
   -H "x-api-key: $CMS_API_KEY" \\
   -H "Content-Type: application/json" \\
   --data @forfragan.json`;
+}
+
+// ---------------------------------------------------------------------------
+// Trafik (sitecms-next 0.6, docs/SEO-TRAFIK.md §1, §3, §5)
+// ---------------------------------------------------------------------------
+
+/** Lägsta paketversion med trafikpixeln. */
+export const ANALYTICS_MIN_VERSION = "0.6.0";
+export const ANALYTICS_INSTALL = `npm install sitecms-next@^${ANALYTICS_MIN_VERSION}`;
+/** Routen på kundsajten som `<SitecmsAnalytics />` skickar sidvisningar till. */
+export const ANALYTICS_ROUTE_PATH = "/api/sitecms/events";
+
+export const ANALYTICS_FILES = {
+  route: "app/api/sitecms/events/route.ts",
+  layout: "app/layout.tsx",
+} as const;
+
+/** Stegen i korthet — samma ordning i /docs och /llms.txt. */
+export const ANALYTICS_STEPS: readonly string[] = [
+  `Uppgradera paketet: \`${ANALYTICS_INSTALL}\` (eller kör \`${INIT_COMMAND}\` igen — den skapar routen).`,
+  `Skapa \`${ANALYTICS_FILES.route}\` med en rad: \`export { POST } from "sitecms-next/analytics";\`.`,
+  `Lägg \`<SitecmsAnalytics />\` från "sitecms-next/analytics" sist i \`<body>\` i \`${ANALYTICS_FILES.layout}\`.`,
+];
+
+export function analyticsRouteSnippet(): string {
+  return `export { POST } from "sitecms-next/analytics";`;
+}
+
+export function analyticsLayoutSnippet(): string {
+  return `// app/layout.tsx
+import { SitecmsAnalytics } from "sitecms-next/analytics";
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="sv">
+      <body>
+        {children}
+        {/* Renderar ingenting i förhandsgranskningen. Inga cookies. */}
+        <SitecmsAnalytics />
+      </body>
+    </html>
+  );
+}`;
+}
+
+/** Det kundsajtens route skickar vidare till sitecms (server-till-server). */
+export function eventsBodyExample(): string {
+  return `{
+  "events": [
+    {
+      "p": "/om-oss",
+      "r": "https://www.google.com/",
+      "q": "utm_source=linkedin&utm_medium=social",
+      "ua": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) …",
+      "ip": "203.0.113.42",
+      "c": "SE"
+    }
+  ]
+}`;
+}
+
+/** curl-exempel: skicka en sidvisning direkt till sitecms (normalt gör sitecms-next det). */
+export function eventsCurlSnippet({ apiUrl = DEFAULT_CMS_URL }: { apiUrl?: string } = {}): string {
+  return `curl -i -X POST ${trimUrl(apiUrl)}${SITE_API_PATH}/events \\
+  -H "x-api-key: $CMS_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  --data '{"events":[{"p":"/om-oss","ua":"Mozilla/5.0 …","ip":"203.0.113.42","c":"SE"}]}'`;
 }
