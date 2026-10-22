@@ -251,16 +251,18 @@
 @keyframes live-preview-flash {
   0%,
   100% {
-    box-shadow: 0 0 0 0 transparent;
+    outline-color: transparent;
   }
   20%,
   60% {
-    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-brand-400) 70%, transparent);
+    outline-color: color-mix(in oklab, var(--color-brand-400) 75%, transparent);
   }
 }
 
 [data-preview-flash="true"] {
-  border-radius: 0.625rem;
+  border-radius: 0.5rem;
+  outline: 3px solid transparent;
+  outline-offset: 6px;
   animation: live-preview-flash 1.2s ease-out 1;
 }
 

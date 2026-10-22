@@ -1,8 +1,8 @@
 # sitecms-next
 
 Koppla en sajt till [sitecms](https://sitecms.se) med **en miljövariabel och
-ett kommando**: typad klient, signerad revalidate-route för Next.js App Router
-och CLI för schema-sync. Inga beroenden.
+ett kommando**: typad klient, signerad revalidate-route för Next.js App Router,
+live-förhandsgranskning i panelen och CLI för schema-sync. Inga beroenden.
 
 ## Kom igång
 
@@ -18,14 +18,16 @@ API-nyckeln från **Integration** för sajten i sitecms-panelen (eller kör
 - sparar `CMS_API_KEY` i `.env.local` (och ser till att `.gitignore` täcker den),
 - installerar `sitecms-next` om det saknas,
 - skapar revalidate-routen `app/api/sitecms/revalidate/route.ts` (eller under `src/app`),
+- skapar preview-routen `app/api/sitecms/preview/route.ts` och skriver ut resten av
+  stegen för [live-förhandsgranskning](#live-förhandsgranskning) (layouten ändras inte),
 - skapar `sitecms.config.ts` — från strukturen som redan finns i sitecms, annars ett kort exempel,
 - lägger till `"prebuild": "sitecms-next sync"` i `package.json` (om inget script
   redan kör `sitecms-next sync`, t.ex. `build`) och synkar direkt.
 
 Det går att köra flera gånger. Exakt vad som rörs:
 
-- **Skrivs aldrig över:** revalidate-routen och `sitecms.config.*` — finns de
-  redan hoppas steget över.
+- **Skrivs aldrig över:** revalidate- och preview-routen och `sitecms.config.*` —
+  finns de redan hoppas steget över. `app/layout.tsx` och `next.config.*` rörs aldrig.
 - **Kompletteras:** `.env.local` (raden `CMS_API_KEY=…` läggs till),
   `.gitignore` (raden `.env.local` läggs till om den inte redan täcks) och
   `package.json` (bara `scripts.prebuild` ändras; indrag, radslut, BOM och
@@ -149,6 +151,100 @@ sitecms. Kundens innehåll skrivs aldrig över. Ogiltig config stoppar bygget.
 Saknas `CMS_API_KEY` hoppas steget över med en tydlig varning i byggloggen
 (använd `--strict` för att låta bygget faila).
 
+## Live-förhandsgranskning
+
+När kunden redigerar en sida i panelen visas den riktiga sajten i en iframe
+bredvid fälten och uppdateras medan hen skriver — innan något sparas. Klick på
+ett markerat element hoppar till fältet. Kräver Next.js App Router (14.2+) och
+sitecms-next 0.4+. Statiska sidor förblir statiska; bara den som förhandsgranskar
+får dynamiskt renderade sidor.
+
+**1. Routen** (skapas av `npx sitecms-next init`):
+
+```ts
+// app/api/sitecms/preview/route.ts
+export { GET } from "sitecms-next/preview";
+```
+
+**2. Komponenten**, sist i `<body>` i `app/layout.tsx`:
+
+```tsx
+import { SitecmsPreview } from "sitecms-next/preview";
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="sv">
+      <body>
+        {children}
+        <SitecmsPreview />
+      </body>
+    </html>
+  );
+}
+```
+
+Den renderar ingenting om draft mode inte är på.
+
+**3. Markera redigerbara element** med `editable(sida, fält)`:
+
+```tsx
+import { editable, getContent, text } from "sitecms-next";
+
+const content = await getContent();
+<h1 {...editable("home", "hero.title")}>{text(content, "home", "hero.title")}</h1>
+// → <h1 data-sitecms="home:hero.title">
+```
+
+Fungerar även i klientkomponenter. Attributet är ofarligt i produktion. Text
+uppdateras direkt medan kunden skriver om elementet bara innehåller texten (inga
+barnelement); bilder (`<img>` eller första `<img>` inuti) byter `src` direkt.
+Allt annat (t.ex. richtext) uppdateras när panelen laddar om sidan, ungefär
+0,4 s efter att kunden slutat skriva.
+
+**4. Låt panelen bädda in sajten** i `next.config.ts` (eller `.mjs`):
+
+```ts
+import { previewFrameHeaders } from "sitecms-next/preview";
+
+const nextConfig = {
+  async headers() {
+    return [{ source: "/:path*", headers: previewFrameHeaders() }];
+  },
+};
+export default nextConfig;
+```
+
+`previewFrameHeaders()` ger `Content-Security-Policy: frame-ancestors 'self' https://sitecms.se https://www.sitecms.se`
+(origin för `CMS_API_URL` i stället för `https://sitecms.se` om den är satt). Egna
+origins: `previewFrameHeaders(["https://panel.example"])`. **Ta bort
+`X-Frame-Options`** om sajten sätter den — CSP:n ersätter den.
+
+**5. Fyll i adressen** under Inställningar → "Adress för förhandsgranskning" i
+panelen om sajten inte ligger på sin domän än (t.ex. en Vercel-URL).
+
+Så fungerar det: panelen öppnar `/api/sitecms/preview?token=…&path=/` i
+iframen. Routen verifierar token mot sitecms (`GET /api/v1/site/preview`), slår
+på draft mode och sätter cookies som fungerar i en iframe från en annan domän
+(`Partitioned; SameSite=None; Secure`; på `http://localhost` i stället
+`SameSite=Lax` utan `Secure`). `getContent()` hämtar då innehållet med
+osparade ändringar (header `x-sitecms-preview`, utan cache); är förhandsgranskningen
+utgången eller sitecms inte svarar visas sparat innehåll — sajten går aldrig
+sönder. Öppnas routen utanför panelen visas en liten bar "Förhandsgranskning ·
+Avsluta" längst ner; `?disable=1` stänger av.
+
+| Export | |
+|---|---|
+| `GET` / `createPreviewRoute({ apiKey?, apiUrl?, site?, fetch? })` | Preview-routen (läser `CMS_API_KEY`, `CMS_API_URL`, `CMS_SITE` som klienten) |
+| `<SitecmsPreview routePath? />` | Async serverkomponent för layouten |
+| `previewFrameHeaders(panelOrigins?)` | Headers för `next.config` |
+| `isPreview()` | `true` när sidan visas i förhandsgranskningen (finns även i `sitecms-next`) |
+| `editable(page, key)` (från `sitecms-next`) | `{ "data-sitecms": "page:key" }` |
+
+`page` och `key` får bara innehålla a–z, 0–9, punkt, bindestreck och
+understreck. `createSitecms({ previewToken })` styr varifrån preview-token
+läses (en funktion, eller `false` för att stänga av förhandsgranskning för en
+klient). Meddelandeprotokollet (postMessage, v1) beskrivs i sitecms-dokumentationen.
+
 ## Miljövariabler
 
 | Variabel | |
@@ -159,10 +255,22 @@ Saknas `CMS_API_KEY` hoppas steget över med en tydlig varning i byggloggen
 | `CMS_REVALIDATE_SECRET` | Valfri. Äldre revalidate-hemlighet, godkänns fortfarande. |
 | `SITE_URL` / `CMS_SITE_URL` | Valfri. Sajtens adress, skickas vid sync (se ovan). |
 
+## Uppgradera från 0.3
+
+```bash
+npm install sitecms-next@^0.4.0
+```
+
+Inget behöver ändras — allt nytt i 0.4 är tillägg. Utan preview-routen och
+`<SitecmsPreview />` fungerar sajten exakt som förut. Vill du ha
+live-förhandsgranskning: kör `npx sitecms-next init` igen (skapar preview-routen
+och skriver ut stegen) eller följ [Live-förhandsgranskning](#live-förhandsgranskning).
+Se även [CHANGELOG.md](./CHANGELOG.md).
+
 ## Uppgradera från 0.2
 
 ```bash
-npm install sitecms-next@^0.3.0
+npm install sitecms-next@^0.4.0
 ```
 
 Inget annat behöver ändras: `CMS_API_URL`, `CMS_SITE` och
@@ -245,7 +353,7 @@ klockfel är `error` "Signaturen stämmer, men tidsstämpeln ligger utanför ±5
 
 | Kommando | Gör |
 |---|---|
-| `sitecms-next init [nyckel] [--force] [--no-install]` | Kopplar projektet (se ovan) |
+| `sitecms-next init [nyckel] [--force] [--no-install]` | Kopplar projektet (se ovan), inkl. preview-routen |
 | `sitecms-next sync [--prune] [--strict] [--config <fil>]` | Synkar configen till sitecms |
 | `sitecms-next check` | Verifierar nyckeln och visar webhook-status |
 | `sitecms-next pull` | Skriver ut strukturen i sitecms som JSON |

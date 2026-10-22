@@ -4,7 +4,7 @@ import { hashApiKey, maskApiKey } from "@/lib/api-keys";
 import { ConsumeReveal } from "@/components/admin/ConsumeReveal";
 import { notFound } from "next/navigation";
 import { count, desc, eq } from "drizzle-orm";
-import { BookOpen, Bot, Circle, CircleCheck, KeyRound, Plug, Server, Terminal, UserPlus, Webhook } from "lucide-react";
+import { BookOpen, Bot, Circle, CircleCheck, Eye, KeyRound, Plug, Server, Settings, Terminal, UserPlus, Webhook } from "lucide-react";
 import { db } from "@/lib/db";
 import { apiKeys, pages, sites } from "@/lib/db/schema";
 import { requireSiteOwner } from "@/lib/guard";
@@ -28,6 +28,12 @@ import {
   NPM_SYNC,
   npmUsageSnippet,
   packageJsonSnippet,
+  PREVIEW_FILES,
+  PREVIEW_INSTALL,
+  previewEditableSnippet,
+  previewLayoutSnippet,
+  previewNextConfigSnippet,
+  previewRouteSnippet,
   revalidateRouteSnippet,
   snippetApiUrl,
   SNIPPET_FILES,
@@ -38,6 +44,7 @@ import {
   usageSnippet,
 } from "@/lib/integration-snippets";
 import { REVALIDATE_URL_ERROR_MESSAGES } from "@/lib/webhook-url";
+import { previewBaseUrl } from "@/lib/preview";
 import { ConfirmButton } from "@/components/content/ConfirmButton";
 import { CodeBlock } from "@/components/admin/CodeBlock";
 import {
@@ -247,6 +254,7 @@ export default async function IntegrationPage({
   const keysErrorMessage = revalidateErrorMessage ? null : errorMessage;
   const membersHref = `/admin/sites/${siteId}/medlemmar`;
   const suggestedUrl = suggestedRevalidateUrl(site.domain);
+  const previewAddress = previewBaseUrl(site);
 
   return (
     <div className="max-w-3xl">
@@ -667,6 +675,72 @@ export default async function IntegrationPage({
             <ButtonLink href="/docs" variant="ghost" icon={<BookOpen />}>
               Läs hela dokumentationen
             </ButtonLink>
+          </CardContent>
+        </Card>
+
+        {/* Live-förhandsgranskning (valfritt) */}
+        <Card id="forhandsgranskning" className="scroll-mt-6">
+          <CardHeader>
+            <IconTitle icon={<Eye />}>Live-förhandsgranskning</IconTitle>
+            <CardDescription>
+              Valfritt, från sitecms-next 0.4: kunden ser sajten bredvid fälten och den uppdateras medan hen skriver —
+              innan något sparas. Klick på en rubrik eller bild i sajten öppnar rätt fält.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-neutral-200 px-4 py-3 text-sm">
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-neutral-500">Panelen öppnar</p>
+                {previewAddress ? (
+                  <code className="break-all font-mono text-xs text-neutral-800">{previewAddress}</code>
+                ) : (
+                  <span className="text-neutral-700">Ingen adress ännu — ange domän eller adress för förhandsgranskning.</span>
+                )}
+              </div>
+              <ButtonLink href={`/admin/sites/${siteId}/installningar#previewUrl`} variant="ghost" size="sm" icon={<Settings />}>
+                Ändra adress
+              </ButtonLink>
+            </div>
+
+            <div className="space-y-2">
+              <SubHeading>Uppgradera paketet</SubHeading>
+              <CodeBlock code={PREVIEW_INSTALL} language="bash" maxHeight={null} />
+            </div>
+            <div className="space-y-2">
+              <SubHeading file={PREVIEW_FILES.route}>routen som panelen öppnar</SubHeading>
+              <CodeBlock code={previewRouteSnippet()} filename={PREVIEW_FILES.route} language="ts" maxHeight={null} />
+            </div>
+            <div className="space-y-2">
+              <SubHeading file={PREVIEW_FILES.layout}>sist i body</SubHeading>
+              <CodeBlock code={previewLayoutSnippet()} filename={PREVIEW_FILES.layout} language="tsx" maxHeight={null} />
+            </div>
+            <div className="space-y-2">
+              <SubHeading>Markera klickbara element med editable()</SubHeading>
+              <p className="text-sm text-neutral-500">
+                Samma sida och nyckel som i <code className="font-mono">{SNIPPET_FILES.config}</code>. Sätt det på
+                elementet som innehåller texten, eller på bilden.
+              </p>
+              <CodeBlock code={previewEditableSnippet()} filename="app/page.tsx" language="tsx" />
+            </div>
+            <div className="space-y-2">
+              <SubHeading file={PREVIEW_FILES.nextConfig}>tillåt att panelen bäddar in sajten</SubHeading>
+              <p className="text-sm text-neutral-500">
+                Ta bort <code className="font-mono">X-Frame-Options</code> om sajten sätter den — CSP:n ersätter den.
+                {customApiUrl ? (
+                  <>
+                    {" "}Panelen körs på <code className="font-mono">{apiUrl}</code>: skicka med den,{" "}
+                    <code className="font-mono">previewFrameHeaders([&quot;{apiUrl}&quot;])</code>.
+                  </>
+                ) : null}
+              </p>
+              <CodeBlock code={previewNextConfigSnippet()} filename={PREVIEW_FILES.nextConfig} language="ts" maxHeight={null} />
+            </div>
+            <p className="text-sm text-neutral-500">
+              Deploya och öppna en sida under Sidor → <strong className="font-medium text-neutral-700">Förhandsgranska</strong>.{" "}
+              <Link href="/docs#forhandsgranskning" className={linkClassName}>
+                Mer om förhandsgranskningen och felsökning
+              </Link>
+            </p>
           </CardContent>
         </Card>
 

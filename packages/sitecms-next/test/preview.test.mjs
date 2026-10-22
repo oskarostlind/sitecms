@@ -413,6 +413,17 @@ test("GET ?disable=1: stänger av draft mode, rensar cookies (samma attribut) oc
     assert.equal(set.secure, true);
   }
 
+  // next start bakom proxy utan x-forwarded-proto: request.url är localhost men Host är den riktiga domänen.
+  const proxied = mockNext();
+  const proxiedHandler = createPreviewRoute({ apiKey: KEY, nextHeaders: () => proxied.headers });
+  await proxiedHandler(new Request("http://localhost:3000/api/sitecms/preview?disable=1", { headers: { host: "kund.se" } }));
+  for (const set of proxied.sets) assert.equal(set.partitioned, true);
+  const localHost = mockNext();
+  await createPreviewRoute({ apiKey: KEY, nextHeaders: () => localHost.headers })(
+    new Request("http://localhost:3000/api/sitecms/preview?disable=1", { headers: { host: "localhost:3000" } }),
+  );
+  for (const set of localHost.sets) assert.equal(set.sameSite, "lax");
+
   const local = mockNext();
   const localHandler = createPreviewRoute({ apiKey: KEY, nextHeaders: () => local.headers });
   const localRes = await localHandler(new Request("http://localhost:3000/api/sitecms/preview?disable=1&path=//evil.se"));

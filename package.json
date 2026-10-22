@@ -14,6 +14,7 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "typecheck": "tsc --noEmit",
     "db:seed:gellivare-traktor": "tsx scripts/seed-gellivare-traktor.ts",
+    "db:seed:preview": "tsx scripts/seed-preview-local.ts",
     "test:quote": "tsx scripts/quote-validation-test.ts",
     "test:webhook": "tsx scripts/webhook-signature-test.ts && tsx scripts/webhook-url-test.ts && tsx scripts/webhook-send-test.ts",
     "test:preview": "tsx scripts/preview-test.ts"

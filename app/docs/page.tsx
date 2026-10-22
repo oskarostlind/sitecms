@@ -1138,6 +1138,7 @@ export default function DocsPage() {
               path={`${BASE}/content`}
               title="Hämta allt innehåll"
               description={
+                <>
                 <p>
                   Sajtens namn, alla sidor med block i ordning, synliga tjänster och SEO per sida. För richtext-block
                   finns färdig <code>html</code>; för bilder <code>alt</code>. <code>label</code> och{" "}
@@ -1150,6 +1151,7 @@ export default function DocsPage() {
                   <code>{`"preview": true`}</code>. Ogiltig eller utgången token ger <code>401</code> med{" "}
                   <code>{`"code": "preview_invalid"`}</code>. Utan headern är svaret oförändrat.
                 </p>
+                </>
               }
             >
               <CodeBlock code={CONTENT_RESPONSE} filename="200 OK" language="json" />

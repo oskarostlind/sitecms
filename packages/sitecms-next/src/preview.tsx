@@ -138,11 +138,26 @@ function normalizeOrigin(value: unknown): string | null {
   }
 }
 
-/** http://localhost (dev): cookies utan Secure/Partitioned och SameSite=Lax. */
-function isLocalHttp(url: URL): boolean {
-  if (url.protocol !== "http:") return false;
-  const host = url.hostname.toLowerCase();
+function isLoopbackHost(hostname: string): boolean {
+  const host = hostname.toLowerCase();
   return host === "localhost" || host.endsWith(".localhost") || host === "127.0.0.1" || host === "[::1]";
+}
+
+/**
+ * http://localhost (dev): cookies utan Secure/Partitioned och SameSite=Lax.
+ * `next start` bygger request.url från sin egen adress (localhost) om proxyn
+ * inte skickar x-forwarded-proto, så även Host/x-forwarded-host måste vara
+ * localhost — annars antas en riktig (https-)sajt bakom proxy.
+ */
+function isLocalHttp(url: URL, headers: Headers): boolean {
+  if (url.protocol !== "http:" || !isLoopbackHost(url.hostname)) return false;
+  const hostHeader = (headers.get("x-forwarded-host") ?? headers.get("host") ?? "").split(",")[0].trim();
+  if (!hostHeader) return true;
+  try {
+    return isLoopbackHost(new URL(`http://${hostHeader}`).hostname);
+  } catch {
+    return false;
+  }
 }
 
 function cookieAttributes(localDev: boolean): Omit<CookieOptions, "name" | "value"> {
@@ -232,7 +247,7 @@ export function createPreviewRoute(options: PreviewRouteOptions = {}) {
   return async function GET(request: Request): Promise<Response> {
     const url = new URL(request.url);
     const path = safePreviewPath(url.searchParams.get("path"));
-    const attrs = cookieAttributes(isLocalHttp(url));
+    const attrs = cookieAttributes(isLocalHttp(url, request.headers));
 
     const next = await (options.nextHeaders ? options.nextHeaders() : loadNextHeaders());
     if (!next) return errorPage(500, MSG_NO_NEXT);
