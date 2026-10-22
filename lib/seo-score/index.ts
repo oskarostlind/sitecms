@@ -45,13 +45,20 @@ function toSeoScore(row: SeoScoreRow): SeoScore {
   };
 }
 
+export type RunSeoScoreOptions = {
+  /** Hoppa över PageSpeed helt (content-only). */
+  skipPageSpeed?: boolean;
+  /** Avbryter PageSpeed-anropet (t.ex. cronens deadline). Avbrott ⇒ lighthouse null, aldrig fel. */
+  signal?: AbortSignal;
+};
+
 /**
  * Räknar poängen för en sajt och upsertar dagens rad (`ON CONFLICT (site_id,
  * day) DO UPDATE`). Sajter utan domän, och `skipPageSpeed`, ger
  * `lighthouse: null` och poängen räknas på innehållet enbart. PSI-fel kastar
  * aldrig (fetchPageSpeed returnerar null).
  */
-export async function runSeoScore(siteId: string, opts: { skipPageSpeed?: boolean } = {}): Promise<SeoScore> {
+export async function runSeoScore(siteId: string, opts: RunSeoScoreOptions = {}): Promise<SeoScore> {
   const [site] = await db
     .select({ id: sites.id, domain: sites.domain })
     .from(sites)
@@ -64,7 +71,9 @@ export async function runSeoScore(siteId: string, opts: { skipPageSpeed?: boolea
   const url = siteUrl(site.domain);
   const [content, lighthouse] = await Promise.all([
     loadContentInput(siteId).then(scoreContent),
-    opts.skipPageSpeed || !url ? Promise.resolve<LighthouseResult | null>(null) : fetchPageSpeed(url),
+    opts.skipPageSpeed || !url
+      ? Promise.resolve<LighthouseResult | null>(null)
+      : fetchPageSpeed(url, { signal: opts.signal }),
   ]);
 
   const lighthouseScore = lighthouse ? lighthouseSubScore(lighthouse) : null;
