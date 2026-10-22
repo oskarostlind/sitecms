@@ -232,6 +232,11 @@ utgången eller sitecms inte svarar visas sparat innehåll — sajten går aldri
 sönder. Öppnas routen utanför panelen visas en liten bar "Förhandsgranskning ·
 Avsluta" längst ner; `?disable=1` stänger av.
 
+> **Lokalt mot en lokal sitecms:** panel och sajt får inte båda ligga på
+> `localhost` (cookies gäller per värd, inte per port — panelen raderar då
+> sajtens draft mode-cookie och previewn slutar uppdateras efter första
+> ändringen). Mot sitecms.se, eller med sajten på en annan värd, fungerar det.
+
 | Export | |
 |---|---|
 | `GET` / `createPreviewRoute({ apiKey?, apiUrl?, site?, fetch? })` | Preview-routen (läser `CMS_API_KEY`, `CMS_API_URL`, `CMS_SITE` som klienten) |
