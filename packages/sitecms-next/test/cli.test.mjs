@@ -121,7 +121,7 @@ test("init: Next.js med src/app — skapar allt, bevarar prebuild och är idempo
     name: "kund",
     private: true,
     scripts: { dev: "next dev", prebuild: "echo hej", build: "next build" },
-    dependencies: { next: "15.0.0", "sitecms-next": "^0.4.0" },
+    dependencies: { next: "15.0.0", "sitecms-next": "^0.6.0" },
   };
   const dir = project({
     "package.json": JSON.stringify(pkg, null, 4) + "\n",
@@ -140,6 +140,9 @@ test("init: Next.js med src/app — skapar allt, bevarar prebuild och är idempo
   assert.match(route, /export \{ POST \} from "sitecms-next\/revalidate";/);
   const previewRoute = read(dir, "src/app/api/sitecms/preview/route.ts");
   assert.match(previewRoute, /^export \{ GET \} from "sitecms-next\/preview";$/m);
+  const eventsRoute = read(dir, "src/app/api/sitecms/events/route.ts");
+  assert.match(eventsRoute, /^export \{ POST \} from "sitecms-next\/analytics";$/m);
+  assert.match(eventsRoute, /^\/\/ Trafik/m, "svensk kommentar i events-routen");
   assert.equal(existsSync(join(dir, "app")), false);
 
   // Nästa steg för live-förhandsgranskning skrivs ut; layouten rörs inte.
@@ -151,6 +154,8 @@ test("init: Next.js med src/app — skapar allt, bevarar prebuild och är idempo
   assert.match(first.stdout, /ta bort X-Frame-Options/);
   assert.match(first.stdout, /Layouten och next\.config\.ts ändras inte automatiskt/);
   assert.match(first.stdout, /src\/app\/api\/sitecms\/preview\/route\.ts/);
+  assert.match(first.stdout, /src\/app\/api\/sitecms\/events\/route\.ts/);
+  assert.match(first.stdout, /<SitecmsAnalytics \/>/);
 
   const config = read(dir, "sitecms.config.ts");
   assert.match(config, /import \{ defineConfig \} from "sitecms-next";/);
@@ -183,6 +188,7 @@ test("init: Next.js med src/app — skapar allt, bevarar prebuild och är idempo
     "sitecms.config.ts",
     "src/app/api/sitecms/revalidate/route.ts",
     "src/app/api/sitecms/preview/route.ts",
+    "src/app/api/sitecms/events/route.ts",
   ];
   const before = snapshot(dir, files);
   const second = await run(dir, ["init"]);
@@ -208,7 +214,7 @@ test("init: config från befintlig struktur, app/ utan TypeScript, annan nyckel 
   ];
   state.schemaPages = pagesFromSchema;
   const dir = project({
-    "package.json": '{\n  "name": "kund2",\n  "dependencies": { "next": "14.2.0", "sitecms-next": "^0.4.0" }\n}',
+    "package.json": '{\n  "name": "kund2",\n  "dependencies": { "next": "14.2.0", "sitecms-next": "^0.6.0" }\n}',
     "app/page.jsx": "export default function Page() { return null; }\n",
     ".gitignore": "node_modules\n.env*\n",
     ".env.local": "export CMS_API_KEY=gammal\nFOO=bar",
@@ -261,7 +267,7 @@ test("init: config från befintlig struktur, app/ utan TypeScript, annan nyckel 
   // Bara scripts lades till; inline-objektet för dependencies är orört.
   assert.equal(
     pkgText,
-    '{\n  "name": "kund2",\n  "dependencies": { "next": "14.2.0", "sitecms-next": "^0.4.0" },\n  "scripts": {\n    "prebuild": "sitecms-next sync"\n  }\n}',
+    '{\n  "name": "kund2",\n  "dependencies": { "next": "14.2.0", "sitecms-next": "^0.6.0" },\n  "scripts": {\n    "prebuild": "sitecms-next sync"\n  }\n}',
   );
 
   const post = state.requests.find((r) => r.method === "POST");
@@ -272,7 +278,7 @@ test("init: config från befintlig struktur, app/ utan TypeScript, annan nyckel 
 test("init: inte Next.js → ingen route, instruktion om deploy hook", async () => {
   reset();
   const dir = project({
-    "package.json": JSON.stringify({ name: "astro-sajt", dependencies: { astro: "4.0.0", "sitecms-next": "^0.4.0" } }, null, 2),
+    "package.json": JSON.stringify({ name: "astro-sajt", dependencies: { astro: "4.0.0", "sitecms-next": "^0.6.0" } }, null, 2),
   });
   const res = await run(dir, ["init", GOOD_KEY]);
   assert.equal(res.code, 0, res.stderr + res.stdout);
@@ -283,7 +289,7 @@ test("init: inte Next.js → ingen route, instruktion om deploy hook", async () 
   assert.doesNotMatch(res.stdout, /Live-förhandsgranskning/);
 });
 
-test("init: befintlig preview-route skrivs inte över; sitecms-next 0.3 räknas som för gammal", async () => {
+test("init: befintlig preview-route skrivs inte över; sitecms-next 0.3 och 0.5 räknas som för gamla", async () => {
   reset();
   const custom = 'import { createPreviewRoute } from "sitecms-next/preview";\nexport const GET = createPreviewRoute({ site: "x" });\n';
   const dir = project({
@@ -304,6 +310,20 @@ test("init: befintlig preview-route skrivs inte över; sitecms-next 0.3 räknas 
   assert.match(res.stdout, /I app\/layout\.tsx, sist i <body>:/);
   assert.match(res.stdout, /i next\.config\.mjs:/);
   assert.equal(read(dir, "app/layout.tsx"), "export default function L({ children }) { return children; }\n", "layouten rörs inte");
+
+  // 0.5 saknar sitecms-next/analytics → räknas som för gammal; befintlig events-route skrivs inte över.
+  reset();
+  const customEvents = 'import { createAnalyticsRoute } from "sitecms-next/analytics";\nexport const POST = createAnalyticsRoute({ site: "x" });\n';
+  const dir2 = project({
+    "package.json": JSON.stringify({ name: "kund", dependencies: { next: "15.0.0", "sitecms-next": "^0.5.0" } }, null, 2),
+    "tsconfig.json": "{}\n",
+    "app/api/sitecms/events/route.ts": customEvents,
+  });
+  const res2 = await run(dir2, ["init", GOOD_KEY, "--no-install"]);
+  assert.equal(res2.code, 0, res2.stderr + res2.stdout);
+  assert.equal(read(dir2, "app/api/sitecms/events/route.ts"), customEvents);
+  assert.match(res2.stdout, /app\/api\/sitecms\/events\/route\.ts \(fanns redan\)/);
+  assert.match(res2.stdout, /Installera paketet: npm install sitecms-next@\^0\.6/);
 });
 
 test("init: fel nyckel → snyggt 401-fel, inget skrivs", async () => {
@@ -561,7 +581,7 @@ test("init: package.json med BOM, CRLF och tabbar bevaras; prebuild läggs före
     '\t\t"dev": "next dev",\r\n' +
     '\t\t"build": "next build"\r\n' +
     "\t},\r\n" +
-    '\t"dependencies": { "next": "15.0.0", "sitecms-next": "^0.4.0" }\r\n' +
+    '\t"dependencies": { "next": "15.0.0", "sitecms-next": "^0.6.0" }\r\n' +
     "}\r\n";
   const dir = project({ "package.json": original, "app/page.jsx": "export default () => null;\n" });
   const res = await run(dir, ["init", GOOD_KEY]);
@@ -581,7 +601,7 @@ test("init: sitecms-next sync i build (eller annat script) → ingen dubbel preb
     { prebuild: "sitecms-next  sync", build: "next build" },
   ]) {
     reset();
-    const text = JSON.stringify({ name: "kund", scripts, dependencies: { next: "15.0.0", "sitecms-next": "^0.4.0" } }, null, 2) + "\n";
+    const text = JSON.stringify({ name: "kund", scripts, dependencies: { next: "15.0.0", "sitecms-next": "^0.6.0" } }, null, 2) + "\n";
     const dir = project({ "package.json": text, "app/page.jsx": "export default () => null;\n" });
     const res = await run(dir, ["init", GOOD_KEY]);
     assert.equal(res.code, 0, res.stderr + res.stdout);
@@ -593,7 +613,7 @@ test("init: sitecms-next sync i build (eller annat script) → ingen dubbel preb
 test("init i 0.2-projekt: CMS_SITE varnas för, init använder bara nyckel-routerna", async () => {
   reset();
   const dir = project({
-    "package.json": JSON.stringify({ name: "gammal", dependencies: { next: "15.0.0", "sitecms-next": "^0.4.0" } }, null, 2),
+    "package.json": JSON.stringify({ name: "gammal", dependencies: { next: "15.0.0", "sitecms-next": "^0.6.0" } }, null, 2),
     "app/page.jsx": "export default () => null;\n",
   });
   // CMS_API_URL i .env.local pekar på mockservern (som i ett riktigt 0.2-projekt).
@@ -621,7 +641,7 @@ test("init: revalidate-URL från sitecms maskas i sammanfattningen", async () =>
   reset();
   state.revalidateUrl = "https://api.vercel.com/v1/integrations/deploy/prj_x/hemlig";
   const dir = project({
-    "package.json": JSON.stringify({ name: "kund", dependencies: { next: "15.0.0", "sitecms-next": "^0.4.0" } }),
+    "package.json": JSON.stringify({ name: "kund", dependencies: { next: "15.0.0", "sitecms-next": "^0.6.0" } }),
     "app/page.jsx": "export default () => null;\n",
   });
   const res = await run(dir, ["init", GOOD_KEY]);

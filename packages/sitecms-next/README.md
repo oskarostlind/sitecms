@@ -345,6 +345,22 @@ Fält i `QuoteRequestInput`: `name` (2–100), `phone` (svenskt nummer), `email`
 `^[a-zA-Z0-9_.-]{1,50}$` → text max 500, max 20 st; tomma värden kastas).
 Finns även på klienten: `createSitecms(...).submitQuoteRequest()` m.fl.
 
+## Trafik
+
+Besökare och sidvisningar i panelen, utan cookies och utan tredjepartsskript.
+`npx sitecms-next init` skapar routen; komponenten läggs sist i `<body>`:
+
+```ts
+// app/api/sitecms/events/route.ts
+export { POST } from "sitecms-next/analytics";
+```
+
+```tsx
+// app/layout.tsx
+import { SitecmsAnalytics } from "sitecms-next/analytics";
+<SitecmsAnalytics />
+```
+
 ## Miljövariabler
 
 | Variabel | |

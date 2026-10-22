@@ -1,7 +1,7 @@
 {
   "name": "sitecms-next",
-  "version": "0.5.0",
-  "description": "Koppla en sajt till sitecms med en nyckel och ett kommando (npx sitecms-next init): typad klient, signerad revalidate-route, live-förhandsgranskning i panelen (draft mode, klicka-för-att-redigera), offertförfrågningar med bilagor och CLI för schema-sync. Inga beroenden.",
+  "version": "0.6.0",
+  "description": "Koppla en sajt till sitecms med en nyckel och ett kommando (npx sitecms-next init): typad klient, signerad revalidate-route, live-förhandsgranskning i panelen (draft mode, klicka-för-att-redigera), offertförfrågningar med bilagor, cookiefri trafikmätning och CLI för schema-sync. Inga beroenden.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -25,6 +25,16 @@
       "types": "./dist/preview-client.d.ts",
       "import": "./dist/preview-client.js",
       "default": "./dist/preview-client.js"
+    },
+    "./analytics": {
+      "types": "./dist/analytics.d.ts",
+      "import": "./dist/analytics.js",
+      "default": "./dist/analytics.js"
+    },
+    "./analytics-client": {
+      "types": "./dist/analytics-client.d.ts",
+      "import": "./dist/analytics-client.js",
+      "default": "./dist/analytics-client.js"
     },
     "./package.json": "./package.json"
   },
@@ -68,14 +78,16 @@
     "app-router",
     "preview",
     "live-preview",
-    "draft-mode"
+    "draft-mode",
+    "analytics",
+    "privacy-friendly"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run clean && npm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build && node --test test/webhook.test.mjs test/helpers.test.mjs test/cli.test.mjs test/preview.test.mjs test/quote.test.mjs"
+    "test": "npm run build && node --test test/webhook.test.mjs test/helpers.test.mjs test/cli.test.mjs test/preview.test.mjs test/quote.test.mjs test/analytics.test.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
