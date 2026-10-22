@@ -30,6 +30,7 @@ import {
   NPM_INSTALL,
   npmPackageJsonSnippet,
   npmPostsSnippet,
+  npmQuoteSnippet,
   npmRevalidateSnippet,
   npmSeoSnippet,
   NPM_SYNC,
@@ -42,6 +43,8 @@ import {
   PREVIEW_INSTALL,
   PREVIEW_ROUTE_PATH,
   previewEditableSnippet,
+  quoteAttachmentCurlSnippet,
+  quoteRequestCurlSnippet,
   previewLayoutSnippet,
   previewNextConfigSnippet,
   previewRouteSnippet,
@@ -177,6 +180,48 @@ const HEALTH_RESPONSE = `{
 
 const ERROR_RESPONSE = `{ "error": "Ogiltig API-nyckel." }`;
 
+const QUOTE_REQUEST_BODY = `{
+  "name": "Anna Andersson",
+  "company": null,
+  "phone": "070-123 45 67",
+  "email": "anna@example.se",
+  "jobType": "Takbyte",
+  "machine": null,
+  "location": "Luleå",
+  "desiredStart": "2026-11-15",
+  "description": "Byta tak på villa, ca 120 kvm. Befintligt tegeltak från 1978.",
+  "consent": true,
+  "customerType": "privat",
+  "budget": "100 000–200 000 kr",
+  "rot": true,
+  "postalCode": "972 31",
+  "source": "referrer=https://www.google.com/ sida=/offert utm_source=google",
+  "attachments": [
+    { "url": "https://….public.blob.vercel-storage.com/quotes/…/tomt.jpg", "name": "tomt.jpg", "contentType": "image/jpeg", "size": 182331 }
+  ],
+  "extra": { "takyta": "120 kvm", "antal-vaningar": "2" },
+  "ipHash": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+}`;
+
+const QUOTE_REQUEST_RESPONSE = `{ "id": "7c1a2f0e-…", "emailStatus": "sent" }`;
+
+const QUOTE_REQUEST_400 = `{
+  "error": "Valideringsfel.",
+  "fields": {
+    "phone": "Ange ett svenskt telefonnummer, t.ex. 070-123 45 67.",
+    "consent": "Du behöver godkänna att vi behandlar dina uppgifter."
+  }
+}`;
+
+const QUOTE_REQUEST_429 = `{ "error": "För många förfrågningar från samma adress. Försök igen om en stund eller ring oss." }`;
+
+const QUOTE_ATTACHMENT_RESPONSE = `{
+  "url": "https://….public.blob.vercel-storage.com/quotes/<siteId>/<uuid>-tomt-<suffix>.jpg",
+  "name": "tomt.jpg",
+  "contentType": "image/jpeg",
+  "size": 182331
+}`;
+
 const PREVIEW_VERIFY_RESPONSE = `{
   "ok": true,
   "expiresAt": "2026-10-21T16:42:00.000Z",
@@ -250,6 +295,7 @@ const TOC: { id: string; label: string; children?: { id: string; label: string }
       { id: "npm-webbhotell", label: "2. Variabeln hos webbhotellet" },
       { id: "npm-config", label: "3. sitecms.config.ts" },
       { id: "npm-anvand", label: "4. Använd innehållet" },
+      { id: "kod-quote", label: "Offertförfrågningar" },
       { id: "npm-manuellt", label: "Utan init" },
     ],
   },
@@ -278,6 +324,8 @@ const TOC: { id: string; label: string; children?: { id: string; label: string }
       { id: "api-schema-post", label: "POST schema" },
       { id: "api-health", label: "GET health" },
       { id: "api-preview", label: "GET preview" },
+      { id: "api-quote-requests", label: "POST quote-requests" },
+      { id: "api-quote-attachments", label: "POST quote-requests/attachments" },
       { id: "api-webhook", label: "Webhook och signatur" },
       { id: "api-verifiera", label: "verifyWebhook()" },
       { id: "api-fel", label: "Felkoder" },
@@ -767,6 +815,27 @@ export default function DocsPage() {
                   webhooken inte tömma cachen och ändringar syns först efter nästa deploy.
                 </p>
               </Prose>
+            </SubSection>
+
+            <SubSection id="kod-quote" title="Offertförfrågningar">
+              <Prose>
+                <p>
+                  Har sajten ett offertformulär? Skicka det till sitecms med <code>submitQuoteRequest()</code> (sitecms-next
+                  0.5+), så hamnar förfrågningarna under <strong>Förfrågningar</strong> i panelen och företaget får mejl
+                  med kvitto till kunden. Bilder och pdf:er laddas upp först med <code>uploadQuoteAttachment()</code> och
+                  skickas med som <code>attachments</code>. Anropen bär API-nyckeln och görs i en server action eller route
+                  handler — aldrig i webbläsaren (funktionerna kastar ett tydligt fel där). Sajten gör spamkontrollerna som
+                  kräver webbläsaren (honeypot, tidsfälla); sitecms validerar alla fält igen, rate-limitar per{" "}
+                  <code>ipHash</code> (<code>hashIp()</code>), sparar och mejlar. Fältfel kommer tillbaka på svenska i{" "}
+                  <code>SitecmsError.fields</code>.
+                </p>
+                <p>
+                  Fyll i <strong>E-post för förfrågningar</strong> under Inställningar för sajten i panelen — annars sparas
+                  förfrågan men inga mejl går ut (<code>emailStatus: &quot;skipped&quot;</code>). Alla fält och gränser:{" "}
+                  <DocLink href="#api-quote-requests">API-referensen</DocLink>.
+                </p>
+              </Prose>
+              <CodeBlock code={npmQuoteSnippet()} filename="app/offert/actions.ts" language="ts" />
             </SubSection>
 
             <SubSection id="npm-manuellt" title="Utan init">
@@ -1260,6 +1329,89 @@ export default function DocsPage() {
               <CodeBlock code={PREVIEW_INVALID_RESPONSE} filename="401 Unauthorized" language="json" maxHeight={null} />
             </Endpoint>
 
+            <Endpoint
+              id="api-quote-requests"
+              method="POST"
+              path={`${BASE}/quote-requests`}
+              title="Skicka en offertförfrågan"
+              description={
+                <>
+                  <p>
+                    Tar emot en förfrågan från sajtens formulär (server-till-server, <code>Content-Type: application/json</code>),
+                    validerar alla fält igen, sparar den under Förfrågningar i panelen och mejlar företaget (svar-till
+                    kunden) samt ett kvitto till kunden. Svaret är <code>201</code> även om mejlen misslyckas —{" "}
+                    <code>emailStatus</code> berättar hur det gick (<code>sent</code>, <code>failed</code> eller{" "}
+                    <code>skipped</code> när <strong>E-post för förfrågningar</strong> inte är ifylld under Inställningar).
+                    Bilagor laddas upp först via{" "}
+                    <DocLink href="#api-quote-attachments">quote-requests/attachments</DocLink>. Enklast med{" "}
+                    <DocLink href="#kod-quote">sitecms-next</DocLink>.
+                  </p>
+                  <p>
+                    <strong>Rate limit:</strong> 5 förfrågningar per timme och <code>ipHash</code> (per sajt) →{" "}
+                    <code>429</code>. Utan <code>ipHash</code> ingen rate limit — skicka den. <strong>Retention:</strong>{" "}
+                    förfrågningar och deras bilagor raderas automatiskt efter 12 månader (GDPR); kunden kan radera tidigare i
+                    panelen. IP-adressen lagras aldrig, bara sajtens saltade hash.
+                  </p>
+                </>
+              }
+            >
+              <DocTable
+                head={["Fält", "Typ", "Krav"]}
+                rows={[
+                  [<code key="name">name</code>, "string", "Krävs. 2–100 tecken."],
+                  [<code key="phone">phone</code>, "string", "Krävs. Svenskt telefonnummer (normaliseras till +46…)."],
+                  [<code key="email">email</code>, "string", "Krävs. Giltig e-postadress, max 200 tecken."],
+                  [<code key="jobType">jobType</code>, "string", "Krävs. Typ av uppdrag, max 100 tecken."],
+                  [<code key="description">description</code>, "string", "Krävs. 10–3000 tecken."],
+                  [<code key="consent">consent</code>, "boolean", "Krävs. Måste vara true (kunden har godkänt behandlingen)."],
+                  [<code key="company">company</code>, "string | null", "Valfri. Max 100 tecken."],
+                  [<code key="machine">machine</code>, "string | null", "Valfri. Max 100 tecken."],
+                  [<code key="location">location</code>, "string | null", "Valfri. Plats/ort, max 100 tecken."],
+                  [<code key="desiredStart">desiredStart</code>, "string | null", "Valfri. YYYY-MM-DD, inte bakåt i tiden."],
+                  [<code key="customerType">customerType</code>, <>&quot;privat&quot; | &quot;foretag&quot; | null</>, "Valfri."],
+                  [<code key="budget">budget</code>, "string | null", "Valfri. Fritext/intervall, max 100 tecken."],
+                  [<code key="rot">rot</code>, "boolean | null", "Valfri. Vill använda ROT-avdrag (även \"true\"/\"false\", \"ja\"/\"nej\")."],
+                  [<code key="postalCode">postalCode</code>, "string | null", "Valfri. Max 10 tecken."],
+                  [<code key="source">source</code>, "string | null", "Valfri. Leadkälla (utm/referrer-sträng), max 500 tecken."],
+                  [<code key="attachments">attachments</code>, <>{"{ url, name, contentType, size }"}[] | null</>, "Valfri. Max 10 st. url: https, max 2048 tecken (från upload-endpointen)."],
+                  [<code key="extra">extra</code>, <>{"Record<string, string>"} | null</>, <>Valfri. Egna fält: nyckel <code>^[a-zA-Z0-9_.-]{"{1,50}"}$</code>, värde max 500 tecken, tomma värden kastas, max 20 nycklar. Visas som tabell i panelen.</>],
+                  [<code key="ipHash">ipHash</code>, "string | null", "Valfri men rekommenderad. Hex 16–128 tecken, saltad SHA-256 av avsändarens IP (hashIp i sitecms-next). Används bara för rate limit."],
+                ]}
+              />
+              <CodeBlock code={quoteRequestCurlSnippet(ctx)} language="bash" maxHeight={null} />
+              <CodeBlock code={QUOTE_REQUEST_BODY} filename="forfragan.json" language="json" />
+              <CodeBlock code={QUOTE_REQUEST_RESPONSE} filename="201 Created" language="json" maxHeight={null} />
+              <CodeBlock code={QUOTE_REQUEST_400} filename="400 Bad Request" language="json" maxHeight={null} />
+              <CodeBlock code={QUOTE_REQUEST_429} filename="429 Too Many Requests" language="json" maxHeight={null} />
+            </Endpoint>
+
+            <Endpoint
+              id="api-quote-attachments"
+              method="POST"
+              path={`${BASE}/quote-requests/attachments`}
+              title="Ladda upp en bilaga"
+              description={
+                <>
+                  <p>
+                    <code>multipart/form-data</code> med fältet <code>file</code> (JPG, PNG, WEBP, HEIC eller PDF, max 10 MB —
+                    filtypen avgörs av innehållet, inte filändelsen) och valfritt <code>ipHash</code>. Filen lagras på en
+                    publik men ogissbar adress och svaret är exakt det objekt som skickas i <code>attachments</code> på
+                    förfrågan. Ladda upp bilagorna först, skicka sedan förfrågan — uppladdningar som inte bifogats någon
+                    förfrågan inom ett dygn raderas.
+                  </p>
+                  <p>
+                    <strong>Rate limit:</strong> 30 uppladdningar per timme och <code>ipHash</code> (per sajt); utan{" "}
+                    <code>ipHash</code> delar hela sajten en hink på 200/h. För stor fil → <code>413</code>, fel filtyp →{" "}
+                    <code>400</code>, för många → <code>429</code>. Bilagorna raderas tillsammans med förfrågan (manuellt
+                    eller efter 12 månader).
+                  </p>
+                </>
+              }
+            >
+              <CodeBlock code={quoteAttachmentCurlSnippet(ctx)} language="bash" maxHeight={null} />
+              <CodeBlock code={QUOTE_ATTACHMENT_RESPONSE} filename="201 Created" language="json" maxHeight={null} />
+            </Endpoint>
+
             <Card id="api-webhook" className="scroll-mt-28">
               <CardContent className="space-y-4">
                 <div className="space-y-2">
@@ -1358,11 +1510,12 @@ export default function DocsPage() {
               <DocTable
                 head={["Status", "Betyder", "Vanlig orsak"]}
                 rows={[
-                  [<code key="400">400</code>, "Ogiltig förfrågan", "Schemat följer inte formatet (fel slug/key, okänd typ, fler än 100 sidor eller 200 block per sida), eller body är inte giltig JSON. Se issues."],
+                  [<code key="400">400</code>, "Ogiltig förfrågan", <>Schemat följer inte formatet (fel slug/key, okänd typ, fler än 100 sidor eller 200 block per sida), eller body är inte giltig JSON. Se <code>issues</code>. För offertförfrågningar: fältfel i <code>fields</code> (fältnamn → svenskt meddelande), eller en bilaga med fel filtyp.</>],
                   [<code key="401">401</code>, "Nyckel saknas eller är fel", <>Headern <code>x-api-key</code> saknas eller nyckeln är borttagen (med slug-adresserna även: nyckeln hör till en annan sajt).</>],
                   [<code key="401p">401</code>, <><code>preview_invalid</code></>, <>Token i <code>x-sitecms-preview</code> är fel, har gått ut eller hör till en annan sajt. Kundsajten ska då visa vanligt innehåll.</>],
                   [<code key="404">404</code>, "Hittades inte", "Inlägget finns inte eller är inte publicerat (med slug-adresserna även: okänd sajt-slug)."],
-                  [<code key="413">413</code>, "För stort", "Request-bodyn är för stor för att tas emot. Kontrollera att schemat inte innehåller stora default-värden (t.ex. base64-bilder i stället för URL:er)."],
+                  [<code key="413">413</code>, "För stort", "Request-bodyn är för stor för att tas emot. Kontrollera att schemat inte innehåller stora default-värden (t.ex. base64-bilder i stället för URL:er). För bilagor: filen är större än 10 MB."],
+                  [<code key="429">429</code>, "För många anrop", <>Rate limit för offertförfrågningar (5/h per <code>ipHash</code>) eller bilagor (30/h per <code>ipHash</code>). Meddelandet i <code>error</code> är på svenska och kan visas för kunden.</>],
                 ]}
               />
               <CodeBlock code={ERROR_RESPONSE} filename="401 Unauthorized" language="json" maxHeight={null} />

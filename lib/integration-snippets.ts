@@ -928,3 +928,84 @@ const nextConfig: NextConfig = {
 
 export default nextConfig;`;
 }
+
+/** Offertförfrågningar med sitecms-next 0.5: server action med honeypot, tidsfälla, bilagor och fältfel. */
+export function npmQuoteSnippet(): string {
+  return `// app/offert/actions.ts
+"use server";
+
+import { headers } from "next/headers";
+import { SitecmsError, hashIp, submitQuoteRequest, uploadQuoteAttachment } from "sitecms-next";
+
+export type OffertResultat =
+  | { ok: true; id: string }
+  | { ok: false; fel: string; falt?: Record<string, string> };
+
+export async function skickaOffert(formData: FormData): Promise<OffertResultat> {
+  // 1. Honeypot: fältet är dolt för människor — ifyllt betyder bot. Låtsas lyckas.
+  if (formData.get("webbplats")) return { ok: true, id: "" };
+
+  // 2. Tidsfälla: formuläret renderades med started=Date.now(); under 3 s är en bot.
+  const started = Number(formData.get("started") ?? 0);
+  if (!started || Date.now() - started < 3_000) return { ok: true, id: "" };
+
+  // 3. ipHash: saltad hash av IP:n, så att sitecms kan rate-limita utan att se adressen.
+  const h = await headers();
+  const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "";
+  const ipHash = await hashIp(ip, process.env.CMS_IP_SALT!);
+
+  try {
+    // 4. Bilagor först (jpg/png/webp/heic/pdf, max 10 MB per fil, max 10 st) …
+    const filer = formData.getAll("bilder").filter((f): f is File => f instanceof File && f.size > 0);
+    const attachments = await Promise.all(filer.map((f) => uploadQuoteAttachment(f, f.name, { ipHash })));
+
+    // 5. … sedan själva förfrågan.
+    const { id } = await submitQuoteRequest({
+      name: String(formData.get("namn") ?? ""),
+      phone: String(formData.get("telefon") ?? ""),
+      email: String(formData.get("epost") ?? ""),
+      jobType: String(formData.get("typ") ?? ""),
+      description: String(formData.get("beskrivning") ?? ""),
+      consent: formData.get("samtycke") === "on",
+      customerType: (formData.get("kundtyp") as "privat" | "foretag" | null) || null,
+      budget: String(formData.get("budget") ?? "") || null,
+      rot: formData.get("rot") === "on",
+      postalCode: String(formData.get("postnummer") ?? "") || null,
+      desiredStart: String(formData.get("start") ?? "") || null,
+      source: String(formData.get("kalla") ?? "") || null, // referrer/utm från klienten
+      attachments,
+      extra: { takyta: String(formData.get("takyta") ?? "") }, // egna fält, visas som tabell i panelen
+      ipHash,
+    });
+    return { ok: true, id };
+  } catch (err) {
+    if (err instanceof SitecmsError && err.status === 400) {
+      // Fältfel på svenska: { phone: "Ange ett svenskt telefonnummer…", … } — mappa till formulärets namn.
+      const namn: Record<string, string> = { name: "namn", phone: "telefon", email: "epost", jobType: "typ", description: "beskrivning", consent: "samtycke", postalCode: "postnummer", customerType: "kundtyp", desiredStart: "start" };
+      const falt = Object.fromEntries(Object.entries(err.fields).map(([k, v]) => [namn[k] ?? k, v]));
+      return { ok: false, fel: "Kontrollera fälten nedan.", falt };
+    }
+    if (err instanceof SitecmsError && (err.status === 429 || err.status === 413)) {
+      return { ok: false, fel: err.message }; // serverns svenska meddelande
+    }
+    console.error("offert:", err);
+    return { ok: false, fel: "Något gick fel. Försök igen eller ring oss." };
+  }
+}`;
+}
+
+/** curl-exempel: ladda upp en bilaga till en offertförfrågan. */
+export function quoteAttachmentCurlSnippet({ apiUrl = DEFAULT_CMS_URL }: { apiUrl?: string } = {}): string {
+  return `curl -X POST ${trimUrl(apiUrl)}${SITE_API_PATH}/quote-requests/attachments \\
+  -H "x-api-key: $CMS_API_KEY" \\
+  -F "file=@tomt.jpg" \\
+  -F "ipHash=$IP_HASH"`;
+}
+
+/** curl-exempel: skicka en offertförfrågan. */
+export function quoteRequestCurlSnippet({ apiUrl = DEFAULT_CMS_URL }: { apiUrl?: string } = {}): string {
+  return `curl -X POST ${trimUrl(apiUrl)}${SITE_API_PATH}/quote-requests \\
+  -H "x-api-key: $CMS_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  --data @forfragan.json`;
+}
