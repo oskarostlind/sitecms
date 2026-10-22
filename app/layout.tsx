@@ -1,5 +1,6 @@
 import "@fontsource-variable/inter";
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import { SITE_LOCALE, SITE_NAME, SITE_URL } from "@/lib/seo";
 import "./globals.css";
 
@@ -28,6 +29,7 @@ export default function RootLayout({
     <html lang="sv">
       <body className="min-h-screen bg-neutral-50 font-sans text-neutral-900 antialiased">
         {children}
+        <Analytics />
       </body>
     </html>
   );
