@@ -373,9 +373,9 @@ function dependencies(pkg: JsonObject | null): Record<string, string> {
 function ownVersion(): string {
   try {
     const pkg = JSON.parse(readFileSync(resolve(dirname(CLI_FILE), "../package.json"), "utf8")) as { version?: string };
-    return pkg.version ?? "0.4.0";
+    return pkg.version ?? "0.5.0";
   } catch {
-    return "0.4.0";
+    return "0.5.0";
   }
 }
 

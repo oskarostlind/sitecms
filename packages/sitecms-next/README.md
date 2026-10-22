@@ -2,7 +2,8 @@
 
 Koppla en sajt till [sitecms](https://sitecms.se) med **en miljövariabel och
 ett kommando**: typad klient, signerad revalidate-route för Next.js App Router,
-live-förhandsgranskning i panelen och CLI för schema-sync. Inga beroenden.
+live-förhandsgranskning i panelen, offertförfrågningar med bilagor och CLI för
+schema-sync. Inga beroenden.
 
 ## Kom igång
 
@@ -250,6 +251,100 @@ understreck. `createSitecms({ previewToken })` styr varifrån preview-token
 läses (en funktion, eller `false` för att stänga av förhandsgranskning för en
 klient). Meddelandeprotokollet (postMessage, v1) beskrivs i sitecms-dokumentationen.
 
+## Offertförfrågningar
+
+Skicka sajtens offertformulär till sitecms så att förfrågningarna hamnar under
+**Förfrågningar** i panelen och företaget får mejl (kunden får ett kvitto).
+Anropen bär API-nyckeln och görs därför bara på serversidan — i en server
+action eller route handler; i webbläsaren kastar funktionerna ett tydligt fel.
+Sajten gör spamkontrollerna som kräver webbläsaren (honeypot, tidsfälla) innan
+den anropar sitecms, som validerar alla fält igen, rate-limitar per `ipHash`
+(5 förfrågningar/h), sparar och mejlar. Förfrågningar raderas efter 12 månader.
+
+Fyll i **E-post för förfrågningar** under Inställningar för sajten i panelen —
+annars sparas förfrågan men inga mejl går ut (`emailStatus: "skipped"`).
+
+```ts
+// app/offert/actions.ts
+"use server";
+
+import { headers } from "next/headers";
+import { SitecmsError, hashIp, submitQuoteRequest, uploadQuoteAttachment } from "sitecms-next";
+
+export type OffertResultat =
+  | { ok: true; id: string }
+  | { ok: false; fel: string; falt?: Record<string, string> };
+
+export async function skickaOffert(formData: FormData): Promise<OffertResultat> {
+  // 1. Honeypot: fältet är dolt för människor — ifyllt betyder bot. Låtsas lyckas.
+  if (formData.get("webbplats")) return { ok: true, id: "" };
+
+  // 2. Tidsfälla: formuläret renderades med `started=Date.now()`; under 3 s är en bot.
+  const started = Number(formData.get("started") ?? 0);
+  if (!started || Date.now() - started < 3_000) return { ok: true, id: "" };
+
+  // 3. ipHash: saltad hash av IP:n, så att sitecms kan rate-limita utan att se adressen.
+  const h = await headers();
+  const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "";
+  const ipHash = await hashIp(ip, process.env.CMS_IP_SALT!);
+
+  try {
+    // 4. Bilagor först (jpg/png/webp/heic/pdf, max 10 MB per fil, max 10 st) …
+    const filer = formData.getAll("bilder").filter((f): f is File => f instanceof File && f.size > 0);
+    const attachments = await Promise.all(filer.map((f) => uploadQuoteAttachment(f, f.name, { ipHash })));
+
+    // 5. … sedan själva förfrågan.
+    const { id } = await submitQuoteRequest({
+      name: String(formData.get("namn") ?? ""),
+      phone: String(formData.get("telefon") ?? ""),
+      email: String(formData.get("epost") ?? ""),
+      jobType: String(formData.get("typ") ?? ""),
+      description: String(formData.get("beskrivning") ?? ""),
+      consent: formData.get("samtycke") === "on",
+      customerType: (formData.get("kundtyp") as "privat" | "foretag" | null) || null,
+      budget: String(formData.get("budget") ?? "") || null,
+      rot: formData.get("rot") === "on",
+      postalCode: String(formData.get("postnummer") ?? "") || null,
+      desiredStart: String(formData.get("start") ?? "") || null,
+      source: String(formData.get("kalla") ?? "") || null, // referrer/utm från klienten
+      attachments,
+      extra: { takyta: String(formData.get("takyta") ?? "") }, // egna fält, visas som tabell
+      ipHash,
+    });
+    return { ok: true, id };
+  } catch (err) {
+    if (err instanceof SitecmsError && err.status === 400) {
+      // Fältfel på svenska: { phone: "Ange ett svenskt telefonnummer…", … }
+      // Mappa sitecms fältnamn till formulärets.
+      const namn: Record<string, string> = { name: "namn", phone: "telefon", email: "epost", jobType: "typ", description: "beskrivning", consent: "samtycke", postalCode: "postnummer", customerType: "kundtyp", desiredStart: "start" };
+      const falt = Object.fromEntries(Object.entries(err.fields).map(([k, v]) => [namn[k] ?? k, v]));
+      return { ok: false, fel: "Kontrollera fälten nedan.", falt };
+    }
+    if (err instanceof SitecmsError && (err.status === 429 || err.status === 413)) {
+      return { ok: false, fel: err.message }; // serverns svenska meddelande
+    }
+    console.error("offert:", err);
+    return { ok: false, fel: "Något gick fel. Försök igen eller ring oss." };
+  }
+}
+```
+
+| Export | |
+|---|---|
+| `submitQuoteRequest(input, { signal? })` | `POST …/quote-requests` → `{ id, emailStatus: "sent" \| "failed" \| "skipped" }` |
+| `uploadQuoteAttachment(file, name, { contentType?, ipHash?, signal? })` | `POST …/quote-requests/attachments` → `{ url, name, contentType, size }` |
+| `hashIp(ip, salt)` | SHA-256 hex av `salt:ip` (Web Crypto) för `ipHash` |
+| `SitecmsError` | `status` (400/413/429/…, `0` när sitecms inte nås) och `fields` (fältnamn → svenskt fel vid 400) |
+| Typer | `QuoteRequestInput`, `QuoteRequestResult`, `QuoteAttachment`, `QuoteCustomerType` |
+
+Fält i `QuoteRequestInput`: `name` (2–100), `phone` (svenskt nummer), `email`,
+`jobType`, `description` (10–3000) och `consent: true` krävs. Valfria:
+`company`, `machine`, `location`, `desiredStart` (YYYY-MM-DD), `customerType`
+(`"privat"` | `"foretag"`), `budget` (max 100), `rot`, `postalCode` (max 10),
+`source` (max 500), `attachments` (max 10) och `extra` (nyckel
+`^[a-zA-Z0-9_.-]{1,50}$` → text max 500, max 20 st; tomma värden kastas).
+Finns även på klienten: `createSitecms(...).submitQuoteRequest()` m.fl.
+
 ## Miljövariabler
 
 | Variabel | |
@@ -259,11 +354,22 @@ klient). Meddelandeprotokollet (postMessage, v1) beskrivs i sitecms-dokumentatio
 | `CMS_SITE` | Valfri. Satt → äldre slug-routes `/api/v1/sites/<slug>/…` (som 0.2.x). |
 | `CMS_REVALIDATE_SECRET` | Valfri. Äldre revalidate-hemlighet, godkänns fortfarande. |
 | `SITE_URL` / `CMS_SITE_URL` | Valfri. Sajtens adress, skickas vid sync (se ovan). |
+| `CMS_IP_SALT` | Valfri (ditt eget namn). Salt till `hashIp()` för offertförfrågningar — läses inte av paketet. |
+
+## Uppgradera från 0.4
+
+```bash
+npm install sitecms-next@^0.5.0
+```
+
+Inget behöver ändras — 0.5 lägger bara till [offertförfrågningar](#offertförfrågningar)
+(`submitQuoteRequest`, `uploadQuoteAttachment`, `hashIp`) och fältet `fields` på
+`SitecmsError`. Se [CHANGELOG.md](./CHANGELOG.md).
 
 ## Uppgradera från 0.3
 
 ```bash
-npm install sitecms-next@^0.4.0
+npm install sitecms-next@^0.5.0
 ```
 
 Inget behöver ändras — allt nytt i 0.4 är tillägg. Utan preview-routen och
