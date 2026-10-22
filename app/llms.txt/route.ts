@@ -129,7 +129,7 @@ ${code("tsx", previewLayoutSnippet())}
 
 ${code("tsx", previewEditableSnippet())}
 
-- \`editable(sida, nyckel)\` → \`{ "data-sitecms": "sida:nyckel" }\`. Samma sida (slug) och nyckel som i \`${SNIPPET_FILES.config}\`; båda matchar \`^[a-z0-9._-]+$\`. Attributet renderas alltid och är ofarligt i produktion.
+- \`editable(sida, nyckel)\` → \`{ "data-sitecms": "sida:nyckel" }\`. Samma sida (slug) och nyckel som i \`${SNIPPET_FILES.config}\`; båda matchar \`^[A-Za-z0-9._-]+$\`. Attributet renderas alltid och är ofarligt i produktion.
 - Sätt det på elementet som innehåller texten (direkta textbyten kräver att elementet saknar barnelement) eller på \`<img>\`/ett element runt bilden.
 - I draft mode hämtar \`getContent()\` automatiskt med headern \`x-sitecms-preview\` och utan cache. Vid fel visas vanligt innehåll — sajten går aldrig sönder.
 

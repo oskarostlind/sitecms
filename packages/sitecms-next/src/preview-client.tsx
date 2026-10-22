@@ -23,7 +23,7 @@ export type SitecmsPreviewClientProps = {
 
 type Field = { page: string; key: string };
 
-const PART = /^[a-z0-9._-]+$/;
+const PART = /^[A-Za-z0-9._-]+$/;
 const ATTR = "data-sitecms";
 const Z = "2147483646";
 const BRAND = "#2450d1";

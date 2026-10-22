@@ -252,7 +252,7 @@ export async function isPreview(): Promise<boolean> {
   return Boolean(await nextPreviewToken());
 }
 
-const EDITABLE_PART = /^[a-z0-9._-]+$/;
+const EDITABLE_PART = /^[A-Za-z0-9._-]+$/;
 
 /**
  * Markerar ett element som redigerbart i förhandsgranskningen:

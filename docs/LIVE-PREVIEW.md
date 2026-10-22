@@ -193,7 +193,7 @@ Sajt → panel (`source: "sitecms-preview"`, `v: 1`):
 | `refreshed` | `path` | när en refresh renderats klart |
 | `focus` | `page, key` | klick på markerat element |
 
-`page` och `key` matchar `^[a-z0-9._-]+$`; separator i attributet är `:`.
+`page` och `key` matchar `^[A-Za-z0-9._-]+$`; separator i attributet är `:`.
 
 ---
 

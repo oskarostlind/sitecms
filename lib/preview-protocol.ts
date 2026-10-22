@@ -25,7 +25,7 @@ export const PREVIEW_INVALID_CODE = "preview_invalid";
 export const PREVIEW_INVALID_ERROR = "Förhandsgranskningen har gått ut. Öppna den igen i sitecms.";
 
 /** `page` och `key` i data-sitecms="page:key" (§5). */
-export const PREVIEW_ID_PATTERN = /^[a-z0-9._-]+$/;
+export const PREVIEW_ID_PATTERN = /^[A-Za-z0-9._-]+$/;
 
 // ---------------------------------------------------------------------------
 // postMessage-protokoll v1 (§5)
