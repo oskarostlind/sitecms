@@ -24,6 +24,7 @@ const ACTION_LABELS: Record<string, string> = {
   "seo.create": "Lade till SEO-inställningar",
   "seo.update": "Uppdaterade SEO-inställningar",
   "seo.delete": "Tog bort SEO-inställningar",
+  "seo.score.run": "Räknade om SEO-poängen",
   "services.create": "Lade till en tjänst",
   "services.update": "Uppdaterade en tjänst",
   "services.delete": "Tog bort en tjänst",
