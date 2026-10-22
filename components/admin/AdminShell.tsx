@@ -52,7 +52,7 @@ const SITE_NAV: SiteNavItem[] = [
   { label: "Inlägg", segment: "posts", icon: Newspaper },
   { label: "Tjänster & priser", segment: "services", icon: BriefcaseBusiness },
   { label: "Förfrågningar", segment: "forfragningar", icon: Inbox },
-  { label: "SEO", segment: "seo", icon: Search },
+  { label: "SEO & Trafik", segment: "seo", icon: Search },
   { label: "Media", segment: "media", icon: ImageIcon },
   { label: "Aktivitet", segment: "aktivitet", icon: History },
   { label: "Medlemmar", segment: "medlemmar", icon: Users, ownerOnly: true },

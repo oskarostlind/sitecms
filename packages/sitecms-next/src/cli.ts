@@ -373,9 +373,9 @@ function dependencies(pkg: JsonObject | null): Record<string, string> {
 function ownVersion(): string {
   try {
     const pkg = JSON.parse(readFileSync(resolve(dirname(CLI_FILE), "../package.json"), "utf8")) as { version?: string };
-    return pkg.version ?? "0.5.0";
+    return pkg.version ?? "0.6.0";
   } catch {
-    return "0.5.0";
+    return "0.6.0";
   }
 }
 
@@ -616,8 +616,9 @@ async function init() {
   // 9. Paketet (behövs för revalidate-routen och configen)
   if (pkg) {
     const current = dependencies(pkg)["sitecms-next"];
-    // Före 0.4 saknas sitecms-next/preview (som preview-routen importerar).
-    const outdated = typeof current === "string" && /^[\^~>=v\s]*0\.[0-3](\.|$)/.test(current);
+    // Före 0.6 saknas sitecms-next/analytics (som events-routen importerar);
+    // före 0.4 saknas även sitecms-next/preview.
+    const outdated = typeof current === "string" && /^[\^~>=v\s]*0\.[0-5](\.|$)/.test(current);
     if (current && !outdated) {
       skipped.push(`sitecms-next i package.json (${current})`);
     } else if (flag("no-install")) {
@@ -635,7 +636,7 @@ async function init() {
     }
   }
 
-  // 10. Revalidate- och preview-route (bara Next.js App Router). Skrivs aldrig över.
+  // 10. Revalidate-, preview- och events-route (bara Next.js App Router). Skrivs aldrig över.
   if (isAppRouter) {
     const routes: { dir: string; lines: string[] }[] = [
       {
@@ -652,6 +653,14 @@ async function init() {
           "// Live-förhandsgranskning: panelen öppnar sajten i en iframe via den här routen",
           "// (verifierar token mot sitecms och slår på draft mode).",
           'export { GET } from "sitecms-next/preview";',
+        ],
+      },
+      {
+        dir: "api/sitecms/events",
+        lines: [
+          "// Trafik: <SitecmsAnalytics /> skickar sidvisningar hit; routen lägger till IP, user agent",
+          "// och land och skickar vidare till sitecms med CMS_API_KEY (inga cookies, inget lagras råt).",
+          'export { POST } from "sitecms-next/analytics";',
         ],
       },
     ];
@@ -774,6 +783,11 @@ function printPreviewSteps(appDir: string, useTs: boolean) {
   log(c.dim('       async headers() { return [{ source: "/:path*", headers: previewFrameHeaders() }]; }'));
   log("     och ta bort X-Frame-Options om sajten sätter den (CSP frame-ancestors ersätter den).");
   log(c.dim(`  Layouten och ${config} ändras inte automatiskt. Mer: ${DOCS_URL}`));
+  log("");
+  log(c.bold("Trafik") + c.dim(" (valfritt — besökare och sidvisningar i panelen, utan cookies):"));
+  log(`  I ${layout}, sist i <body>:`);
+  log(c.dim('       import { SitecmsAnalytics } from "sitecms-next/analytics";'));
+  log(c.dim("       <SitecmsAnalytics />"));
 }
 
 function help() {
@@ -781,7 +795,7 @@ function help() {
 
   sitecms-next init [nyckel] [--force] [--no-install]
       Kopplar projektet: verifierar API-nyckeln, sparar CMS_API_KEY i
-      .env.local, skapar revalidate- och preview-routen (Next.js App Router)
+      .env.local, skapar revalidate-, preview- och events-routen (Next.js App Router)
       och sitecms.config.ts, lägger till "prebuild": "sitecms-next sync" och
       synkar. Skriver ut stegen för live-förhandsgranskning (layouten ändras
       inte automatiskt).

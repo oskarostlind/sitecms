@@ -2,9 +2,23 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowRight, Building2, Globe, Plus } from "lucide-react";
 import { requireUser, getUserSites } from "@/lib/guard";
-import { Alert, Avatar, ButtonLink, Card, EmptyState, PageHeader } from "@/components/ui";
-import { formatDateTime, relativeTime } from "@/lib/format";
+import { Alert, Avatar, Badge, ButtonLink, Card, EmptyState, PageHeader } from "@/components/ui";
+import { formatDateTime, formatNumber, relativeTime } from "@/lib/format";
 import { displayDomain } from "@/lib/site-url";
+import { getVisitorSeriesForSites, type DayPoint } from "@/lib/traffic";
+import { getLatestScoresForSites } from "@/lib/seo-score";
+import { Sparkline } from "@/components/admin/Sparkline";
+import { scoreTone } from "@/components/admin/ScoreRing";
+
+/** Trafik och poäng får aldrig fälla listan (nya/tomma tabeller) → tom Map vid fel. */
+async function safeMap<K, V>(label: string, promise: Promise<Map<K, V>>): Promise<Map<K, V>> {
+  try {
+    return await promise;
+  } catch (err) {
+    console.error(`admin: ${label} misslyckades`, err);
+    return new Map();
+  }
+}
 
 export default async function AdminHomePage({
   searchParams,
@@ -22,6 +36,13 @@ export default async function AdminHomePage({
   }
 
   const sorted = [...sites].sort((a, b) => a.name.localeCompare(b.name, "sv"));
+  const siteIds = sorted.map((site) => site.id);
+
+  // En query för alla sajter per källa (docs/SEO-TRAFIK.md §8).
+  const [visitorSeries, scores] = await Promise.all([
+    safeMap<string, DayPoint[]>("getVisitorSeriesForSites", getVisitorSeriesForSites(siteIds, 7)),
+    safeMap<string, number>("getLatestScoresForSites", getLatestScoresForSites(siteIds)),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -63,6 +84,9 @@ export default async function AdminHomePage({
         <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {sorted.map((site) => {
             const domain = displayDomain(site.domain);
+            const series = visitorSeries.get(site.id) ?? [];
+            const visitors = series.reduce((sum, point) => sum + point.visitors, 0);
+            const score = scores.get(site.id);
             return (
               <li key={site.id} className="min-w-0">
                 <Link
@@ -84,7 +108,32 @@ export default async function AdminHomePage({
                         </p>
                       </div>
                     </div>
-                    <div className="mt-5 flex items-center justify-between gap-2 border-t border-neutral-100 pt-3 text-xs text-neutral-500">
+
+                    {/* Trafik + poäng */}
+                    <div className="mt-4 flex items-center gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm text-neutral-700">
+                          <span className="font-medium tabular-nums text-neutral-900">{formatNumber(visitors)}</span>{" "}
+                          besökare · 7 dagar
+                        </p>
+                        <Sparkline
+                          points={series.map((point) => point.visitors)}
+                          ariaLabel={`${site.name}: besökare per dag, senaste 7 dagarna`}
+                          className="mt-1 h-6 w-full max-w-40"
+                        />
+                      </div>
+                      {typeof score === "number" ? (
+                        <Badge tone={scoreTone(score)} dot title={`SEO-poäng ${score} av 100`}>
+                          SEO {score}
+                        </Badge>
+                      ) : (
+                        <Badge tone="neutral" title="Ingen SEO-poäng beräknad ännu">
+                          SEO –
+                        </Badge>
+                      )}
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-between gap-2 border-t border-neutral-100 pt-3 text-xs text-neutral-500">
                       <span title={formatDateTime(site.updatedAt)}>Uppdaterad {relativeTime(site.updatedAt)}</span>
                       <ArrowRight
                         aria-hidden

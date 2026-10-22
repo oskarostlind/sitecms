@@ -6,6 +6,8 @@ Skriv gärna in egna punkter här mellan körningarna — det är det enklaste s
 
 ## Att göra
 
+- [ ] Sätt `CRON_SECRET` och ev. `PAGESPEED_API_KEY` i Vercel (sitecms-projektet, Production). Utan `CRON_SECRET` svarar `/api/cron/daily` 503 och SEO-poängen räknas bara när kunden trycker "Räkna om"; utan `PAGESPEED_API_KEY` fungerar PageSpeed med låg kvot (kräver Oskar).
+- [ ] Lägg `<SitecmsAnalytics />` + events-route i JJ Bygg och Gällivare Traktor (sitecms-next ^0.6): kör `npx sitecms-next init` igen i respektive repo (skapar `app/api/sitecms/events/route.ts`) och lägg komponenten från `sitecms-next/analytics` sist i `<body>` i layouten. Se /docs#trafik.
 - [ ] Jjbygg: byt formulärets server action till sitecms-next 0.5 (`submitQuoteRequest` + `uploadQuoteAttachment`, se /docs#kod-quote). Kräver två ändringar i formuläret: telefon måste bli obligatoriskt (sitecms kräver svenskt nummer) och en samtyckesruta (`consent: true`) behöver läggas till. Mappa kalla→source, kundtyp→customerType, postnummer→postalCode, bilder→attachments. Fyll i "E-post för förfrågningar" på JJ Bygg under Inställningar.
 - [ ] Beslut (Oskar): bilagor större än 4,5 MB — Vercels funktioner tar emot högst 4,5 MB per anrop, så gränsen på 10 MB nås inte via upload-endpointen. Antingen acceptera 4,5 MB (dokumentera) eller låta sajten ladda upp direkt till Blob via klient-token (`handleUpload`).
 - [ ] scripts/preview-test.ts faller på rad 373 sedan b40ec72 (versaler tillåts nu i fältnycklar men testet förväntar null för page "Home") — uppdatera testet.

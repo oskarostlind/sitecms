@@ -1,5 +1,10 @@
 import {
   aiPromptSnippet,
+  ANALYTICS_FILES,
+  ANALYTICS_ROUTE_PATH,
+  ANALYTICS_STEPS,
+  analyticsLayoutSnippet,
+  analyticsRouteSnippet,
   DEFAULT_CMS_URL,
   DEPLOY_HOOK_HOSTS,
   DOCS_URL,
@@ -49,6 +54,7 @@ Viktigast för dig som AI-assistent:
 - Hämta innehållet i serverkomponenter med \`getContent()\` och hjälparna \`text()\`, \`image()\`, \`block()\`, \`seo()\`; inlägg med \`getPosts()\`/\`getPost()\`.
 - Hårdkoda inte innehåll som ska gå att redigera — deklarera det i \`${SNIPPET_FILES.config}\` med nuvarande text som \`default\`.
 - Den enda miljövariabeln är \`CMS_API_KEY\`. Den ska finnas i \`.env.local\` och hos webbhotellet.
+- Besöksstatistik finns inbyggd (sitecms-next 0.6): routen \`${ANALYTICS_FILES.route}\` + \`<SitecmsAnalytics />\` i layouten. Lägg inte till Google Analytics eller ett cookie-meddelande för det.
 
 ## Koppla en Next.js-sajt (App Router)
 
@@ -150,6 +156,26 @@ ${code("ts", previewNextConfigSnippet())}
 - Sajt → panel (\`source: "sitecms-preview"\`, \`v: 1\`): \`ready { path, title, fields }\`, \`refreshed { path }\`, \`focus { page, key }\`.
 - Sajten tar bara emot från \`panelOrigin\` och postar bara dit; panelen bara till och från iframens origin.
 
+## Trafik (sitecms-next 0.6+)
+
+Egen cookiefri mätning: besökare, sidvisningar, sidor, källor, länder och enheter visas i panelen under "SEO & Trafik". Inga cookies, ingen localStorage, inget tredjepartsskript och inget cookie-meddelande behövs. sitecms lagrar bara dagssummor — aldrig IP, user agent eller råevents. Unika besökare räknas med en dagsbunden hash (sha256 av salt, dag, sajt, IP och UA), så ingen kan följas mellan dagar. Robotar filtreras bort. Inga nya miljövariabler.
+
+${ANALYTICS_STEPS.map((s, i) => `${i + 1}. ${s}`).join("\n")}
+
+### ${ANALYTICS_FILES.route}
+
+${code("ts", analyticsRouteSnippet())}
+
+Routen tar emot \`{ p, r, q }\` från webbläsaren (max 2 kB), lägger till \`ua\`, \`ip\` (x-forwarded-for) och \`c\` (x-vercel-ip-country/cf-ipcountry) och skickar \`{ events: [{…}] }\` till \`POST ${SITE_API_PATH}/events\` med \`x-api-key\`. Svarar alltid 204 till webbläsaren, även utan CMS_API_KEY (då skickas inget vidare). Egna värden: \`createAnalyticsRoute({ apiKey?, apiUrl?, site?, fetch? })\`.
+
+### ${ANALYTICS_FILES.layout}
+
+${code("tsx", analyticsLayoutSnippet())}
+
+- \`<SitecmsAnalytics endpoint? />\` är en async serverkomponent: i förhandsgranskningen (draft mode) renderar den null, annars klienten som skickar en sidvisning vid mount och vid varje byte av pathname (inte query/hash) med \`sendBeacon\`, annars \`fetch keepalive\`.
+- Inget skickas från localhost/127.0.0.1, när \`navigator.webdriver\` är satt eller för samma pathname två gånger i rad. \`r\` = document.referrer (bara första visningen), \`q\` = querysträngen bara om den innehåller \`utm_\`.
+- Felsökning: nätverksfliken ska visa \`POST ${ANALYTICS_ROUTE_PATH}\` → 204 vid varje sidbyte. 404 = routen saknas; 204 men inget i panelen = CMS_API_KEY saknas hos webbhotellet eller hör till en annan sajt (serverloggen: "sitecms: trafikpixeln fick 401").
+
 ## Vanliga misstag
 
 - Hämta innehållet i en klientkomponent (\`"use client"\`) eller i webbläsaren: API-nyckeln exponeras. Hämta alltid på servern.
@@ -173,6 +199,7 @@ Bas-URL: \`${API}\`. Autentisering: headern \`x-api-key: <CMS_API_KEY>\` — nyc
 - \`x-sitecms-preview: <token>\` på \`GET ${SITE_API_PATH}/content\` → panelens osparade värden i \`value\`/\`alt\`/\`html\` och \`"preview": true\`; ogiltig/utgången token → 401 \`preview_invalid\`. Utan headern är svaret oförändrat.
 - \`POST ${SITE_API_PATH}/quote-requests\` → offertförfrågan från sajtens formulär (server-till-server, JSON). Body: \`{ "name", "phone" (svenskt nummer), "email", "jobType", "description" (10–3000), "consent": true, "company"?, "machine"?, "location"?, "desiredStart"? (YYYY-MM-DD), "customerType"?: "privat" | "foretag", "budget"? (max 100), "rot"?: boolean, "postalCode"? (max 10), "source"? (utm/referrer, max 500), "attachments"?: [{ "url" (https), "name", "contentType", "size" }] (max 10), "extra"?: { nyckel ^[a-zA-Z0-9_.-]{1,50}$: text max 500 } (max 20), "ipHash"? (hex 16–128, saltad sha256 av IP) }\`. Svar 201 \`{ "id", "emailStatus": "sent" | "failed" | "skipped" }\` (skipped = sajten saknar "E-post för förfrågningar" under Inställningar). 400 \`{ "error", "fields": { fält: svenskt meddelande } }\`, 429 vid fler än 5/h per ipHash. Raderas efter 12 månader.
 - \`POST ${SITE_API_PATH}/quote-requests/attachments\` → ladda upp en bilaga innan förfrågan: multipart/form-data med \`file\` (jpg/png/webp/heic/pdf, max 10 MB, typen avgörs av innehållet) och valfritt \`ipHash\`. Svar 201 \`{ "url", "name", "contentType", "size" }\` — skickas som det är i \`attachments\`. 413 för stor, 400 fel filtyp, 429 fler än 30/h per ipHash. Oanvända uppladdningar raderas efter ett dygn. sitecms-next 0.5: \`submitQuoteRequest()\`, \`uploadQuoteAttachment()\`, \`hashIp()\`.
+- \`POST ${SITE_API_PATH}/events\` → sidvisningar till trafikmätningen (server-till-server, JSON, max 4 kB). Body: \`{ "events": [{ "p" (sökväg, krävs, ≤ 2048), "r"? (referer), "q"? (querysträng, bara utm_source används), "ua"? (user agent — tom/robot ignoreras), "ip"? (annars anropets IP), "c"? (landskod), "t"? (ms, används inte) }] }\`, 1–20 events. Svar alltid 204 utan body (även när allt filtrerats bort). 400 ogiltig body, 401 nyckel, 413 över 4 kB, 429 fler än 600 events/min per sajt. Lagrar bara dagssummor per sökväg/källa/land/enhet plus unika besökare via dagsbunden hash — aldrig IP eller UA. sitecms-next 0.6: \`sitecms-next/analytics\` (\`POST\`, \`<SitecmsAnalytics />\`) gör anropet åt dig.
 - Fel: \`{ "error": "…" }\` med 400 (ogiltig förfrågan), 401 (nyckel saknas/ogiltig), 404 (hittades inte), 413 (för stor body/fil), 429 (rate limit).
 - Äldre slug-routes \`${LEGACY_SITE_API_PATH}/<slug>/…\` finns kvar med identiska svar.
 
@@ -200,12 +227,15 @@ ${aiPromptSnippet()}
 
 ## Länkar
 
-- [Utvecklardokumentation](${DOCS_URL}): snabbstart, sitecms-next, CLI, schema-format, API-referens, webhook och uppgradering från 0.2
+- [Utvecklardokumentation](${DOCS_URL}): snabbstart, sitecms-next, live-förhandsgranskning, trafik, SEO-poäng, CLI, schema-format, API-referens, webhook och uppgradering från 0.2
 - [Kom igång](${DOCS_URL}#kom-igang)
 - [API-referens](${DOCS_URL}#api)
 - [Webhook-signaturen](${DOCS_URL}#api-webhook)
 - [Deploy hooks](${DOCS_URL}#deploy-hooks)
 - [Live-förhandsgranskning](${DOCS_URL}#forhandsgranskning)
+- [Trafik — cookiefri mätning](${DOCS_URL}#trafik)
+- [SEO-poäng — så räknas den](${DOCS_URL}#seo-poang)
+- [POST events](${DOCS_URL}#api-events)
 - [Uppgradera från sitecms-next 0.2](${DOCS_URL}#uppgradera)
 - [npm: sitecms-next](https://www.npmjs.com/package/sitecms-next)
 `;

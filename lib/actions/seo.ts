@@ -4,9 +4,23 @@ import { and, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { db, seoMeta } from "@/lib/db";
-import { requireSiteAccess } from "@/lib/guard";
+import { requireSiteAccess, requireSiteOwner } from "@/lib/guard";
 import { triggerSiteRevalidation } from "@/lib/revalidate";
 import { logActivity } from "@/lib/audit";
+import { getTodaySeoScoreRow, runSeoScore } from "@/lib/seo-score";
+
+/** Minsta tid mellan två manuella omräkningar per sajt (docs/SEO-TRAFIK.md §6). */
+const SCORE_RUN_COOLDOWN_MS = 10 * 60 * 1000;
+
+/**
+ * Sajter med en omräkning som pågår just nu. Db-läsningen av dagens rad
+ * stoppar omräkningar efter att en körning sparats, men två klick inom samma
+ * sekund läser båda den gamla raden och skulle båda starta PageSpeed. Det här
+ * låset sätts synkront före första await i körningen och stoppar dubbelklick
+ * på samma serverinstans. Spärren är per instans – två olika Vercel-instanser
+ * kan fortfarande köra samtidigt, vilket bara kostar ett extra PSI-anrop.
+ */
+const scoreRunsInFlight = new Set<string>();
 
 function readString(formData: FormData, key: string): string {
   const value = formData.get(key);
@@ -98,4 +112,53 @@ export async function deleteSeoMeta(siteId: string, seoId: string): Promise<void
     });
   }
   redirect(`/admin/sites/${siteId}/seo`);
+}
+
+/**
+ * "Räkna om"-knappen på SEO & Trafik. Owner eller admin (admin räknas som
+ * owner i requireSiteOwner). Max en körning per 10 min och sajt: är dagens
+ * rad nyare än så körs inget och sidan laddas om med `?score=recent`.
+ * Annars körs runSeoScore (inkl. PageSpeed, upp till 60 s), loggas som
+ * `seo.score.run` och sidan laddas om med `?score=ok`. Ett fel i körningen
+ * ger `?score=failed` i stället för en felsida.
+ */
+export async function runSeoScoreNow(siteId: string): Promise<void> {
+  const user = await requireSiteOwner(siteId);
+  const target = `/admin/sites/${siteId}/seo`;
+
+  const today = await getTodaySeoScoreRow(siteId);
+  if (today && Date.now() - today.updatedAt.getTime() < SCORE_RUN_COOLDOWN_MS) {
+    redirect(`${target}?score=recent`);
+  }
+
+  // Kontroll + reservation utan await emellan, så två samtidiga anrop på
+  // samma instans inte båda passerar.
+  if (scoreRunsInFlight.has(siteId)) {
+    redirect(`${target}?score=recent`);
+  }
+  scoreRunsInFlight.add(siteId);
+
+  let status: "ok" | "failed" = "ok";
+  try {
+    const result = await runSeoScore(siteId);
+    await logActivity({
+      userId: user.id,
+      userEmail: user.email,
+      siteId,
+      action: "seo.score.run",
+      detail:
+        result.lighthouseScore === null
+          ? `Räknade om SEO-poängen: ${result.score} av 100 (innehåll ${result.contentScore}, ingen Google-mätning)`
+          : `Räknade om SEO-poängen: ${result.score} av 100 (innehåll ${result.contentScore}, Google ${result.lighthouseScore})`,
+    });
+  } catch (err) {
+    console.error(`runSeoScoreNow: misslyckades för sajt ${siteId}`, err);
+    status = "failed";
+  } finally {
+    scoreRunsInFlight.delete(siteId);
+  }
+
+  revalidatePath(target);
+  revalidatePath(`/admin/sites/${siteId}`);
+  redirect(`${target}?score=${status}`);
 }

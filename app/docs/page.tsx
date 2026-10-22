@@ -13,11 +13,18 @@ import { JsonLd } from "@/components/JsonLd";
 import { absoluteUrl, breadcrumbJsonLd, SITE_URL } from "@/lib/seo";
 import {
   aiPromptSnippet,
+  ANALYTICS_FILES,
+  ANALYTICS_INSTALL,
+  ANALYTICS_ROUTE_PATH,
+  analyticsLayoutSnippet,
+  analyticsRouteSnippet,
   clientSnippet,
   configSnippet,
   DEFAULT_CMS_URL,
   DEPLOY_HOOK_HOSTS,
   envSnippet,
+  eventsBodyExample,
+  eventsCurlSnippet,
   healthCurlSnippet,
   INIT_COMMAND,
   initCommand,
@@ -245,6 +252,22 @@ kunden skriver   ── text/bild direkt   ───►  byts i sidan
                  ── efter 400 ms       ───►  sidan renderas om
 klick på ett markerat element          ◄───  fältet fokuseras i panelen`;
 
+/** Trafikpixeln: webbläsare → kundsajtens route → sitecms. */
+const TRAFFIC_FLOW = `Besökarens webbläsare          Kundsajten                              sitecms
+──────────────────────         ──────────                              ───────
+<SitecmsAnalytics />
+  POST ${ANALYTICS_ROUTE_PATH}
+  { p, r, q }               ───►  + ip, ua, land från anropet
+                                  POST …/events, x-api-key    ───►   robotfilter, normalisering
+                                                                      visitor_hash = sha256(salt:dag:sajt:ip:ua)
+                                                                      dagsaggregat uppdateras
+                            ◄───  204                         ◄───   204
+IP och user agent lagras aldrig — bara sökväg, källa, land, enhet och antal.`;
+
+const EVENTS_400_RESPONSE = `{ "error": "Varje event måste ha fältet p (sökväg, sträng på högst 2048 tecken)." }`;
+
+const EVENTS_429_RESPONSE = `{ "error": "För många events för sajten just nu (max 600 per minut). Försök igen om en stund." }`;
+
 const WEBHOOK_HEADERS = `POST https://jjbygg.se${REVALIDATE_ROUTE_PATH}
 content-type: application/json
 user-agent: sitecms-webhook
@@ -308,6 +331,16 @@ const TOC: { id: string; label: string; children?: { id: string; label: string }
       { id: "forhandsgranskning-felsok", label: "Felsökning" },
     ],
   },
+  {
+    id: "trafik",
+    label: "Trafik",
+    children: [
+      { id: "trafik-matning", label: "Vad som mäts" },
+      { id: "trafik-steg", label: "Slå på den" },
+      { id: "trafik-felsok", label: "Felsökning" },
+    ],
+  },
+  { id: "seo-poang", label: "SEO-poäng" },
   { id: "ai", label: "Med en AI-assistent" },
   { id: "deploy-hooks", label: "Andra ramverk: deploy hooks" },
   { id: "cli", label: "CLI: sitecms-next" },
@@ -326,6 +359,7 @@ const TOC: { id: string; label: string; children?: { id: string; label: string }
       { id: "api-preview", label: "GET preview" },
       { id: "api-quote-requests", label: "POST quote-requests" },
       { id: "api-quote-attachments", label: "POST quote-requests/attachments" },
+      { id: "api-events", label: "POST events" },
       { id: "api-webhook", label: "Webhook och signatur" },
       { id: "api-verifiera", label: "verifyWebhook()" },
       { id: "api-fel", label: "Felkoder" },
@@ -361,7 +395,8 @@ const QUICKSTART = [
     body: (
       <>
         <code>{INIT_COMMAND} &lt;nyckel&gt;</code> i kundsajtens rotkatalog. Installerar paketet, sparar nyckeln i{" "}
-        <code>.env.local</code>, skapar revalidate-routen och <code>{SNIPPET_FILES.config}</code> och synkar fälten.
+        <code>.env.local</code>, skapar routerna (revalidate, förhandsgranskning, trafik) och{" "}
+        <code>{SNIPPET_FILES.config}</code> och synkar fälten.
       </>
     ),
   },
@@ -574,7 +609,7 @@ function Toc() {
   );
 }
 
-const DOCS_MODIFIED = "2026-10-22";
+const DOCS_MODIFIED = "2026-10-23";
 
 export default function DocsPage() {
   return (
@@ -741,7 +776,7 @@ export default function DocsPage() {
                   ))}
                 </ul>
                 <p>
-                  I ett projekt utan Next.js App Router hoppar init över revalidate-routen — använd då en{" "}
+                  I ett projekt utan Next.js App Router hoppar init över routerna — använd då en{" "}
                   <DocLink href="#deploy-hooks">deploy hook</DocLink>.
                 </p>
               </Prose>
@@ -1005,6 +1040,195 @@ export default function DocsPage() {
             </SubSection>
           </Section>
 
+          {/* Trafik */}
+          <Section
+            id="trafik"
+            eyebrow="sitecms-next 0.6"
+            title="Trafik"
+            intro={
+              <>
+                Besökare och sidvisningar visas i panelen under <strong>SEO &amp; Trafik</strong> och på översikten —
+                utan cookies, utan skript från tredje part och utan cookie-meddelande. Sajten skickar varje sidvisning
+                till sin egen route, som skickar vidare till sitecms med API-nyckeln. Nyckeln når aldrig webbläsaren.
+              </>
+            }
+          >
+            <CodeBlock code={TRAFFIC_FLOW} filename="Flödet" language="text" maxHeight={null} />
+
+            <SubSection id="trafik-matning" title="Vad som mäts — och vad som inte lagras">
+              <Prose>
+                <p>sitecms lagrar bara dagssummor per sajt. Per dag (UTC) räknas:</p>
+                <ul>
+                  <li>
+                    <strong>Sidvisningar</strong> och <strong>unika besökare</strong>. En besökare är en hash av dag,
+                    sajt, IP-adress och user agent med ett hemligt salt — hashen går inte att vända, och i morgon blir
+                    det en ny, så samma person kan inte följas mellan dagar.
+                  </li>
+                  <li>
+                    <strong>Sida</strong>: sökvägen utan query och hash, max 200 tecken. Fler än 500 olika sökvägar
+                    samma dag bokförs som <code>/…</code>.
+                  </li>
+                  <li>
+                    <strong>Källa</strong>: <code>direkt</code> (ingen referer eller egen domän), <code>utm:…</code>{" "}
+                    från <code>utm_source</code>, annars refererens värd klassad som t.ex. <code>google</code>,{" "}
+                    <code>linkedin</code>, <code>ai:chatgpt</code> eller <code>ref:example.com</code>.
+                  </li>
+                  <li>
+                    <strong>Land</strong>: tvåbokstavskod från webbhotellets geo-header (Vercel, Cloudflare), annars{" "}
+                    <code>ZZ</code>.
+                  </li>
+                  <li>
+                    <strong>Enhet</strong>: mobil, surfplatta eller dator, avläst från user agent.
+                  </li>
+                </ul>
+                <p>
+                  <strong>Lagras aldrig:</strong> IP-adress, user agent, tidsstämpel per besök eller några råevents.
+                  Inga cookies, ingen <code>localStorage</code>, inget fingerprinting utöver dagshashen. Robotar och
+                  verktyg (Googlebot, Lighthouse, curl …) filtreras bort, och fler än 100 visningar från samma besökare
+                  samma dag ignoreras. Det är därför inget cookie-meddelande behövs för mätningen.
+                </p>
+              </Prose>
+            </SubSection>
+
+            <SubSection id="trafik-steg" title="Slå på den — två rader">
+              <Prose>
+                <p>
+                  <strong>1. Paketet</strong> måste vara 0.6 eller senare. <code>{INIT_COMMAND}</code> uppgraderar och
+                  skapar routen i steg 2 om den saknas; befintliga filer skrivs inte över.
+                </p>
+              </Prose>
+              <CodeBlock code={ANALYTICS_INSTALL} language="bash" maxHeight={null} />
+              <Prose>
+                <p>
+                  <strong>2. Routen</strong> som tar emot sidvisningarna. Den lägger till IP, user agent och land från
+                  anropet och skickar vidare till sitecms med <code>CMS_API_KEY</code>. Den svarar alltid{" "}
+                  <code>204</code> till webbläsaren — även om sitecms inte svarar (en varning i serverloggen, högst en
+                  per process) och även utan nyckel (då skickas inget vidare).
+                </p>
+              </Prose>
+              <CodeBlock code={analyticsRouteSnippet()} filename={ANALYTICS_FILES.route} language="ts" maxHeight={null} />
+              <Prose>
+                <p>
+                  <strong>3. Komponenten</strong>, sist i <code>&lt;body&gt;</code>. Den skickar en sidvisning vid
+                  första laddningen och vid varje byte av sökväg (inte vid ändrad query eller hash), med{" "}
+                  <code>sendBeacon</code> så att sidan aldrig väntar på den.
+                </p>
+              </Prose>
+              <CodeBlock code={analyticsLayoutSnippet()} filename={ANALYTICS_FILES.layout} language="tsx" maxHeight={null} />
+              <Prose>
+                <p>
+                  Deploya. Inga nya miljövariabler behövs. <strong>Inget skickas</strong> i förhandsgranskningen (draft
+                  mode — komponenten renderar null, så panelens klick räknas aldrig), från <code>localhost</code> /{" "}
+                  <code>127.0.0.1</code>, från automatiserade webbläsare (<code>navigator.webdriver</code>) eller för
+                  samma sökväg två gånger i rad.
+                </p>
+                <p>
+                  Egen sökväg för routen: <code>&lt;SitecmsAnalytics endpoint=&quot;/api/stats&quot; /&gt;</code>. Egna
+                  värden i routen: <code>createAnalyticsRoute({`{ apiKey, apiUrl, site, fetch }`})</code> från{" "}
+                  <code>sitecms-next/analytics</code>.
+                </p>
+              </Prose>
+            </SubSection>
+
+            <SubSection id="trafik-felsok" title="Felsökning">
+              <DocTable
+                head={["Det du ser", "Kontrollera"]}
+                rows={[
+                  [
+                    "Ingen trafik ännu, trots besök",
+                    <>
+                      Öppna sajten och nätverksfliken i webbläsaren: en <code>POST {ANALYTICS_ROUTE_PATH}</code> ska
+                      svara <code>204</code> vid varje sidbyte. <code>404</code> → routen saknas (kör{" "}
+                      <code>{INIT_COMMAND}</code> igen eller skapa filen). Inget anrop alls →{" "}
+                      <code>&lt;SitecmsAnalytics /&gt;</code> saknas i layouten, eller du besöker sajten på localhost
+                      eller i förhandsgranskningen.
+                    </>,
+                  ],
+                  [
+                    "204 i nätverksfliken, men inget i panelen",
+                    <>
+                      <code>CMS_API_KEY</code> saknas hos webbhotellet (routen svarar 204 men skickar inget vidare),
+                      eller hör till en annan sajt. Serverloggen visar då <code>sitecms: trafikpixeln fick 401 …</code>.
+                      Kör <code>{NPM_CHECK}</code>.
+                    </>,
+                  ],
+                  [
+                    "Dina egna besök syns inte",
+                    "Avsiktligt på localhost och i förhandsgranskningen. Besök från produktionsadressen räknas, även dina egna.",
+                  ],
+                  [
+                    "Siffrorna ser låga ut",
+                    "Robotar räknas inte, och besökare är unika per dag — inte sessioner. Dagarna räknas i UTC, så besök efter midnatt svensk tid hamnar på föregående dag.",
+                  ],
+                ]}
+              />
+            </SubSection>
+          </Section>
+
+          {/* SEO-poäng */}
+          <Section
+            id="seo-poang"
+            eyebrow="Panelen"
+            title="SEO-poäng"
+            intro={
+              <>
+                Varje sajt får en poäng 0–100 under <strong>SEO &amp; Trafik</strong>, med en lista &quot;Att fixa&quot;
+                där varje rad länkar till rätt ställe i panelen. Poängen räknas om varje natt och när kunden trycker på{" "}
+                <strong>Räkna om</strong> (högst en gång per tio minuter).
+              </>
+            }
+          >
+            <Prose>
+              <p>
+                <strong>Så räknas den.</strong> Innehållspoängen väger 60 % och Googles PageSpeed-mätning 40 %. Saknar
+                sajten domän, eller svarar inte Google, blir poängen innehållspoängen rakt av — kortet visar då
+                &quot;Google-mätning körs varje natt&quot;.
+              </p>
+              <ul>
+                <li>
+                  <strong>Innehåll (60 %)</strong> — tolv regler på det som ligger i sitecms. Start 100, varje träff drar
+                  poäng med ett tak per regel, golv 0. Räknas direkt, utan nätverk.
+                </li>
+                <li>
+                  <strong>Google (40 %)</strong> — PageSpeed Insights för startsidan på mobil:{" "}
+                  <code>SEO × 0,5 + Prestanda × 0,3 + Tillgänglighet × 0,2</code>. Hämtas en gång per natt, timeout
+                  60 s.
+                </li>
+              </ul>
+            </Prose>
+            <DocTable
+              head={["Regel", "Drar", "Tak"]}
+              rows={[
+                ["Sida saknar SEO-titel", "6 / sida", "18"],
+                ["Sida saknar SEO-beskrivning", "6 / sida", "18"],
+                ["Sida saknar SEO-inställningar helt", "4 / sida", "12"],
+                ["Bild saknar alt-text", "2 / bild", "12"],
+                ["Sida har under 300 ord text", "3 / sida", "9"],
+                ["SEO-titel med fel längd (30–60 tecken)", "2 / sida", "8"],
+                ["SEO-beskrivning med fel längd (70–155 tecken)", "2 / sida", "8"],
+                ["Samma SEO-titel på flera sidor", "4 / dubblett", "8"],
+                ["Inget inlägg publicerat på 90 dagar", "5", "5"],
+                ["Startsidan saknar delningsbild (og-bild)", "4", "4"],
+                ["Omslagsbild på inlägg utan alt-text", "1 / inlägg", "4"],
+                ["Inga inlägg alls", "3", "3"],
+              ]}
+            />
+            <Prose>
+              <p>
+                <strong>Vad kunden kan påverka</strong> är hela innehållsdelen: fylla i titel och beskrivning per sida
+                med rätt längd, skriva alt-texter, ge tunna sidor mer text och publicera inlägg då och då. &quot;Att
+                fixa&quot; visar de fem fynd som drar mest, med en <strong>Åtgärda</strong>-knapp till rätt vy.
+                Google-delen styrs av hur sajten är byggd (laddtid, tillgänglighet, teknisk SEO) och är utvecklarens
+                ansvar — se Lighthouse-värdena på kortet.
+              </p>
+              <p>
+                Panelen behöver inga inställningar för detta. Kör du en egen installation av sitecms: nattjobbet är{" "}
+                <code>GET /api/cron/daily</code> (Vercel Cron 03:15 UTC) och kräver <code>CRON_SECRET</code>;{" "}
+                <code>PAGESPEED_API_KEY</code> är valfri och höjer Googles kvot.
+              </p>
+            </Prose>
+          </Section>
+
           {/* AI */}
           <Section
             id="ai"
@@ -1176,7 +1400,8 @@ export default function DocsPage() {
             intro={
               <>
                 Bas-URL: <code className="break-all font-mono text-sm">{BASE}</code>. Sajten avgörs av API-nyckeln. Alla
-                svar är JSON och cachas inte av sitecms (
+                svar är JSON (utom <code className="font-mono text-sm">events</code>, som svarar 204 utan body) och
+                cachas inte av sitecms (
                 <code className="break-words font-mono text-sm">Cache-Control: private, no-store</code>) — cacha på din
                 sida med <code className="font-mono text-sm">next.tags</code>.
               </>
@@ -1412,6 +1637,57 @@ export default function DocsPage() {
               <CodeBlock code={QUOTE_ATTACHMENT_RESPONSE} filename="201 Created" language="json" maxHeight={null} />
             </Endpoint>
 
+            <Endpoint
+              id="api-events"
+              method="POST"
+              path={`${BASE}/events`}
+              title="Registrera sidvisningar"
+              description={
+                <>
+                  <p>
+                    Tar emot sidvisningar från kundsajtens events-route (<code>sitecms-next/analytics</code>,
+                    server-till-server med <code>Content-Type: application/json</code>) och uppdaterar dagssummorna
+                    som visas under <DocLink href="#trafik">Trafik</DocLink>. Normalt anropar du inte den själv —
+                    routen i paketet gör det. Anropa den direkt om sajten inte är byggd i Next.js: skicka då med{" "}
+                    <code>ua</code> och <code>ip</code> från besökarens anrop, annars räknas alla besökare som en.
+                  </p>
+                  <p>
+                    Svaret är alltid <code>204</code> utan body när anropet är giltigt — även när alla events
+                    filtrerats bort som robotar. <code>ip</code> och <code>ua</code> används bara för att räkna unika
+                    besökare (dagsbunden hash) och lagras aldrig.
+                  </p>
+                </>
+              }
+            >
+              <DocTable
+                head={["Fält", "Typ", "Krav"]}
+                rows={[
+                  [<code key="events">events</code>, "objekt[]", "Krävs. 1–20 events. Hela bodyn max 4 kB."],
+                  [<code key="p">p</code>, "string", <>Krävs. Sökväg eller full URL, max 2048 tecken. Normaliseras till pathname utan query/hash, max 200 tecken.</>],
+                  [<code key="r">r</code>, "string", <>Valfri. Referer (<code>document.referrer</code>). Egen domän räknas som <code>direkt</code>.</>],
+                  [<code key="q">q</code>, "string", <>Valfri. Querysträng utan <code>?</code>; bara <code>utm_source</code> används (→ källan <code>utm:…</code>).</>],
+                  [<code key="ua">ua</code>, "string", "Valfri men viktig. Besökarens user agent — tom eller robotlik UA ignoreras tyst."],
+                  [<code key="ip">ip</code>, "string", <>Valfri. Besökarens IP (första i <code>x-forwarded-for</code>). Saknas den används anropets IP.</>],
+                  [<code key="c">c</code>, "string", <>Valfri. Landskod (ISO 3166-1 alpha-2), t.ex. från <code>x-vercel-ip-country</code>. Annars <code>ZZ</code>.</>],
+                  [<code key="t">t</code>, "number", "Valfri. Tidsstämpel i ms — tas emot men används inte; dagen är alltid serverns UTC-dag."],
+                ]}
+              />
+              <CodeBlock code={eventsBodyExample()} filename="Body" language="json" maxHeight={null} />
+              <CodeBlock code={eventsCurlSnippet(ctx)} language="bash" maxHeight={null} />
+              <CodeBlock code={`HTTP/1.1 204 No Content\nCache-Control: private, no-store`} filename="204 No Content" language="http" maxHeight={null} />
+              <CodeBlock code={EVENTS_400_RESPONSE} filename="400 Bad Request" language="json" maxHeight={null} />
+              <CodeBlock code={EVENTS_429_RESPONSE} filename="429 Too Many Requests" language="json" maxHeight={null} />
+              <Prose>
+                <p>
+                  <strong>Gränser:</strong> 600 events per minut och sajt → <code>429</code>. Body över 4 kB →{" "}
+                  <code>413</code>. Ogiltig JSON, fel typ på ett fält eller fler än 20 events → <code>400</code>. Fel
+                  nyckel → <code>401</code>. Högst 100 visningar per besökare och dag räknas; resten ignoreras tyst.
+                  Robotfiltret matchar user agents med <code>bot</code>, <code>crawl</code>, <code>spider</code>,{" "}
+                  <code>headless</code>, <code>lighthouse</code>, <code>curl</code>, <code>python</code> m.fl.
+                </p>
+              </Prose>
+            </Endpoint>
+
             <Card id="api-webhook" className="scroll-mt-28">
               <CardContent className="space-y-4">
                 <div className="space-y-2">
@@ -1510,12 +1786,12 @@ export default function DocsPage() {
               <DocTable
                 head={["Status", "Betyder", "Vanlig orsak"]}
                 rows={[
-                  [<code key="400">400</code>, "Ogiltig förfrågan", <>Schemat följer inte formatet (fel slug/key, okänd typ, fler än 100 sidor eller 200 block per sida), eller body är inte giltig JSON. Se <code>issues</code>. För offertförfrågningar: fältfel i <code>fields</code> (fältnamn → svenskt meddelande), eller en bilaga med fel filtyp.</>],
+                  [<code key="400">400</code>, "Ogiltig förfrågan", <>Schemat följer inte formatet (fel slug/key, okänd typ, fler än 100 sidor eller 200 block per sida), eller body är inte giltig JSON. Se <code>issues</code>. För offertförfrågningar: fältfel i <code>fields</code> (fältnamn → svenskt meddelande), eller en bilaga med fel filtyp. För events: <code>events</code> saknas, är tom eller har fler än 20 objekt, eller ett event saknar <code>p</code>.</>],
                   [<code key="401">401</code>, "Nyckel saknas eller är fel", <>Headern <code>x-api-key</code> saknas eller nyckeln är borttagen (med slug-adresserna även: nyckeln hör till en annan sajt).</>],
                   [<code key="401p">401</code>, <><code>preview_invalid</code></>, <>Token i <code>x-sitecms-preview</code> är fel, har gått ut eller hör till en annan sajt. Kundsajten ska då visa vanligt innehåll.</>],
                   [<code key="404">404</code>, "Hittades inte", "Inlägget finns inte eller är inte publicerat (med slug-adresserna även: okänd sajt-slug)."],
-                  [<code key="413">413</code>, "För stort", "Request-bodyn är för stor för att tas emot. Kontrollera att schemat inte innehåller stora default-värden (t.ex. base64-bilder i stället för URL:er). För bilagor: filen är större än 10 MB."],
-                  [<code key="429">429</code>, "För många anrop", <>Rate limit för offertförfrågningar (5/h per <code>ipHash</code>) eller bilagor (30/h per <code>ipHash</code>). Meddelandet i <code>error</code> är på svenska och kan visas för kunden.</>],
+                  [<code key="413">413</code>, "För stort", "Request-bodyn är för stor för att tas emot. Kontrollera att schemat inte innehåller stora default-värden (t.ex. base64-bilder i stället för URL:er). För bilagor: filen är större än 10 MB. För events: bodyn är över 4 kB."],
+                  [<code key="429">429</code>, "För många anrop", <>Rate limit för offertförfrågningar (5/h per <code>ipHash</code>), bilagor (30/h per <code>ipHash</code>) eller events (600/min per sajt). Meddelandet i <code>error</code> är på svenska och kan visas för kunden.</>],
                 ]}
               />
               <CodeBlock code={ERROR_RESPONSE} filename="401 Unauthorized" language="json" maxHeight={null} />

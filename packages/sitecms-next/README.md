@@ -2,8 +2,8 @@
 
 Koppla en sajt till [sitecms](https://sitecms.se) med **en miljövariabel och
 ett kommando**: typad klient, signerad revalidate-route för Next.js App Router,
-live-förhandsgranskning i panelen, offertförfrågningar med bilagor och CLI för
-schema-sync. Inga beroenden.
+live-förhandsgranskning i panelen, offertförfrågningar med bilagor, cookiefri
+trafikmätning och CLI för schema-sync. Inga beroenden.
 
 ## Kom igång
 
@@ -21,13 +21,15 @@ API-nyckeln från **Integration** för sajten i sitecms-panelen (eller kör
 - skapar revalidate-routen `app/api/sitecms/revalidate/route.ts` (eller under `src/app`),
 - skapar preview-routen `app/api/sitecms/preview/route.ts` och skriver ut resten av
   stegen för [live-förhandsgranskning](#live-förhandsgranskning) (layouten ändras inte),
+- skapar events-routen `app/api/sitecms/events/route.ts` för [trafik](#trafik) och
+  skriver ut raden för layouten,
 - skapar `sitecms.config.ts` — från strukturen som redan finns i sitecms, annars ett kort exempel,
 - lägger till `"prebuild": "sitecms-next sync"` i `package.json` (om inget script
   redan kör `sitecms-next sync`, t.ex. `build`) och synkar direkt.
 
 Det går att köra flera gånger. Exakt vad som rörs:
 
-- **Skrivs aldrig över:** revalidate- och preview-routen och `sitecms.config.*` —
+- **Skrivs aldrig över:** revalidate-, preview- och events-routen och `sitecms.config.*` —
   finns de redan hoppas steget över. `app/layout.tsx` och `next.config.*` rörs aldrig.
 - **Kompletteras:** `.env.local` (raden `CMS_API_KEY=…` läggs till),
   `.gitignore` (raden `.env.local` läggs till om den inte redan täcks) och
@@ -345,6 +347,80 @@ Fält i `QuoteRequestInput`: `name` (2–100), `phone` (svenskt nummer), `email`
 `^[a-zA-Z0-9_.-]{1,50}$` → text max 500, max 20 st; tomma värden kastas).
 Finns även på klienten: `createSitecms(...).submitQuoteRequest()` m.fl.
 
+## Trafik
+
+Besökare, sidvisningar, sidor, källor, länder och enheter visas i panelen under
+**SEO & Trafik** — utan cookies, utan skript från tredje part och utan
+cookie-meddelande. Kräver Next.js App Router och sitecms-next 0.6+. Två rader:
+
+**1. Routen** (skapas av `npx sitecms-next init`):
+
+```ts
+// app/api/sitecms/events/route.ts
+export { POST } from "sitecms-next/analytics";
+```
+
+**2. Komponenten**, sist i `<body>` i `app/layout.tsx`:
+
+```tsx
+import { SitecmsAnalytics } from "sitecms-next/analytics";
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="sv">
+      <body>
+        {children}
+        <SitecmsAnalytics />
+      </body>
+    </html>
+  );
+}
+```
+
+Deploya. Inga nya miljövariabler — routen använder samma `CMS_API_KEY`.
+
+Så fungerar det: komponenten skickar `{ p, r, q }` (sökväg, referer, utm-query)
+till sajtens egen route vid första laddningen och vid varje byte av pathname
+(inte vid ändrad query eller hash), med `navigator.sendBeacon` och annars
+`fetch` med `keepalive`. Routen lägger till IP (`x-forwarded-for`/`x-real-ip`),
+user agent och land (`x-vercel-ip-country`/`cf-ipcountry`) från anropet och
+skickar vidare till `POST …/events` med API-nyckeln — nyckeln når aldrig
+webbläsaren. Routen svarar **alltid 204** till webbläsaren, även om sitecms
+svarar fel (en `console.warn`, högst en per process) och även utan
+`CMS_API_KEY` (då skickas inget vidare).
+
+**Vad som mäts:** sidvisningar och unika besökare per dag (UTC), fördelade på
+sida, källa (`direkt`, `utm:<utm_source>`, `google`, `linkedin`,
+`ai:chatgpt`, `ref:<domän>` …), land och enhet (mobil/surfplatta/dator).
+
+**Vad som inte lagras:** IP, user agent, tidsstämplar eller råevents. Unika
+besökare räknas med `sha256(salt:dag:sajt:ip:ua)` — hashen byts varje dag, så
+ingen kan följas över tid. Robotar (Googlebot, Lighthouse, curl …) filtreras
+bort. Inga cookies, ingen `localStorage`.
+
+**Inget skickas** i förhandsgranskningen (draft mode — `<SitecmsAnalytics />`
+renderar null, så panelens klick aldrig räknas), från `localhost`/`127.0.0.1`,
+när `navigator.webdriver` är satt, eller för samma pathname två gånger i rad.
+
+| Export | |
+|---|---|
+| `POST` / `createAnalyticsRoute({ apiKey?, apiUrl?, site?, fetch? })` | Events-routen (läser `CMS_API_KEY`, `CMS_API_URL`, `CMS_SITE` som klienten; `fetch` för tester) |
+| `<SitecmsAnalytics endpoint? />` | Async serverkomponent för layouten; `endpoint` default `/api/sitecms/events` |
+| `ANALYTICS_ROUTE_PATH` | `"/api/sitecms/events"` |
+| `isPreview()` | Samma som i `sitecms-next/preview` |
+| `shouldTrack(pathname, prev, hostname, webdriver)`, `utmQuery(search)` | Rena hjälpfunktioner från `sitecms-next/analytics-client` (testbara utan DOM) |
+
+`sitecms-next/analytics-client` (`"use client"`) exporterar `SitecmsAnalyticsClient`
+direkt, men använd `<SitecmsAnalytics />` så att inget skickas i förhandsgranskningen.
+
+Felsökning — syns ingen trafik i panelen: öppna sajten med nätverksfliken
+öppen. `POST /api/sitecms/events` ska svara `204` vid varje sidbyte. `404` →
+routen saknas (kör `npx sitecms-next init` igen). Inget anrop → komponenten
+saknas i layouten, eller du är på localhost/i förhandsgranskningen. `204` men
+inget i panelen → `CMS_API_KEY` saknas hos webbhotellet eller hör till en annan
+sajt (serverloggen visar `sitecms: trafikpixeln fick 401 …`; kör
+`npx sitecms-next check`).
+
 ## Miljövariabler
 
 | Variabel | |
@@ -355,6 +431,18 @@ Finns även på klienten: `createSitecms(...).submitQuoteRequest()` m.fl.
 | `CMS_REVALIDATE_SECRET` | Valfri. Äldre revalidate-hemlighet, godkänns fortfarande. |
 | `SITE_URL` / `CMS_SITE_URL` | Valfri. Sajtens adress, skickas vid sync (se ovan). |
 | `CMS_IP_SALT` | Valfri (ditt eget namn). Salt till `hashIp()` för offertförfrågningar — läses inte av paketet. |
+
+## Uppgradera från 0.5
+
+```bash
+npm install sitecms-next@^0.6.0
+```
+
+Inget behöver ändras — 0.6 lägger bara till [trafik](#trafik)
+(`sitecms-next/analytics`). Utan events-routen och `<SitecmsAnalytics />`
+fungerar sajten exakt som förut. Vill du ha trafiken i panelen: kör
+`npx sitecms-next init` igen (skapar routen) och lägg komponenten i layouten.
+Se [CHANGELOG.md](./CHANGELOG.md).
 
 ## Uppgradera från 0.4
 
@@ -464,7 +552,7 @@ klockfel är `error` "Signaturen stämmer, men tidsstämpeln ligger utanför ±5
 
 | Kommando | Gör |
 |---|---|
-| `sitecms-next init [nyckel] [--force] [--no-install]` | Kopplar projektet (se ovan), inkl. preview-routen |
+| `sitecms-next init [nyckel] [--force] [--no-install]` | Kopplar projektet (se ovan), inkl. preview- och events-routen |
 | `sitecms-next sync [--prune] [--strict] [--config <fil>]` | Synkar configen till sitecms |
 | `sitecms-next check` | Verifierar nyckeln och visar webhook-status |
 | `sitecms-next pull` | Skriver ut strukturen i sitecms som JSON |

@@ -7,6 +7,7 @@ import {
   ExternalLink,
   FilePenLine,
   FileText,
+  Gauge,
   Image as ImageIcon,
   Info,
   ImageOff,
@@ -15,14 +16,19 @@ import {
   Plus,
   Search,
   BriefcaseBusiness,
+  TrendingUp,
   type LucideIcon,
 } from "lucide-react";
 import { db } from "@/lib/db";
 import { auditLogs, blocks, media, pages, posts, seoMeta, services, sites, users } from "@/lib/db/schema";
 import { requireSiteAccessWithRole } from "@/lib/guard";
 import { describeActivity } from "@/lib/audit-labels";
-import { formatDateTime, relativeTime } from "@/lib/format";
+import { formatDateTime, formatNumber, relativeTime } from "@/lib/format";
 import { displayDomain, siteUrl } from "@/lib/site-url";
+import { getTrafficSummary, type TrafficSummary } from "@/lib/traffic";
+import { getLatestSeoScore, type SeoScore } from "@/lib/seo-score";
+import { Sparkline } from "@/components/admin/Sparkline";
+import { scoreTextClass } from "@/components/admin/ScoreRing";
 import {
   Alert,
   Avatar,
@@ -40,6 +46,19 @@ const RECENT_ACTIVITY = 5;
 
 const countSql = sql<number>`count(*)::int`;
 
+/** Finding måste dra minst så många poäng för att hamna i "Förslag". */
+const MIN_FINDING_POINTS = 4;
+
+/** Trafik och poäng får aldrig fälla översikten (nya/tomma tabeller) → null vid fel. */
+async function safe<T>(label: string, promise: Promise<T>): Promise<T | null> {
+  try {
+    return await promise;
+  } catch (err) {
+    console.error(`sites/[siteId]: ${label} misslyckades`, err);
+    return null;
+  }
+}
+
 export default async function SiteOverviewPage({ params }: { params: Promise<{ siteId: string }> }) {
   const { siteId } = await params;
   const { isOwner } = await requireSiteAccessWithRole(siteId);
@@ -55,6 +74,8 @@ export default async function SiteOverviewPage({ params }: { params: Promise<{ s
     [seoMissingRow],
     [lastBlockUpdateRow],
     recentActivity,
+    traffic,
+    seoScore,
   ] = await Promise.all([
     db.select().from(sites).where(eq(sites.id, siteId)).limit(1),
     db.select({ count: countSql }).from(pages).where(eq(pages.siteId, siteId)),
@@ -108,6 +129,8 @@ export default async function SiteOverviewPage({ params }: { params: Promise<{ s
       .where(eq(auditLogs.siteId, siteId))
       .orderBy(desc(auditLogs.createdAt))
       .limit(RECENT_ACTIVITY),
+    safe<TrafficSummary>("getTrafficSummary", getTrafficSummary(siteId, 7)),
+    safe<SeoScore | null>("getLatestSeoScore", getLatestSeoScore(siteId)),
   ]);
 
   if (!site) notFound();
@@ -151,7 +174,18 @@ export default async function SiteOverviewPage({ params }: { params: Promise<{ s
 
   const editStartHref = firstPage ? `${base}/pages/${firstPage.id}` : `${base}/pages`;
 
-  const stats: { label: string; value: number; hint?: string; href: string; icon: LucideIcon }[] = [
+  const visitorSeries = traffic?.series.map((p) => p.visitors) ?? [];
+  const visitors7 = traffic?.visitors ?? 0;
+  const score = seoScore?.score ?? null;
+
+  const stats: {
+    label: string;
+    value: React.ReactNode;
+    hint?: React.ReactNode;
+    href: string;
+    icon: LucideIcon;
+    extra?: React.ReactNode;
+  }[] = [
     { label: "Sidor", value: pagesCount, href: `${base}/pages`, icon: FileText },
     {
       label: "Inlägg",
@@ -162,10 +196,47 @@ export default async function SiteOverviewPage({ params }: { params: Promise<{ s
     },
     { label: "Tjänster", value: servicesCount, href: `${base}/services`, icon: BriefcaseBusiness },
     { label: "Media", value: mediaCount, href: `${base}/media`, icon: ImageIcon },
+    {
+      label: "Besökare 7 dagar",
+      value: traffic?.hasData ? formatNumber(visitors7) : <span className="text-neutral-400">–</span>,
+      hint: traffic?.hasData ? undefined : "Mätning inte igång",
+      href: `${base}/seo`,
+      icon: TrendingUp,
+      extra: traffic?.hasData ? (
+        <Sparkline points={visitorSeries} ariaLabel="Besökare per dag, senaste 7 dagarna" className="mt-2 h-8 w-full" />
+      ) : null,
+    },
+    {
+      label: "SEO-poäng",
+      value:
+        score === null ? (
+          <span className="text-neutral-400">–</span>
+        ) : (
+          <span className={scoreTextClass(score)}>
+            {score}
+            <span className="text-base font-normal text-neutral-400"> / 100</span>
+          </span>
+        ),
+      hint: score === null ? "Beräknas i natt" : undefined,
+      href: `${base}/seo`,
+      icon: Gauge,
+    },
   ];
 
   const todos: { key: string; icon: LucideIcon; text: string; href: string }[] = [];
-  if (missingAltCount > 0) {
+  // Högsta SEO-fyndet först, om det väger tillräckligt.
+  const topFinding = seoScore?.findings
+    .filter((f) => f.points >= MIN_FINDING_POINTS)
+    .sort((a, b) => b.points - a.points)[0];
+  if (topFinding) {
+    todos.push({
+      key: `finding:${topFinding.id}`,
+      icon: Gauge,
+      text: topFinding.title,
+      href: topFinding.href ? `${base}${topFinding.href}` : `${base}/seo`,
+    });
+  }
+  if (missingAltCount > 0 && !topFinding?.id.startsWith("images.alt")) {
     todos.push({
       key: "alt",
       icon: ImageOff,
@@ -177,7 +248,7 @@ export default async function SiteOverviewPage({ params }: { params: Promise<{ s
       href: missingAltRows.length === 1 ? `${base}/pages/${missingAltRows[0].pageId}` : `${base}/pages`,
     });
   }
-  if (seoMissingCount > 0) {
+  if (seoMissingCount > 0 && topFinding?.id !== "seo.description.missing") {
     todos.push({
       key: "seo",
       icon: Search,
@@ -201,7 +272,7 @@ export default async function SiteOverviewPage({ params }: { params: Promise<{ s
     { label: "Redigera sidor", description: "Ändra texter och bilder på hemsidan.", href: `${base}/pages`, icon: FileText },
     { label: "Skriv ett inlägg", description: "Berätta om ett nytt projekt eller en nyhet.", href: `${base}/posts/new`, icon: PenLine },
     { label: "Tjänster & priser", description: "Uppdatera vad du erbjuder och vad det kostar.", href: `${base}/services`, icon: BriefcaseBusiness },
-    { label: "SEO-inställningar", description: "Hur sidorna visas i Google.", href: `${base}/seo`, icon: Search },
+    { label: "SEO & Trafik", description: "Poäng, besökare och hur sidorna visas i Google.", href: `${base}/seo`, icon: Search },
     { label: "Mediabibliotek", description: "Ladda upp och hantera bilder och filer.", href: `${base}/media`, icon: ImageIcon },
   ];
 
@@ -257,7 +328,7 @@ export default async function SiteOverviewPage({ params }: { params: Promise<{ s
       ) : null}
 
       {/* Statistik */}
-      <ul className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      <ul className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
@@ -266,7 +337,7 @@ export default async function SiteOverviewPage({ params }: { params: Promise<{ s
                 href={stat.href}
                 className="group block h-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50 focus-visible:ring-offset-2"
               >
-                <Card interactive className="h-full p-4 sm:p-5">
+                <Card interactive className="flex h-full flex-col p-4 sm:p-5">
                   <div className="flex items-start justify-between gap-2">
                     <span
                       aria-hidden
@@ -282,6 +353,7 @@ export default async function SiteOverviewPage({ params }: { params: Promise<{ s
                   <p className="mt-3 text-2xl font-semibold text-neutral-900 tabular-nums">{stat.value}</p>
                   <p className="text-sm text-neutral-500">{stat.label}</p>
                   {stat.hint ? <p className="mt-1 text-xs text-neutral-500">{stat.hint}</p> : null}
+                  {stat.extra ? <div className="mt-auto">{stat.extra}</div> : null}
                 </Card>
               </Link>
             </li>

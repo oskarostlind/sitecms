@@ -1,5 +1,29 @@
 # Ändringar i sitecms-next
 
+## 0.6.0
+
+Trafik: egen cookiefri pixel som visar besökare, sidvisningar, sidor, källor,
+länder och enheter i panelen under "SEO & Trafik". Allt är additivt — sajter
+som inte lägger till routen och komponenten fungerar exakt som med 0.5.
+
+- Ny subpath `sitecms-next/analytics`: `POST` (route för
+  `app/api/sitecms/events/route.ts`), `createAnalyticsRoute(options?)`,
+  `<SitecmsAnalytics />` (async serverkomponent för layouten, renderar null i
+  förhandsgranskningen) och `ANALYTICS_ROUTE_PATH`.
+- Ny subpath `sitecms-next/analytics-client` (`"use client"`): klienten som
+  skickar `{ p, r, q }` vid mount och vid byte av pathname (`sendBeacon`,
+  annars `fetch keepalive`), plus de rena hjälpfunktionerna `shouldTrack()` och
+  `utmQuery()`. Skippar `localhost`, `navigator.webdriver` och dubbletter.
+- Routen fyller på `ua`, `ip` (x-forwarded-for/x-real-ip) och `c`
+  (x-vercel-ip-country/cf-ipcountry) och skickar vidare till `…/events` med
+  `x-api-key`. Svarar alltid 204 till webbläsaren; utan `CMS_API_KEY` skickas
+  inget vidare. sitecms lagrar bara dagsaggregat — aldrig IP, user agent
+  eller råevents, inga cookies.
+- `sitecms-next init` skapar även `app/api/sitecms/events/route.ts` (om den
+  saknas) och skriver ut raden för layouten. Projekt med sitecms-next 0.5
+  eller äldre uppgraderas till ^0.6.
+- Fortfarande noll runtime-beroenden.
+
 ## 0.5.0
 
 Offertförfrågningar: sajtens formulär skickas till sitecms (panelen under

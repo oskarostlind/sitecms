@@ -93,6 +93,24 @@ export function relativeTime(value: DateInput, now: Date = new Date()): string {
   return formatDate(date);
 }
 
+const numberFormatter = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 0 });
+
+/** 12345 → "12 345" (sv-SE, mellanslag som tusentalsavgränsare). Ogiltigt → "0". */
+export function formatNumber(value: number | null | undefined): string {
+  return Number.isFinite(value) ? numberFormatter.format(value as number) : "0";
+}
+
+/**
+ * Förändring mot föregående period: "+12 %", "−3 %", "±0 %". Returnerar null
+ * när föregående värde är 0 (ingen jämförelse möjlig – visa "–" i gränssnittet).
+ */
+export function formatPercentChange(current: number, previous: number): string | null {
+  if (!Number.isFinite(current) || !Number.isFinite(previous) || previous <= 0) return null;
+  const change = Math.round(((current - previous) / previous) * 100);
+  if (change === 0) return "±0 %";
+  return change > 0 ? `+${change} %` : `−${Math.abs(change)} %`;
+}
+
 /** "Anna-Karin Svensson" → "AS", "info@firma.se" → "IN", "" → "?" */
 export function initials(name: string | null | undefined): string {
   const cleaned = (name ?? "").trim();
