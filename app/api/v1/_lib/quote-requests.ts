@@ -4,6 +4,7 @@ import { db, quoteRequests, sites } from "@/lib/db";
 import type { ApiSite } from "@/app/api/v1/_lib/auth";
 import { validateQuote } from "@/lib/quote-validation";
 import { sendCompanyNotification, sendCustomerReceipt } from "@/lib/quote-mail";
+import { claimUploads, deleteAttachmentBlobs, purgeOrphanUploads } from "@/lib/quote-attachments";
 
 /** Max requests per sender IP per site and hour. */
 const RATE_LIMIT_PER_HOUR = 5;
@@ -21,6 +22,11 @@ const RETENTION_MONTHS = 12;
  * request and e-mails the company + a receipt to the customer. E-mail
  * failures never lose the request: it is stored first and the outcome is
  * recorded on the row.
+ *
+ * v2 (0008): the optional fields customerType, budget, rot, postalCode,
+ * source, attachments and extra are stored when sent and null otherwise —
+ * the response `201 { id, emailStatus }` is unchanged. Files are uploaded
+ * first via …/quote-requests/attachments (app/api/v1/_lib/quote-attachments.ts).
  */
 export async function quoteRequestResponse(site: ApiSite, request: Request): Promise<Response> {
   let body: unknown;
@@ -59,10 +65,19 @@ export async function quoteRequestResponse(site: ApiSite, request: Request): Pro
     .values({ siteId, ...result.data, ipHash, status: "ny", emailStatus: "skipped" })
     .returning({ id: quoteRequests.id });
 
-  // Housekeeping: drop requests past the retention period for this site.
+  // The uploads referenced by this request are now in use (no longer orphans).
+  await claimUploads(siteId, result.data.attachments);
+
+  // Housekeeping: drop requests past the retention period for this site
+  // (and their attachment blobs), plus uploads that were never submitted.
   const cutoff = new Date();
   cutoff.setMonth(cutoff.getMonth() - RETENTION_MONTHS);
-  await db.delete(quoteRequests).where(and(eq(quoteRequests.siteId, siteId), lt(quoteRequests.createdAt, cutoff)));
+  const expired = await db
+    .delete(quoteRequests)
+    .where(and(eq(quoteRequests.siteId, siteId), lt(quoteRequests.createdAt, cutoff)))
+    .returning({ attachments: quoteRequests.attachments });
+  await deleteAttachmentBlobs(expired.flatMap((r) => r.attachments ?? []));
+  await purgeOrphanUploads(siteId);
 
   const [siteRow] = await db
     .select({ name: sites.name, notifyEmail: sites.notifyEmail })
