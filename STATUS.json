@@ -1,11 +1,11 @@
 {
   "project": "sitecms",
-  "updated": "2026-10-22T15:40:00Z",
+  "updated": "2026-10-23T09:00:00Z",
   "phase": "polish",
   "progress": 100,
   "deploy_url": "https://sitecms-zeta.vercel.app",
   "repo_url": "https://github.com/oskarostlind/sitecms",
-  "last_run_summary": "Offertförfrågningar v2 (branch quote-requests-v2, PR mot main, ej mergad): quote_requests har fått customer_type, budget, rot, postal_code, source, attachments och extra (migration 0008 körd mot Neon, alla nullable), ny upload-endpoint för bilagor mot Vercel Blob (filtyp avgörs av innehållet, 30/h per ipHash, tabellen quote_uploads), blobbar raderas med förfrågan (manuellt + retention), panel och mejl visar allt nytt, sitecms-next 0.5.0 (submitQuoteRequest, uploadQuoteAttachment, hashIp, SitecmsError.fields; 68/68 tester), /docs + llms.txt. Verifierat: next build grönt, test:quote/webhook/markdown gröna, curl-smoke lokalt (legacy-body oförändrad → 201 {id, emailStatus}; fältfel → 400 fields), riktig blob-uppladdning via preview-deployen, detaljsidan browser-verifierad med thumbnail och 375 px, radering i panelen → blob 404. Testsajt/-konto (e2e-quote-v2, e2e-quote@sitecms.local) raderade efteråt. OBS: merge till main publicerar sitecms-next 0.5.0 till npm via workflow.",
+  "last_run_summary": "SEO & Trafik (branch feat/seo-trafik, fyra agenter enligt docs/SEO-TRAFIK.md): egen cookiefri trafikpixel i sitecms-next 0.6.0 (sitecms-next/analytics: POST-route + <SitecmsAnalytics />, init skapar events-routen), POST /api/v1/site/events med robotfilter och rate limit, migration 0009 (traffic_daily, traffic_daily_dims, traffic_visitors, seo_scores — aldrig IP/UA/råevents), SEO-poäng 0–100 (tolv innehållsregler 60 % + Google PageSpeed 40 %), daglig cron /api/cron/daily (03:15 UTC) och panelfliken 'SEO & Trafik' + stat-rutor på översikten och 'Dina sajter'. Dokumentation: /docs#trafik, #seo-poang, #api-events, llms.txt, README 'Trafik', CHANGELOG. Återstår innan det syns i prod: CRON_SECRET (och ev. PAGESPEED_API_KEY) i Vercel, migration 0009 körs vid deploy, och kundsajterna behöver events-routen + komponenten.",
   "criteria": [
     {
       "text": "Adminpanelen deployad på Vercel, senaste deploy grön",
@@ -76,6 +76,8 @@
     }
   ],
   "next_up": [
+    "Sätt `CRON_SECRET` och ev. `PAGESPEED_API_KEY` i Vercel (sitecms-projektet) — utan CRON_SECRET svarar /api/cron/daily 503 och SEO-poängen räknas bara via 'Räkna om'.",
+    "Lägg `<SitecmsAnalytics />` + events-route i JJ Bygg och Gällivare Traktor (sitecms-next ^0.6) — kör `npx sitecms-next init` igen i respektive repo och lägg komponenten sist i <body>.",
     "Merga PR quote-requests-v2 (publicerar sitecms-next 0.5.0 automatiskt via .github/workflows/publish-sitecms-next.yml).",
     "Jjbygg: koppla offertformuläret till sitecms-next 0.5 — telefon måste bli obligatoriskt och en samtyckesruta läggas till innan sitecms accepterar förfrågningarna (se BACKLOG).",
     "Beslut (Oskar): bilagor > 4,5 MB kräver klientuppladdning direkt till Blob (Vercels body-gräns).",
