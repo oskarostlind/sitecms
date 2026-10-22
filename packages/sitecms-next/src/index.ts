@@ -109,6 +109,88 @@ export type Health = {
 
 export type ResolvedBlock = { value: string; html: string; alt: string };
 
+// ---------------------------------------------------------------------------
+// Offertförfrågningar (POST …/quote-requests)
+// ---------------------------------------------------------------------------
+
+export type QuoteCustomerType = "privat" | "foretag";
+
+/** En uppladdad bilaga — svaret från `uploadQuoteAttachment()`. */
+export type QuoteAttachment = {
+  /** Publik, ogissbar https-URL. */
+  url: string;
+  /** Ursprungligt filnamn. */
+  name: string;
+  /** image/jpeg, image/png, image/webp, image/heic eller application/pdf. */
+  contentType: string;
+  /** Storlek i byte. */
+  size: number;
+};
+
+/**
+ * Offertförfrågan från sajtens formulär. sitecms validerar allt igen på
+ * servern (svenska felmeddelanden per fält vid HTTP 400).
+ */
+export type QuoteRequestInput = {
+  /** 2–100 tecken. */
+  name: string;
+  /** Max 100 tecken. */
+  company?: string | null;
+  /** Svenskt telefonnummer, t.ex. "070-123 45 67" (normaliseras till +46…). */
+  phone: string;
+  email: string;
+  /** Typ av uppdrag, max 100 tecken. */
+  jobType: string;
+  /** Max 100 tecken. */
+  machine?: string | null;
+  /** Plats/ort, max 100 tecken. */
+  location?: string | null;
+  /** Önskad start, YYYY-MM-DD, inte bakåt i tiden. */
+  desiredStart?: string | null;
+  /** 10–3000 tecken. */
+  description: string;
+  /** Måste vara true — kunden har godkänt behandlingen av sina uppgifter. */
+  consent: boolean;
+  /** "privat" eller "foretag". */
+  customerType?: QuoteCustomerType | null;
+  /** Fritext/intervall, max 100 tecken. */
+  budget?: string | null;
+  /** Vill använda ROT-avdrag. */
+  rot?: boolean | null;
+  /** Max 10 tecken. */
+  postalCode?: string | null;
+  /** Leadkälla (utm/referrer), max 500 tecken. */
+  source?: string | null;
+  /** Upp till 10 bilagor från `uploadQuoteAttachment()`. */
+  attachments?: QuoteAttachment[] | null;
+  /** Egna fält: nyckel ^[a-zA-Z0-9_.-]{1,50}$ → text (max 500 tecken), max 20 st. Visas som tabell i panelen. */
+  extra?: Record<string, string> | null;
+  /**
+   * Saltad hash av avsändarens IP (se `hashIp()`), hex 16–128 tecken. Används
+   * bara för rate limit (5 förfrågningar/h). Utelämnas → ingen rate limit.
+   */
+  ipHash?: string | null;
+};
+
+export type QuoteRequestResult = {
+  /** Förfrågans id i sitecms. */
+  id: string;
+  /** Hur mejlen till företaget och kvittot till kunden gick. Förfrågan är sparad oavsett. */
+  emailStatus: "sent" | "failed" | "skipped";
+};
+
+export type QuoteRequestOptions = {
+  /** Avbryt anropet (t.ex. timeout). */
+  signal?: AbortSignal;
+};
+
+export type QuoteAttachmentOptions = QuoteRequestOptions & {
+  /** MIME-typ om blobben saknar en (t.ex. en Buffer). Innehållet kontrolleras ändå av sitecms. */
+  contentType?: string;
+  /** Samma `ipHash` som på förfrågan — rate limit 30 uppladdningar/h. */
+  ipHash?: string | null;
+};
+
 /** Publika adressen till sitecms, används när CMS_API_URL inte är satt. */
 export const DEFAULT_API_URL = "https://sitecms.se";
 
@@ -138,12 +220,21 @@ export type SitecmsOptions = {
 };
 
 export class SitecmsError extends Error {
+  /**
+   * Fältfel från sitecms vid HTTP 400 på en offertförfrågan: fältnamn →
+   * svenskt felmeddelande (t.ex. `{ phone: "Ange ett svenskt telefonnummer…" }`).
+   * Tomt objekt för andra fel.
+   */
+  readonly fields: Record<string, string>;
+
   constructor(
     message: string,
     readonly status: number,
+    fields?: Record<string, string>,
   ) {
     super(message);
     this.name = "SitecmsError";
+    this.fields = fields ?? {};
   }
 }
 
@@ -275,6 +366,19 @@ export function editable(page: string, key: string): { "data-sitecms": string } 
   return { "data-sitecms": `${p}:${k}` };
 }
 
+/**
+ * Offertanropen bär API-nyckeln och får därför bara göras på serversidan
+ * (server action, route handler, serverkomponent). I en webbläsare kastar vi
+ * ett tydligt fel i stället för att låta nyckeln läcka.
+ */
+function assertServer(fn: string): void {
+  if (typeof window !== "undefined" && typeof document !== "undefined") {
+    throw new Error(
+      `sitecms-next: ${fn}() får bara anropas på serversidan (server action eller route handler) — API-nyckeln får aldrig skickas från webbläsaren.`,
+    );
+  }
+}
+
 function isDev(): boolean {
   try {
     // Exakt `process.env.NODE_ENV` så att bundlern kan ersätta uttrycket i klientkod.
@@ -357,9 +461,79 @@ export function createSitecms(input: Partial<SitecmsOptions> = {}) {
     return null;
   }
 
+  /** Kastar SitecmsError med serverns meddelande (400 även med fältfel). */
+  async function throwQuoteError(res: Response, path: string): Promise<never> {
+    const body = (await res.json().catch(() => null)) as { error?: string; fields?: Record<string, string> } | null;
+    const serverMessage = body?.error?.trim();
+    if (res.status === 400) {
+      throw new SitecmsError(serverMessage || "Valideringsfel.", 400, body?.fields ?? {});
+    }
+    // 413/429 m.fl.: serverns svenska meddelande går att visa för kunden som det är.
+    if (serverMessage && (res.status === 413 || res.status === 429 || res.status === 503)) {
+      throw new SitecmsError(serverMessage, res.status);
+    }
+    throw new SitecmsError(`sitecms: ${serverMessage || res.statusText} (HTTP ${res.status}, ${path})`, res.status);
+  }
+
+  async function postQuote(path: string, init: RequestInit, signal: AbortSignal | undefined): Promise<Response> {
+    try {
+      return await doFetch(`${base}${path}`, { ...init, cache: "no-store", signal });
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") throw err;
+      throw new SitecmsError(`sitecms: kunde inte nå sitecms (${err instanceof Error ? err.message : String(err)}).`, 0);
+    }
+  }
+
   return {
     /** Cache-taggen som alla anrop använder. */
     tag,
+
+    /**
+     * Skickar en offertförfrågan till sitecms (POST …/quote-requests). Bara på
+     * serversidan — i en server action eller route handler, aldrig i
+     * webbläsaren (API-nyckeln). Sajten gör spamkontrollerna som kräver
+     * webbläsaren (honeypot, tidsfälla) innan den anropar.
+     *
+     * Kastar `SitecmsError`: `status: 400` med `fields` (fältnamn → svenskt
+     * fel) vid valideringsfel, `status: 429` med serverns meddelande vid för
+     * många förfrågningar, `status: 0` när sitecms inte kunde nås.
+     */
+    async submitQuoteRequest(input: QuoteRequestInput, opts: QuoteRequestOptions = {}): Promise<QuoteRequestResult> {
+      assertServer("submitQuoteRequest");
+      const res = await postQuote(
+        "/quote-requests",
+        {
+          method: "POST",
+          headers: { "x-api-key": options.apiKey, "content-type": "application/json" },
+          body: JSON.stringify(input),
+        },
+        opts.signal,
+      );
+      if (!res.ok) await throwQuoteError(res, "/quote-requests");
+      return (await res.json()) as QuoteRequestResult;
+    },
+
+    /**
+     * Laddar upp en bilaga (jpg/png/webp/heic/pdf, max 10 MB) och returnerar
+     * objektet som skickas i `attachments` på förfrågan. Bara på serversidan.
+     * Kastar `SitecmsError` med serverns meddelande vid 400 (fel filtyp),
+     * 413 (för stor) och 429 (för många uppladdningar).
+     */
+    async uploadQuoteAttachment(file: File | Blob, name: string, opts: QuoteAttachmentOptions = {}): Promise<QuoteAttachment> {
+      assertServer("uploadQuoteAttachment");
+      const fileName = String(name ?? "").trim() || (file instanceof File ? file.name : "") || "bilaga";
+      const blob = opts.contentType && file.type !== opts.contentType ? new Blob([file], { type: opts.contentType }) : file;
+      const form = new FormData();
+      form.append("file", blob, fileName);
+      if (opts.ipHash) form.append("ipHash", opts.ipHash);
+      const res = await postQuote(
+        "/quote-requests/attachments",
+        { method: "POST", headers: { "x-api-key": options.apiKey }, body: form },
+        opts.signal,
+      );
+      if (!res.ok) await throwQuoteError(res, "/quote-requests/attachments");
+      return (await res.json()) as QuoteAttachment;
+    },
 
     /**
      * Hela sajtens innehåll: sidor med block, tjänster och SEO.
@@ -420,6 +594,28 @@ export function getPost(slug: string): Promise<Post | null> {
 /** Verifierar nyckeln (standardklienten, läser env). */
 export function health(): Promise<Health> {
   return client().health();
+}
+/** Skickar en offertförfrågan (standardklienten, läser env). Bara på serversidan. */
+export function submitQuoteRequest(input: QuoteRequestInput, options?: QuoteRequestOptions): Promise<QuoteRequestResult> {
+  return client().submitQuoteRequest(input, options);
+}
+/** Laddar upp en bilaga till en offertförfrågan (standardklienten, läser env). Bara på serversidan. */
+export function uploadQuoteAttachment(file: File | Blob, name: string, options?: QuoteAttachmentOptions): Promise<QuoteAttachment> {
+  return client().uploadQuoteAttachment(file, name, options);
+}
+
+/**
+ * Saltad SHA-256 (hex) av avsändarens IP för `ipHash` — så att alla sajter
+ * hashar på samma sätt och sitecms kan rate-limita utan att se IP-adressen.
+ * Saltet är en hemlighet per sajt (t.ex. miljövariabeln `CMS_IP_SALT`); byt
+ * salt och gamla hashar blir värdelösa. Web Crypto, inga beroenden.
+ *
+ *   const ipHash = await hashIp(headers().get("x-forwarded-for")?.split(",")[0] ?? "", process.env.CMS_IP_SALT!);
+ */
+export async function hashIp(ip: string, salt: string): Promise<string> {
+  const value = `${String(salt ?? "")}:${String(ip ?? "").trim()}`;
+  const digest = await subtleCrypto().digest("SHA-256", new TextEncoder().encode(value));
+  return toHex(digest);
 }
 
 function subtleCrypto(): SubtleCrypto {

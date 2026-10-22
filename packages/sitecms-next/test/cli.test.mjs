@@ -298,7 +298,9 @@ test("init: befintlig preview-route skrivs inte över; sitecms-next 0.3 räknas 
   assert.equal(read(dir, "app/api/sitecms/preview/route.ts"), custom);
   assert.match(res.stdout, /app\/api\/sitecms\/preview\/route\.ts \(fanns redan\)/);
   assert.ok(existsSync(join(dir, "app/api/sitecms/revalidate/route.ts")));
-  assert.match(res.stdout, /Installera paketet: npm install sitecms-next@\^0\.4\.0/);
+  // Versionsnumret i tipset följer paketets egen version (package.json).
+  const ownVersion = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
+  assert.match(res.stdout, new RegExp(`Installera paketet: npm install sitecms-next@\\^${ownVersion.replace(/\./g, "\\.")}`));
   assert.match(res.stdout, /I app\/layout\.tsx, sist i <body>:/);
   assert.match(res.stdout, /i next\.config\.mjs:/);
   assert.equal(read(dir, "app/layout.tsx"), "export default function L({ children }) { return children; }\n", "layouten rörs inte");

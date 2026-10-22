@@ -1,5 +1,31 @@
 # Ändringar i sitecms-next
 
+## 0.5.0
+
+Offertförfrågningar: sajtens formulär skickas till sitecms (panelen under
+Förfrågningar + mejl), med bilagor. Allt är additivt — sajter som inte använder
+funktionerna fungerar exakt som med 0.4.
+
+- `submitQuoteRequest(input, options?)` — `POST …/quote-requests` med
+  `x-api-key` och `cache: "no-store"` → `{ id, emailStatus }`. Finns som
+  standardexport (läser env) och på klienten från `createSitecms()`. Bara på
+  serversidan: i webbläsaren kastas ett tydligt fel så att nyckeln aldrig läcker.
+- `uploadQuoteAttachment(file, name, options?)` — laddar upp en bilaga
+  (jpg/png/webp/heic/pdf, max 10 MB) → `{ url, name, contentType, size }`, som
+  skickas i `attachments` på förfrågan.
+- `hashIp(ip, salt)` — SHA-256 hex av `salt:ip` via Web Crypto, så att alla
+  sajter skapar `ipHash` på samma sätt.
+- `SitecmsError` har nu `fields: Record<string, string>` — fältfel på svenska
+  vid HTTP 400. Vid 429 (och 413) är `message` serverns svenska meddelande,
+  redo att visas för kunden. Nätverksfel → `SitecmsError` med `status: 0`.
+- Nya typer: `QuoteRequestInput` (alla fält, nya som valfria: `customerType`,
+  `budget`, `rot`, `postalCode`, `source`, `attachments`, `extra`),
+  `QuoteRequestResult`, `QuoteAttachment`, `QuoteCustomerType`,
+  `QuoteRequestOptions`, `QuoteAttachmentOptions`.
+- README: avsnittet "Offertförfrågningar" med en komplett server action
+  (honeypot, tidsfälla, bilagor, fältfel).
+- Fortfarande noll runtime-beroenden.
+
 ## 0.4.0
 
 Live-förhandsgranskning: sajten visas i en iframe i panelen och uppdateras

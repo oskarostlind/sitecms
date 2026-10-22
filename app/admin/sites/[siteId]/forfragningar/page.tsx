@@ -1,8 +1,15 @@
 import Link from "next/link";
+import { Building2, MapPin, Paperclip, User } from "lucide-react";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db, quoteRequests, quoteStatusValues, type QuoteStatus } from "@/lib/db";
 import { requireSiteAccess } from "@/lib/guard";
-import { QUOTE_STATUS_CLASS, QUOTE_STATUS_LABEL, formatDateTime } from "@/components/admin/quote-status";
+import {
+  QUOTE_CUSTOMER_TYPE_LABEL,
+  QUOTE_STATUS_CLASS,
+  QUOTE_STATUS_LABEL,
+  formatDateTime,
+  formatPlace,
+} from "@/components/admin/quote-status";
 
 const FILTERS: { value: QuoteStatus | "alla"; label: string }[] = [
   { value: "ny", label: "Nya" },
@@ -99,8 +106,41 @@ export default async function QuotesPage({
                   <span className="block truncate text-sm text-neutral-500">
                     {q.jobType} — {q.description}
                   </span>
+                  {q.customerType || q.location || q.postalCode ? (
+                    <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-neutral-500">
+                      {q.customerType ? (
+                        <span className="inline-flex items-center gap-1">
+                          {q.customerType === "foretag" ? (
+                            <Building2 className="size-3.5" aria-hidden />
+                          ) : (
+                            <User className="size-3.5" aria-hidden />
+                          )}
+                          {QUOTE_CUSTOMER_TYPE_LABEL[q.customerType]}
+                        </span>
+                      ) : null}
+                      {q.location || q.postalCode ? (
+                        <span className="inline-flex items-center gap-1">
+                          <MapPin className="size-3.5" aria-hidden />
+                          {formatPlace(q.location, q.postalCode)}
+                        </span>
+                      ) : null}
+                    </span>
+                  ) : null}
                 </span>
-                <span className="whitespace-nowrap text-xs text-neutral-500">{formatDateTime(q.createdAt)}</span>
+                <span className="flex items-center gap-3 whitespace-nowrap text-xs text-neutral-500">
+                  {q.attachments && q.attachments.length > 0 ? (
+                    <span
+                      className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 font-medium text-neutral-700"
+                      title={`${q.attachments.length} ${q.attachments.length === 1 ? "bilaga" : "bilagor"}`}
+                      data-testid="quote-attachment-count"
+                    >
+                      <Paperclip className="size-3.5" aria-hidden />
+                      {q.attachments.length}
+                      <span className="sr-only"> {q.attachments.length === 1 ? "bilaga" : "bilagor"}</span>
+                    </span>
+                  ) : null}
+                  {formatDateTime(q.createdAt)}
+                </span>
               </Link>
             </li>
           ))}

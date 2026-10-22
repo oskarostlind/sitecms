@@ -1,7 +1,7 @@
 {
   "name": "sitecms-next",
-  "version": "0.4.0",
-  "description": "Koppla en sajt till sitecms med en nyckel och ett kommando (npx sitecms-next init): typad klient, signerad revalidate-route, live-förhandsgranskning i panelen (draft mode, klicka-för-att-redigera) och CLI för schema-sync. Inga beroenden.",
+  "version": "0.5.0",
+  "description": "Koppla en sajt till sitecms med en nyckel och ett kommando (npx sitecms-next init): typad klient, signerad revalidate-route, live-förhandsgranskning i panelen (draft mode, klicka-för-att-redigera), offertförfrågningar med bilagor och CLI för schema-sync. Inga beroenden.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -75,7 +75,7 @@
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run clean && npm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build && node --test test/webhook.test.mjs test/helpers.test.mjs test/cli.test.mjs test/preview.test.mjs"
+    "test": "npm run build && node --test test/webhook.test.mjs test/helpers.test.mjs test/cli.test.mjs test/preview.test.mjs test/quote.test.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

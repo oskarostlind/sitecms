@@ -310,6 +310,17 @@ export type QuoteStatus = (typeof quoteStatusValues)[number];
 export const quoteEmailStatusValues = ["sent", "failed", "skipped"] as const;
 export type QuoteEmailStatus = (typeof quoteEmailStatusValues)[number];
 
+export const quoteCustomerTypeValues = ["privat", "foretag"] as const;
+export type QuoteCustomerType = (typeof quoteCustomerTypeValues)[number];
+
+/** One file attached to a quote request (uploaded via …/quote-requests/attachments). */
+export type QuoteAttachment = {
+  url: string;
+  name: string;
+  contentType: string;
+  size: number;
+};
+
 export const quoteRequests = pgTable("quote_requests", {
   id: uuid("id").primaryKey().defaultRandom(),
   siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
@@ -325,6 +336,19 @@ export const quoteRequests = pgTable("quote_requests", {
   desiredStart: text("desired_start"),
   description: text("description").notNull(),
   consent: boolean("consent").notNull().default(false),
+  // --- v2 (0008): all nullable, older sites never send them ---
+  customerType: text("customer_type", { enum: quoteCustomerTypeValues }),
+  /** Free text / range, max 100 chars. */
+  budget: text("budget"),
+  /** Wants to use the Swedish ROT tax deduction. */
+  rot: boolean("rot"),
+  postalCode: text("postal_code"),
+  /** Lead source (utm/referrer string from the site), max 500 chars. */
+  source: text("source"),
+  /** Up to 10 files uploaded through the attachments endpoint. */
+  attachments: jsonb("attachments").$type<QuoteAttachment[]>(),
+  /** Site-specific extra fields (string → string, max 20 keys). */
+  extra: jsonb("extra").$type<Record<string, string>>(),
   // Salted SHA-256 of the sender's IP — used for rate limiting only.
   ipHash: text("ip_hash"),
   // Outcome of the notification e-mails; the request is stored regardless.
@@ -334,6 +358,29 @@ export const quoteRequests = pgTable("quote_requests", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("quote_requests_site_created_idx").on(table.siteId, table.createdAt),
+]);
+
+// ---------------------------------------------------------------------------
+// quote_uploads (files uploaded for a quote request, before it is submitted)
+// ---------------------------------------------------------------------------
+/**
+ * One row per file uploaded via POST …/quote-requests/attachments. Used for
+ * the per-IP rate limit and to find orphans: the row is deleted when the
+ * request that references the URL is stored, so anything older than a day is
+ * an upload whose form was never submitted — its blob is deleted too.
+ */
+export const quoteUploads = pgTable("quote_uploads", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+  ipHash: text("ip_hash"),
+  url: text("url").notNull(),
+  name: text("name").notNull(),
+  contentType: text("content_type").notNull(),
+  size: integer("size").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("quote_uploads_site_ip_created_idx").on(table.siteId, table.ipHash, table.createdAt),
+  uniqueIndex("quote_uploads_url_idx").on(table.url),
 ]);
 
 // ---------------------------------------------------------------------------
