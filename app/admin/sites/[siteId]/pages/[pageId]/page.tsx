@@ -7,6 +7,7 @@ import { pages, blocks, sites } from "@/lib/db/schema";
 import { requireSiteAccessWithRole } from "@/lib/guard";
 import { createBlock } from "@/lib/actions/structure";
 import PageBlockEditor from "@/components/admin/PageBlockEditor";
+import { PreviewToggleButton } from "@/components/admin/PreviewToggleButton";
 import { FlashToast } from "@/components/admin/FlashToast";
 import { groupSortIndex, groupTitle } from "@/components/admin/labels";
 import {
@@ -66,6 +67,14 @@ export default async function PageEditorPage({
     .limit(1);
   const siteDomain = site?.domain ?? null;
 
+  // För förhandsgranskningen: klickar man på ett fält i sajten som hör till en
+  // annan sida kan editorn länka dit.
+  const sitePages = await db
+    .select({ id: pages.id, slug: pages.slug, title: pages.title })
+    .from(pages)
+    .where(eq(pages.siteId, siteId))
+    .orderBy(asc(pages.sortOrder));
+
   const pageBlocks = await db
     .select()
     .from(blocks)
@@ -118,6 +127,8 @@ export default async function PageEditorPage({
         <FlashToast messages={FLASH_MESSAGES} />
       </Suspense>
 
+      {/* data-editor-header: döljs när den delade förhandsgranskningsvyn är öppen (globals.css). */}
+      <div data-editor-header="">
       <PageHeader
         breadcrumbs={[{ label: "Sidor", href: `/admin/sites/${siteId}/pages` }, { label: page.title }]}
         title={page.title}
@@ -134,22 +145,27 @@ export default async function PageEditorPage({
           )
         }
         actions={
-          pageUrl ? (
-            <ButtonLink href={pageUrl} target="_blank" rel="noopener noreferrer" variant="secondary">
-              Visa sidan <span aria-hidden>↗</span>
-              <span className="sr-only">(öppnas i ny flik)</span>
-            </ButtonLink>
-          ) : null
+          <>
+            {pageUrl ? (
+              <ButtonLink href={pageUrl} target="_blank" rel="noopener noreferrer" variant="ghost">
+                Visa sidan <span aria-hidden>↗</span>
+                <span className="sr-only">(öppnas i ny flik)</span>
+              </ButtonLink>
+            ) : null}
+            <PreviewToggleButton />
+          </>
         }
       />
-
-      {errorMessage ? (
-        <Alert tone="danger" className="mb-6 lg:max-w-3xl">
-          {errorMessage}
-        </Alert>
-      ) : null}
+      </div>
 
       <PageBlockEditor
+        topSlot={errorMessage ? <Alert tone="danger">{errorMessage}</Alert> : undefined}
+        preview={{
+          pageTitle: page.title,
+          pageMeta: `/${page.slug} · ${fieldCount} fält`,
+          isOwner,
+          sitePages,
+        }}
         siteId={siteId}
         groups={groups}
         siteDomain={siteDomain}

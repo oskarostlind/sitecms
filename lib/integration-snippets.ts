@@ -836,3 +836,95 @@ export const DEPLOY_HOOK_HOSTS: readonly { name: string; term: string }[] = [
   { name: "Render", term: "Deploy hook" },
   { name: "Vercel", term: "Deploy hook" },
 ];
+
+// ---------------------------------------------------------------------------
+// Live-förhandsgranskning (sitecms-next 0.4, docs/LIVE-PREVIEW.md §4)
+// ---------------------------------------------------------------------------
+
+/** Lägsta paketversion med förhandsgranskning. */
+export const PREVIEW_MIN_VERSION = "0.4.0";
+export const PREVIEW_INSTALL = `npm install sitecms-next@^${PREVIEW_MIN_VERSION}`;
+/** Routen på kundsajten som panelens iframe öppnar. */
+export const PREVIEW_ROUTE_PATH = "/api/sitecms/preview";
+
+export const PREVIEW_FILES = {
+  route: "app/api/sitecms/preview/route.ts",
+  layout: "app/layout.tsx",
+  nextConfig: "next.config.ts",
+} as const;
+
+/** Stegen i korthet — samma ordning i /docs, /llms.txt och på Integration-sidan. */
+export const PREVIEW_STEPS: readonly string[] = [
+  `Uppgradera paketet: \`${PREVIEW_INSTALL}\`.`,
+  `Skapa \`${PREVIEW_FILES.route}\` med en rad: \`export { GET } from "sitecms-next/preview";\`.`,
+  `Lägg \`<SitecmsPreview />\` från "sitecms-next/preview" sist i \`<body>\` i \`${PREVIEW_FILES.layout}\`.`,
+  `Markera redigerbara element med \`{...editable("sida", "nyckel")}\` från "sitecms-next" — samma sida och nyckel som i ${SNIPPET_FILES.config}.`,
+  `Tillåt att panelen bäddar in sajten: \`previewFrameHeaders()\` i \`headers()\` i ${PREVIEW_FILES.nextConfig}, och ta bort \`X-Frame-Options\` om sajten sätter den.`,
+];
+
+export function previewRouteSnippet(): string {
+  return `export { GET } from "sitecms-next/preview";`;
+}
+
+export function previewLayoutSnippet(): string {
+  return `// app/layout.tsx
+import { SitecmsPreview } from "sitecms-next/preview";
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="sv">
+      <body>
+        {children}
+        {/* Renderar ingenting utanför förhandsgranskningen. */}
+        <SitecmsPreview />
+      </body>
+    </html>
+  );
+}`;
+}
+
+export function previewEditableSnippet(): string {
+  return `// app/page.tsx
+import Image from "next/image";
+import { block, editable, getContent, image, text } from "sitecms-next";
+
+export default async function Home() {
+  const content = await getContent();
+  const hero = image(content, "home", "hero.image");
+
+  return (
+    <main>
+      {/* data-sitecms="home:hero.title" — klickbar i förhandsgranskningen */}
+      <h1 {...editable("home", "hero.title")}>{text(content, "home", "hero.title", "Välkommen")}</h1>
+      {hero ? (
+        <Image {...editable("home", "hero.image")} src={hero.src} alt={hero.alt} width={1200} height={630} />
+      ) : null}
+      <div
+        {...editable("home", "intro.body")}
+        dangerouslySetInnerHTML={{ __html: block(content, "home", "intro.body").html }}
+      />
+    </main>
+  );
+}`;
+}
+
+export function previewNextConfigSnippet(): string {
+  return `// next.config.ts
+import type { NextConfig } from "next";
+import { previewFrameHeaders } from "sitecms-next/preview";
+
+const nextConfig: NextConfig = {
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        // Content-Security-Policy: frame-ancestors 'self' https://sitecms.se https://www.sitecms.se
+        // Ta bort X-Frame-Options om sajten sätter den — CSP:n ersätter den.
+        headers: previewFrameHeaders(),
+      },
+    ];
+  },
+};
+
+export default nextConfig;`;
+}

@@ -16,7 +16,17 @@
  * Inga beroenden. Alla anrop använder `fetch` med `next: { tags: [tag] }` så
  * att en revalidate-route kan tömma cachen med `revalidateTag("sitecms")`.
  * Samma kod som copy-paste-varianten `lib/sitecms.ts` i panelen.
+ *
+ * Live-förhandsgranskning (0.4): `getContent()` hämtar osparade ändringar när
+ * sidan visas i sitecms förhandsgranskning (draft mode + cookien
+ * `sitecms_preview`), se `sitecms-next/preview`. Markera redigerbara element
+ * med `editable(page, key)`.
  */
+
+// `next/headers` bara i React Server Components (villkoret "react-server" i
+// package.json "imports"); i klientbundlar och vanlig Node blir det null.
+import { loadNextHeaders } from "#next-headers";
+import type { NextHeadersModule } from "#next-headers";
 
 export type BlockType = "text" | "richtext" | "image";
 
@@ -57,6 +67,8 @@ export type Content = {
   pages: Page[];
   services: Service[];
   seo: Seo[];
+  /** true när innehållet kommer från en förhandsgranskning (med osparade ändringar). */
+  preview?: boolean;
 };
 
 export type PostSummary = {
@@ -115,6 +127,14 @@ export type SitecmsOptions = {
   tag?: string;
   /** Egen fetch, t.ex. för tester. Default globalThis.fetch. */
   fetch?: typeof fetch;
+  /**
+   * Var preview-token för `getContent()` kommer ifrån. Default: läser
+   * `draftMode()` och cookien `sitecms_preview` via `next/headers` (bara i
+   * Next.js, och `cookies()` anropas bara när draft mode är på). En funktion
+   * ersätter det (t.ex. i tester eller utanför Next); `false` stänger av
+   * förhandsgranskning helt för klienten.
+   */
+  previewToken?: (() => Promise<string | null | undefined> | string | null | undefined) | false;
 };
 
 export class SitecmsError extends Error {
@@ -181,6 +201,89 @@ export function apiBase(apiUrl: string | undefined, site?: string | null): strin
   return slug ? `${root}/api/v1/sites/${encodeURIComponent(slug)}` : `${root}/api/v1/site`;
 }
 
+// ---------------------------------------------------------------------------
+// Live-förhandsgranskning
+// ---------------------------------------------------------------------------
+
+/** Header som bär preview-token till sitecms API. */
+export const PREVIEW_HEADER = "x-sitecms-preview";
+/** Cookie med preview-token (sätts av `sitecms-next/preview`). */
+export const PREVIEW_COOKIE = "sitecms_preview";
+/** Cookie med panelens origin (sätts av `sitecms-next/preview`). */
+export const PREVIEW_ORIGIN_COOKIE = "sitecms_preview_origin";
+
+const warned = new Set<string>();
+function warnOnce(message: string) {
+  if (warned.has(message)) return;
+  warned.add(message);
+  if (warned.size > 50) warned.clear();
+  console.warn(message);
+}
+
+
+/** Fungerar med både Next 14 (synkrona värden) och Next 15+ (promises). */
+async function draftModeEnabled(mod: NextHeadersModule): Promise<boolean> {
+  const dm = (await mod.draftMode()) as { isEnabled?: boolean } | null;
+  return Boolean(dm?.isEnabled);
+}
+
+/**
+ * Preview-token från cookien, men bara när draft mode är på. `cookies()`
+ * anropas aldrig annars, så statiska sidor förblir statiska. Utanför en
+ * request (bygge, generateStaticParams, skript) → null.
+ */
+async function nextPreviewToken(): Promise<string | null> {
+  const mod = await loadNextHeaders();
+  if (!mod) return null;
+  try {
+    if (!(await draftModeEnabled(mod))) return null;
+    const store = (await mod.cookies()) as { get(name: string): { value?: string } | undefined };
+    return store.get(PREVIEW_COOKIE)?.value || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * true när sidan visas i sitecms förhandsgranskning: draft mode är på och
+ * preview-cookien finns. Samma villkor som `getContent()` använder.
+ */
+export async function isPreview(): Promise<boolean> {
+  return Boolean(await nextPreviewToken());
+}
+
+const EDITABLE_PART = /^[a-z0-9._-]+$/;
+
+/**
+ * Markerar ett element som redigerbart i förhandsgranskningen:
+ *
+ *   <h1 {...editable("home", "hero.title")}>{text(content, "home", "hero.title")}</h1>
+ *   // → <h1 data-sitecms="home:hero.title">
+ *
+ * Attributet renderas alltid (ofarligt i produktion). Ogiltiga värden
+ * (annat än a–z, 0–9, punkt, bindestreck, understreck) ger en varning i
+ * utvecklingsläge men kastar aldrig.
+ */
+export function editable(page: string, key: string): { "data-sitecms": string } {
+  const p = String(page ?? "");
+  const k = String(key ?? "");
+  if ((!EDITABLE_PART.test(p) || !EDITABLE_PART.test(k)) && isDev()) {
+    warnOnce(
+      `sitecms: editable(${JSON.stringify(p)}, ${JSON.stringify(k)}) — sida och fält får bara innehålla a–z, 0–9, punkt, bindestreck och understreck. Elementet går inte att klicka på i förhandsgranskningen.`,
+    );
+  }
+  return { "data-sitecms": `${p}:${k}` };
+}
+
+function isDev(): boolean {
+  try {
+    // Exakt `process.env.NODE_ENV` så att bundlern kan ersätta uttrycket i klientkod.
+    return process.env.NODE_ENV !== "production";
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Skapar en klient. Utelämnade värden läses från miljövariablerna
  * CMS_API_KEY (krävs), CMS_API_URL (default https://sitecms.se) och
@@ -224,12 +327,48 @@ export function createSitecms(input: Partial<SitecmsOptions> = {}) {
     return (await res.json()) as T;
   }
 
+  const readToken = options.previewToken === undefined ? nextPreviewToken : options.previewToken;
+
+  /**
+   * Innehåll med osparade ändringar från förhandsgranskningen, eller null
+   * (ingen token, utgången token eller fel) — då används vanligt innehåll.
+   */
+  async function previewContent(): Promise<Content | null> {
+    if (!readToken) return null;
+    let token: string | null | undefined;
+    try {
+      token = await readToken();
+    } catch {
+      return null;
+    }
+    token = typeof token === "string" ? token.trim() : "";
+    if (!token) return null;
+    try {
+      const res = await doFetch(`${base}/content`, {
+        headers: { "x-api-key": options.apiKey, [PREVIEW_HEADER]: token },
+        cache: "no-store",
+      });
+      if (res.ok) return (await res.json()) as Content;
+      if (res.status === 401) warnOnce("sitecms: förhandsgranskningen har gått ut — visar sparat innehåll. Öppna den igen i sitecms.");
+      else warnOnce(`sitecms: förhandsgranskningen svarade HTTP ${res.status} — visar sparat innehåll.`);
+    } catch (err) {
+      warnOnce(`sitecms: förhandsgranskningen kunde inte hämtas (${err instanceof Error ? err.message : String(err)}) — visar sparat innehåll.`);
+    }
+    return null;
+  }
+
   return {
     /** Cache-taggen som alla anrop använder. */
     tag,
 
-    /** Hela sajtens innehåll: sidor med block, tjänster och SEO. */
+    /**
+     * Hela sajtens innehåll: sidor med block, tjänster och SEO.
+     * I sitecms förhandsgranskning (draft mode + preview-cookie) med osparade
+     * ändringar och utan cache; annars som vanligt (cache-taggad).
+     */
     async getContent(): Promise<Content> {
+      const preview = await previewContent();
+      if (preview) return preview;
       return (await request<Content>("/content"))!;
     },
 

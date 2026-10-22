@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { readReveal } from "@/lib/reveal-flash";
 import { maskApiKey } from "@/lib/api-keys";
 import { REVALIDATE_URL_ERROR_MESSAGES } from "@/lib/webhook-url";
+import { PREVIEW_URL_ERROR_MESSAGES, previewBaseUrl } from "@/lib/preview";
 import { ConsumeReveal } from "@/components/admin/ConsumeReveal";
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
@@ -27,6 +28,7 @@ import {
   Field,
   Input,
   PageHeader,
+  fieldIds,
   SubmitButton,
   Table,
   Tbody,
@@ -41,6 +43,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   "confirm-name": "Skriv sajtens namn exakt som det står för att bekräfta borttagningen.",
   "notify-email": "E-postadressen för förfrågningar ser inte giltig ut.",
   ...REVALIDATE_URL_ERROR_MESSAGES,
+  ...PREVIEW_URL_ERROR_MESSAGES,
 };
 
 export default async function SiteSettingsPage({
@@ -72,7 +75,11 @@ export default async function SiteSettingsPage({
     .where(eq(apiKeys.siteId, siteId))
     .orderBy(desc(apiKeys.createdAt));
 
-  const errorMessage = error ? (ERROR_MESSAGES[error] ?? "Något gick fel. Försök igen.") : null;
+  // Fel i förhandsgranskningsadressen visas vid fältet i stället för överst.
+  const errorMessage =
+    error && error !== "preview-url-invalid" ? (ERROR_MESSAGES[error] ?? "Något gick fel. Försök igen.") : null;
+  // Det förhandsgranskningen faller tillbaka på när fältet är tomt (domän → revalidate-URL).
+  const previewFallback = previewBaseUrl({ domain: site.domain, revalidateUrl: site.revalidateUrl });
 
   return (
     <div className="max-w-3xl">
@@ -109,6 +116,43 @@ export default async function SiteSettingsPage({
                   type="text"
                   defaultValue={site.revalidateUrl ?? ""}
                   placeholder="https://kundsajt.se/api/sitecms/revalidate"
+                  className="font-mono"
+                />
+              </Field>
+
+              <Field
+                htmlFor="previewUrl"
+                label="Adress för förhandsgranskning"
+                error={error === "preview-url-invalid" ? PREVIEW_URL_ERROR_MESSAGES["preview-url-invalid"] : undefined}
+                hint={
+                  <>
+                    Sajten som visas bredvid fälten när du förhandsgranskar en sida, t.ex. en testadress hos
+                    webbhotellet. Börjar med https:// (eller http://localhost när du utvecklar).{" "}
+                    {previewFallback ? (
+                      <>
+                        Lämna tomt för att använda <span className="font-mono">{previewFallback}</span>.
+                      </>
+                    ) : (
+                      "Lämna tomt för att använda sajtens domän."
+                    )}
+                  </>
+                }
+              >
+                <Input
+                  id="previewUrl"
+                  name="previewUrl"
+                  type="text"
+                  inputMode="url"
+                  autoComplete="off"
+                  spellCheck={false}
+                  defaultValue={site.previewUrl ?? ""}
+                  aria-describedby={
+                    error === "preview-url-invalid"
+                      ? `${fieldIds("previewUrl").hintId} ${fieldIds("previewUrl").errorId}`
+                      : fieldIds("previewUrl").hintId
+                  }
+                  placeholder={previewFallback ?? "https://min-sajt.vercel.app"}
+                  invalid={error === "preview-url-invalid"}
                   className="font-mono"
                 />
               </Field>

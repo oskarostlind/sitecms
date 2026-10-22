@@ -18,5 +18,5 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
-  return contentResponse(auth.site);
+  return contentResponse(auth.site, request);
 }

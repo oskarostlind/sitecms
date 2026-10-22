@@ -42,6 +42,7 @@ const CONFIG_NAMES = [
 ];
 
 const DOCS_URL = "https://sitecms.se/docs";
+const ROUTE_FILES = ["route.ts", "route.tsx", "route.js", "route.jsx", "route.mjs"];
 const CLI_FILE = fileURLToPath(import.meta.url);
 
 const cwd = process.cwd();
@@ -372,9 +373,9 @@ function dependencies(pkg: JsonObject | null): Record<string, string> {
 function ownVersion(): string {
   try {
     const pkg = JSON.parse(readFileSync(resolve(dirname(CLI_FILE), "../package.json"), "utf8")) as { version?: string };
-    return pkg.version ?? "0.3.0";
+    return pkg.version ?? "0.4.0";
   } catch {
-    return "0.3.0";
+    return "0.4.0";
   }
 }
 
@@ -615,7 +616,8 @@ async function init() {
   // 9. Paketet (behövs för revalidate-routen och configen)
   if (pkg) {
     const current = dependencies(pkg)["sitecms-next"];
-    const outdated = typeof current === "string" && /^[\^~>=v\s]*0\.[0-2](\.|$)/.test(current);
+    // Före 0.4 saknas sitecms-next/preview (som preview-routen importerar).
+    const outdated = typeof current === "string" && /^[\^~>=v\s]*0\.[0-3](\.|$)/.test(current);
     if (current && !outdated) {
       skipped.push(`sitecms-next i package.json (${current})`);
     } else if (flag("no-install")) {
@@ -633,24 +635,36 @@ async function init() {
     }
   }
 
-  // 10. Revalidate-route (bara Next.js App Router)
+  // 10. Revalidate- och preview-route (bara Next.js App Router). Skrivs aldrig över.
   if (isAppRouter) {
-    const routeDir = resolve(cwd, appDir!, "api/sitecms/revalidate");
-    const existing = ["route.ts", "route.tsx", "route.js", "route.jsx", "route.mjs"].find((f) => existsSync(join(routeDir, f)));
-    if (existing) {
-      skipped.push(`${rel(join(routeDir, existing))} (fanns redan)`);
-    } else {
-      const routePath = join(routeDir, useTs ? "route.ts" : "route.js");
-      mkdirSync(routeDir, { recursive: true });
-      writeFileSync(
-        routePath,
-        [
+    const routes: { dir: string; lines: string[] }[] = [
+      {
+        dir: "api/sitecms/revalidate",
+        lines: [
           "// sitecms anropar den här routen när kunden sparar; cachen töms och sajten",
           "// visar det nya innehållet direkt. Anropet är signerat med CMS_API_KEY.",
           'export { POST } from "sitecms-next/revalidate";',
-          "",
-        ].join("\n"),
-      );
+        ],
+      },
+      {
+        dir: "api/sitecms/preview",
+        lines: [
+          "// Live-förhandsgranskning: panelen öppnar sajten i en iframe via den här routen",
+          "// (verifierar token mot sitecms och slår på draft mode).",
+          'export { GET } from "sitecms-next/preview";',
+        ],
+      },
+    ];
+    for (const route of routes) {
+      const routeDir = resolve(cwd, appDir!, route.dir);
+      const existing = ROUTE_FILES.find((f) => existsSync(join(routeDir, f)));
+      if (existing) {
+        skipped.push(`${rel(join(routeDir, existing))} (fanns redan)`);
+        continue;
+      }
+      const routePath = join(routeDir, useTs ? "route.ts" : "route.js");
+      mkdirSync(routeDir, { recursive: true });
+      writeFileSync(routePath, [...route.lines, ""].join("\n"));
       done.push(rel(routePath));
     }
   }
@@ -736,7 +750,30 @@ async function init() {
     c.bold("Nästa steg: ") +
       "Lägg CMS_API_KEY=… som miljövariabel hos ditt webbhotell (Vercel, Netlify, Cloudflare, egen server …) och deploya.",
   );
+  if (isAppRouter) printPreviewSteps(appDir!, useTs);
   if (syncOk === false) process.exitCode = 1;
+}
+
+/** Det som init inte gör automatiskt för live-förhandsgranskningen. */
+function printPreviewSteps(appDir: string, useTs: boolean) {
+  const ext = useTs ? "tsx" : "jsx";
+  const layout = ["tsx", "jsx", "js"].map((e) => `${appDir}/layout.${e}`).find((f) => existsSync(resolve(cwd, f))) ?? `${appDir}/layout.${ext}`;
+  const config =
+    ["next.config.ts", "next.config.mjs", "next.config.js", "next.config.cjs"].find((f) => existsSync(resolve(cwd, f))) ??
+    (useTs ? "next.config.ts" : "next.config.mjs");
+  log("");
+  log(c.bold("Live-förhandsgranskning") + c.dim(" (valfritt — klicka-för-att-redigera i panelen):"));
+  log(`  1. I ${layout}, sist i <body>:`);
+  log(c.dim('       import { SitecmsPreview } from "sitecms-next/preview";'));
+  log(c.dim("       <SitecmsPreview />"));
+  log("  2. Markera redigerbara element med editable():");
+  log(c.dim('       import { editable } from "sitecms-next";'));
+  log(c.dim('       <h1 {...editable("home", "hero.title")}>…</h1>'));
+  log(`  3. Låt panelen bädda in sajten — i ${config}:`);
+  log(c.dim('       import { previewFrameHeaders } from "sitecms-next/preview";'));
+  log(c.dim('       async headers() { return [{ source: "/:path*", headers: previewFrameHeaders() }]; }'));
+  log("     och ta bort X-Frame-Options om sajten sätter den (CSP frame-ancestors ersätter den).");
+  log(c.dim(`  Layouten och ${config} ändras inte automatiskt. Mer: ${DOCS_URL}`));
 }
 
 function help() {
@@ -744,10 +781,12 @@ function help() {
 
   sitecms-next init [nyckel] [--force] [--no-install]
       Kopplar projektet: verifierar API-nyckeln, sparar CMS_API_KEY i
-      .env.local, skapar revalidate-routen (Next.js App Router) och
-      sitecms.config.ts, lägger till "prebuild": "sitecms-next sync" och synkar.
+      .env.local, skapar revalidate- och preview-routen (Next.js App Router)
+      och sitecms.config.ts, lägger till "prebuild": "sitecms-next sync" och
+      synkar. Skriver ut stegen för live-förhandsgranskning (layouten ändras
+      inte automatiskt).
       Körs i katalogen med package.json (--force: spara ändå bara nyckeln).
-      Kan köras flera gånger. Revalidate-routen och sitecms.config skrivs
+      Kan köras flera gånger. Routerna och sitecms.config skrivs
       aldrig över; .env.local, .gitignore och package.json kompletteras med
       en rad var utan att annat ändras. En annan CMS_API_KEY i .env.local
       ersätts bara efter bekräftelse eller med --force, och den gamla raden

@@ -1,7 +1,7 @@
 {
   "name": "sitecms-next",
-  "version": "0.3.0",
-  "description": "Koppla en sajt till sitecms med en nyckel och ett kommando (npx sitecms-next init): typad klient, signerad revalidate-route och CLI för schema-sync. Inga beroenden.",
+  "version": "0.4.0",
+  "description": "Koppla en sajt till sitecms med en nyckel och ett kommando (npx sitecms-next init): typad klient, signerad revalidate-route, live-förhandsgranskning i panelen (draft mode, klicka-för-att-redigera) och CLI för schema-sync. Inga beroenden.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -16,21 +16,43 @@
       "import": "./dist/revalidate.js",
       "default": "./dist/revalidate.js"
     },
+    "./preview": {
+      "types": "./dist/preview.d.ts",
+      "import": "./dist/preview.js",
+      "default": "./dist/preview.js"
+    },
+    "./preview-client": {
+      "types": "./dist/preview-client.d.ts",
+      "import": "./dist/preview-client.js",
+      "default": "./dist/preview-client.js"
+    },
     "./package.json": "./package.json"
+  },
+  "imports": {
+    "#next-headers": {
+      "types": "./dist/next-headers.d.ts",
+      "react-server": "./dist/next-headers.server.js",
+      "default": "./dist/next-headers.js"
+    }
   },
   "files": [
     "dist",
     "src",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "sideEffects": false,
   "license": "MIT",
   "peerDependencies": {
-    "next": ">=14.2"
+    "next": ">=14.2",
+    "react": ">=18"
   },
   "peerDependenciesMeta": {
     "next": {
+      "optional": true
+    },
+    "react": {
       "optional": true
     }
   },
@@ -43,19 +65,25 @@
     "nextjs",
     "headless",
     "next",
-    "app-router"
+    "app-router",
+    "preview",
+    "live-preview",
+    "draft-mode"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run clean && npm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build && node --test test/webhook.test.mjs test/helpers.test.mjs test/cli.test.mjs"
+    "test": "npm run build && node --test test/webhook.test.mjs test/helpers.test.mjs test/cli.test.mjs test/preview.test.mjs"
   },
   "devDependencies": {
-    "typescript": "^5.6.0",
     "@types/node": "^22.0.0",
-    "next": "^15.4.0"
+    "@types/react": "^19.3.0",
+    "next": "^15.4.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "typescript": "^5.6.0"
   },
   "repository": {
     "type": "git",

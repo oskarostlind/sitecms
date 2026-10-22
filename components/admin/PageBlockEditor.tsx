@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Check, CircleCheck, ExternalLink, FileText, Trash2, Undo2 } from "lucide-react";
+import Link from "next/link";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Check, ChevronLeft, CircleCheck, ExternalLink, FileText, PencilLine, Eye, Trash2, Undo2 } from "lucide-react";
 import { updateBlocks, type BlockUpdate } from "@/lib/actions/pages";
 import { undoActivity } from "@/lib/actions/undo";
 import { deleteBlock } from "@/lib/actions/structure";
@@ -11,6 +12,13 @@ import AutoTextarea from "@/components/admin/AutoTextarea";
 import ImageField from "@/components/admin/ImageField";
 import RichTextEditor from "@/components/admin/RichTextEditor";
 import type { BlockDTO, BlockGroupDTO } from "@/components/admin/types";
+import LivePreview, {
+  type FocusFieldResult,
+  type LivePreviewHandle,
+  type PreviewUpdate,
+} from "@/components/admin/LivePreview";
+import { useLivePreviewPrefs } from "@/components/admin/live-preview-prefs";
+import { previewPathForPage } from "@/lib/preview-protocol";
 import {
   Alert,
   Badge,
@@ -55,6 +63,20 @@ function unsavedLabel(count: number) {
   return count === 1 ? "1 osparad ändring" : `${count} osparade ändringar`;
 }
 
+/** Live-förhandsgranskning i sidredigeraren (docs/LIVE-PREVIEW.md §6). */
+export type PageEditorPreviewConfig = {
+  pageTitle: string;
+  /** Visas under titeln i den delade vyn, t.ex. "/om-oss · 12 fält". */
+  pageMeta: string;
+  /** Owner/admin: hänvisa till Inställningar när adressen saknas. */
+  isOwner: boolean;
+  /** Sajtens sidor — för "Fältet hör till sidan …" när man klickar på något i sajten som finns på en annan sida. */
+  sitePages: { id: string; slug: string; title: string }[];
+};
+
+/** Delad vy från 1024 px (lg) — samma brytpunkt som Tailwinds lg. */
+const SPLIT_VIEW_QUERY = "(min-width: 1024px)";
+
 export default function PageBlockEditor({
   siteId,
   groups,
@@ -63,6 +85,8 @@ export default function PageBlockEditor({
   pageId,
   canManageStructure = false,
   structureSlot,
+  topSlot,
+  preview,
 }: {
   siteId: string;
   groups: BlockGroupDTO[];
@@ -75,6 +99,10 @@ export default function PageBlockEditor({
   canManageStructure?: boolean;
   /** Renderas sist i innehållskolumnen, t.ex. formuläret "Lägg till fält" (bara owners). */
   structureSlot?: React.ReactNode;
+  /** Renderas först i innehållskolumnen, t.ex. ett felmeddelande från en server action. */
+  topSlot?: React.ReactNode;
+  /** Slår på live-förhandsgranskningen (knappen "Förhandsgranska" i sidhuvudet styr den). */
+  preview?: PageEditorPreviewConfig;
 }) {
   const manage = canManageStructure && pageId ? { pageId } : null;
   const { toast } = useToast();
@@ -114,6 +142,170 @@ export default function PageBlockEditor({
   const baseUrl = siteUrl(siteDomain);
   const pageUrl = baseUrl && pageSlug !== undefined ? `${baseUrl}/${pageSlug === "home" ? "" : pageSlug}` : null;
 
+  // --- Live-förhandsgranskning -------------------------------------------
+  const [previewPrefs, setPreviewPrefs] = useLivePreviewPrefs();
+  const previewOpen = Boolean(preview) && pageSlug !== undefined && previewPrefs.open;
+  const [mobileTab, setMobileTab] = useState<"edit" | "preview">("edit");
+  const livePreviewRef = useRef<LivePreviewHandle>(null);
+  const editorRootRef = useRef<HTMLDivElement>(null);
+  const previewPaneRef = useRef<HTMLDivElement>(null);
+  const [flashKey, setFlashKey] = useState<string | null>(null);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Fältet som senast fick fokus — "highlight" skickas bara när det byts. */
+  const lastFocusedKey = useRef<string | null>(null);
+  /** Fält som fokuseras för att det klickats i sajten: blinka inte tillbaka i sajten. */
+  const suppressHighlight = useRef<string | null>(null);
+
+  const blockById = useMemo(() => {
+    const map = new Map<string, BlockDTO>();
+    for (const group of groups) for (const block of group.blocks) map.set(block.id, block);
+    return map;
+  }, [groups]);
+  const blockByKey = useMemo(() => {
+    const map = new Map<string, BlockDTO>();
+    for (const group of groups) for (const block of group.blocks) map.set(block.key, block);
+    return map;
+  }, [groups]);
+
+  // Senaste fältvärden för förhandsgranskningens synk (läses utanför render).
+  const valuesRef = useRef(values);
+  const altsRef = useRef(alts);
+  useLayoutEffect(() => {
+    valuesRef.current = values;
+    altsRef.current = alts;
+  });
+
+  /** Alla osparade block (blockId → value/alt) — det som förhandsgranskningen visar. */
+  const getUnsaved = useCallback((): PreviewUpdate[] => {
+    const updates: PreviewUpdate[] = [];
+    for (const group of groups) {
+      for (const block of group.blocks) {
+        const value = valuesRef.current[block.id];
+        const alt = altsRef.current[block.id];
+        if (value !== originalValues.current[block.id] || alt !== originalAlts.current[block.id]) {
+          updates.push({ blockId: block.id, value: value ?? "", ...(block.type === "image" ? { alt: alt ?? "" } : {}) });
+        }
+      }
+    }
+    return updates;
+  }, [groups]);
+
+  function flashField(key: string) {
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+    setFlashKey(null);
+    window.requestAnimationFrame(() => setFlashKey(key));
+    flashTimer.current = setTimeout(() => setFlashKey(null), 1300);
+  }
+
+  /** Scrollar till fältet i editorn och fokuserar det (efter klick i sajten). */
+  function focusBlockElement(block: BlockDTO) {
+    const root = editorRootRef.current;
+    const wrapper = root?.querySelector<HTMLElement>(`[data-block-key="${CSS.escape(block.key)}"]`);
+    if (!wrapper) return;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    wrapper.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
+    const selector =
+      block.type === "image"
+        ? "button:not([disabled]), input:not([type='file']):not([type='hidden'])"
+        : "[contenteditable='true'], textarea, input:not([type='file']):not([type='hidden'])";
+    const target = wrapper.querySelector<HTMLElement>(selector);
+    if (target) {
+      target.focus({ preventScroll: true });
+      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
+        const end = target.value.length;
+        try {
+          target.setSelectionRange(end, end);
+        } catch {
+          // vissa inputtyper saknar markering
+        }
+      }
+    }
+    flashField(block.key);
+  }
+
+  const focusFieldFromPreview = useCallback(
+    (page: string, key: string): FocusFieldResult => {
+      if (page === pageSlug) {
+        const block = blockByKey.get(key);
+        if (!block) return { status: "missing" };
+        setMobileTab("edit");
+        lastFocusedKey.current = key;
+        suppressHighlight.current = key;
+        window.setTimeout(() => {
+          if (suppressHighlight.current === key) suppressHighlight.current = null;
+        }, 600);
+        // Vänta in att redigeringsfliken (mobil) hunnit visas innan vi scrollar.
+        window.requestAnimationFrame(() => window.requestAnimationFrame(() => focusBlockElement(block)));
+        return { status: "focused" };
+      }
+      const other = preview?.sitePages.find((p) => p.slug === page);
+      if (other) return { status: "other-page", title: other.title, href: `/admin/sites/${siteId}/pages/${other.id}` };
+      return { status: "missing" };
+    },
+    // focusBlockElement läser bara refs och DOM.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pageSlug, blockByKey, preview?.sitePages, siteId],
+  );
+
+  function handleFieldFocus(key: string) {
+    if (!previewOpen || lastFocusedKey.current === key) return;
+    lastFocusedKey.current = key;
+    if (suppressHighlight.current === key) {
+      suppressHighlight.current = null;
+      return;
+    }
+    livePreviewRef.current?.highlight(key);
+  }
+
+  function handleFieldBlur(event: React.FocusEvent<HTMLDivElement>, key: string) {
+    const next = event.relatedTarget as Node | null;
+    if (next && event.currentTarget.contains(next)) return;
+    if (lastFocusedKey.current === key) lastFocusedKey.current = null;
+  }
+
+  /**
+   * Efter Spara/Ångra: förhandsgranskningen ska visa det som nu ligger i
+   * databasen. Körs efter nästa render, så att fältvärdena (t.ex. efter en
+   * ångring) hunnit uppdateras innan de osparade värdena räknas om.
+   */
+  const [previewSyncTick, setPreviewSyncTick] = useState(0);
+  function syncPreviewAfterSave() {
+    setPreviewSyncTick((n) => n + 1);
+  }
+  useEffect(() => {
+    if (previewSyncTick > 0) livePreviewRef.current?.syncNow();
+  }, [previewSyncTick]);
+
+  // Delad vy (≥1024 px) fyller ytan bredvid menyn och har egen scroll —
+  // sidan bakom ska inte kunna scrollas samtidigt.
+  useEffect(() => {
+    if (!previewOpen) return;
+    const query = window.matchMedia(SPLIT_VIEW_QUERY);
+    const root = document.documentElement;
+    const apply = () => {
+      root.style.overflow = query.matches ? "hidden" : "";
+    };
+    apply();
+    query.addEventListener("change", apply);
+    return () => {
+      query.removeEventListener("change", apply);
+      root.style.overflow = "";
+    };
+  }, [previewOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (flashTimer.current) clearTimeout(flashTimer.current);
+    };
+  }, []);
+
+  function showMobileTab(tab: "edit" | "preview") {
+    setMobileTab(tab);
+    if (tab === "preview") {
+      window.requestAnimationFrame(() => previewPaneRef.current?.scrollIntoView({ block: "start" }));
+    }
+  }
+
   function rememberLastSave(snapshot: SavedSnapshot | null) {
     lastSaveRef.current = snapshot;
     setLastSave(snapshot);
@@ -143,11 +335,20 @@ export default function PageBlockEditor({
 
   function handleChange(blockId: string, value: string) {
     setValues((prev) => ({ ...prev, [blockId]: value }));
+    const block = blockById.get(blockId);
+    // Textfält byts direkt i sajten; formaterad text visas efter omrenderingen.
+    if (previewOpen && block?.type === "text") {
+      livePreviewRef.current?.patch({ key: block.key, kind: "text", value });
+    }
   }
 
   function handleImageChange(blockId: string, next: { value: string; alt: string }) {
     setValues((prev) => ({ ...prev, [blockId]: next.value }));
     setAlts((prev) => ({ ...prev, [blockId]: next.alt }));
+    const block = blockById.get(blockId);
+    if (previewOpen && block?.type === "image") {
+      livePreviewRef.current?.patch({ key: block.key, kind: "image", value: next.value, alt: next.alt });
+    }
   }
 
   function isBlockDirty(block: BlockDTO) {
@@ -215,6 +416,7 @@ export default function PageBlockEditor({
     }
 
     commit(changed);
+    syncPreviewAfterSave();
     setStatus(group.key, "saved");
     const snapshot: SavedSnapshot = { undoId: result.undoId, blocks: before, groupKeys: [group.key] };
     rememberLastSave(snapshot);
@@ -249,6 +451,7 @@ export default function PageBlockEditor({
     }
 
     commit(allChanged);
+    syncPreviewAfterSave();
     for (const key of dirtyGroups) {
       setStatus(key, "saved");
     }
@@ -308,6 +511,7 @@ export default function PageBlockEditor({
     }
 
     rememberLastSave(null);
+    syncPreviewAfterSave();
     setUndoNotice("Ändringen är ångrad.");
     toast({ tone: "neutral", title: "Ändringen är ångrad." });
   }
@@ -406,156 +610,268 @@ export default function PageBlockEditor({
     setActiveGroup(key);
   }
 
-  if (groups.length === 0) {
+  const emptyState = (
+    <EmptyState
+      icon={<FileText />}
+      title="Den här sidan har inget innehåll ännu"
+      description={
+        manage
+          ? "Lägg till fält nedan, eller låt kundsajten deklarera dem med schema-sync."
+          : "Fälten läggs upp av din leverantör. Hör av dig om det är något du vill kunna ändra här."
+      }
+    />
+  );
+
+  const sections = groups.map((group) => {
+    const status = groupStatus[group.key] ?? "idle";
+    const dirty = changedInGroup(group).length > 0;
+    const description = groupDescription(group.key);
+    const titleId = `${groupAnchor(group.key)}-titel`;
+
     return (
-      <div className="space-y-6 lg:max-w-3xl">
-        <EmptyState
-          icon={<FileText />}
-          title="Den här sidan har inget innehåll ännu"
-          description={
-            manage
-              ? "Lägg till fält nedan, eller låt kundsajten deklarera dem med schema-sync."
-              : "Fälten läggs upp av din leverantör. Hör av dig om det är något du vill kunna ändra här."
-          }
-        />
-        {structureSlot}
+      <section
+        key={group.key}
+        id={groupAnchor(group.key)}
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className="scroll-mt-20 rounded-xl focus:outline-none"
+      >
+        <Card>
+          <CardHeader
+            actions={
+              <>
+                <span aria-live="polite" className="flex items-center">
+                  {status === "saved" && !dirty ? (
+                    <Badge tone="success">Sparat ✓</Badge>
+                  ) : dirty && status !== "saving" ? (
+                    <span className="flex items-center gap-1.5 text-xs font-medium text-amber-700">
+                      <span aria-hidden className="size-1.5 rounded-full bg-amber-500" />
+                      Ej sparat
+                    </span>
+                  ) : null}
+                </span>
+                <Button
+                  size="sm"
+                  variant={dirty ? "primary" : "secondary"}
+                  onClick={() => saveGroup(group)}
+                  disabled={!dirty || status === "saving" || savingAll}
+                >
+                  {status === "saving" ? "Sparar…" : "Spara"}
+                </Button>
+              </>
+            }
+          >
+            <CardTitle id={titleId}>{group.title}</CardTitle>
+            {description ? <CardDescription>{description}</CardDescription> : null}
+          </CardHeader>
+
+          <CardContent className="space-y-5">
+            {status === "error" && groupError[group.key] ? (
+              <Alert tone="danger">{groupError[group.key]}</Alert>
+            ) : null}
+
+            {group.blocks.map((block) => (
+              <div
+                key={block.id}
+                data-block-key={block.key}
+                data-preview-flash={flashKey === block.key ? "true" : undefined}
+                onFocusCapture={() => handleFieldFocus(block.key)}
+                onBlurCapture={(event) => handleFieldBlur(event, block.key)}
+                className="scroll-my-24"
+              >
+                <BlockField
+                  block={block}
+                  siteId={siteId}
+                  value={values[block.id] ?? ""}
+                  alt={alts[block.id] ?? ""}
+                  dirty={isBlockDirty(block)}
+                  onChange={(value) => handleChange(block.id, value)}
+                  onImageChange={(next) => handleImageChange(block.id, next)}
+                  manage={manage}
+                  pageHasUnsaved={anyDirty}
+                />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </section>
+    );
+  });
+
+  const content = (
+    <div className="space-y-6">
+      {topSlot}
+      {groups.length === 0 ? emptyState : sections}
+      {structureSlot}
+    </div>
+  );
+
+  /* Sparrad: sticky inuti innehållskolumnen – aldrig fixed över sidomenyn. */
+  const saveBar =
+    groups.length === 0 ? null : (
+      <div
+        className={cn(
+          "sticky bottom-0 z-10 -mx-4 mt-6 -mb-6 border-t border-neutral-200 bg-white/90 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 md:-mx-8 md:-mb-8 md:px-8",
+          // I den delade vyn ligger raden längst ner i fältkolumnens egen scroll.
+          previewOpen && "lg:-mx-6 lg:mb-0 lg:px-6",
+        )}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <div aria-live="polite" className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+            {undoNotice && !anyDirty ? (
+              <span className="text-neutral-600">{undoNotice}</span>
+            ) : anyDirty ? (
+              <span className="flex items-center gap-2 font-medium text-amber-700">
+                <span aria-hidden className="size-2 rounded-full bg-amber-500" />
+                {unsavedLabel(dirtyCount)}
+              </span>
+            ) : lastSave?.undoId ? (
+              <>
+                <span className="flex items-center gap-1.5 text-neutral-700">
+                  <CircleCheck aria-hidden className="size-4 text-emerald-600" />
+                  Sparat på sajten
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon={<Undo2 />}
+                  loading={undoing}
+                  onClick={() => lastSave && undoSave(lastSave)}
+                  className="-ml-1"
+                >
+                  {undoing ? "Ångrar…" : "Ångra"}
+                </Button>
+                {pageUrl && !previewOpen ? (
+                  <a
+                    href={pageUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 rounded-md text-sm text-brand-700 underline-offset-2 hover:text-brand-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50 focus-visible:ring-offset-2"
+                  >
+                    Visa sidan
+                    <ExternalLink aria-hidden className="size-3.5" />
+                    <span className="sr-only">(öppnas i ny flik)</span>
+                  </a>
+                ) : null}
+              </>
+            ) : savingAll ? (
+              <span className="text-neutral-500">Sparar…</span>
+            ) : (
+              <span className="text-neutral-500">Inga osparade ändringar</span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className={cn("hidden items-center gap-1.5 text-xs text-neutral-500 sm:flex", previewOpen && "lg:hidden xl:flex")}>
+              <Kbd>{isMac ? "⌘S" : "Ctrl+S"}</Kbd>
+            </span>
+            <Button onClick={() => saveAll()} disabled={!anyDirty} loading={savingAll}>
+              {savingAll ? "Sparar hela sidan…" : "Spara hela sidan"}
+            </Button>
+          </div>
+        </div>
       </div>
     );
+
+  if (previewOpen && preview && pageSlug !== undefined) {
+    return (
+      <div
+        data-preview-workspace=""
+        className="lg:fixed lg:inset-y-0 lg:right-0 lg:left-[260px] lg:top-14 lg:z-[15] lg:flex lg:bg-neutral-50"
+      >
+        {/* Mobil/surfplatta: flikar i stället för delad vy. */}
+        <div className="sticky top-14 z-10 -mx-4 mb-5 border-b border-neutral-200 bg-neutral-50/90 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6 md:-mx-8 md:px-8 lg:hidden">
+          <div role="tablist" aria-label="Redigera eller förhandsgranska" className="grid grid-cols-2 gap-1 rounded-lg bg-neutral-200/70 p-1">
+            <MobileTabButton
+              selected={mobileTab === "edit"}
+              controls="sidredigerare-falt"
+              onClick={() => showMobileTab("edit")}
+              icon={<PencilLine />}
+            >
+              Redigera
+              {anyDirty ? (
+                <span title={unsavedLabel(dirtyCount)} className="size-1.5 rounded-full bg-amber-500">
+                  <span className="sr-only">({unsavedLabel(dirtyCount)})</span>
+                </span>
+              ) : null}
+            </MobileTabButton>
+            <MobileTabButton
+              selected={mobileTab === "preview"}
+              controls="sidredigerare-forhandsgranskning"
+              onClick={() => showMobileTab("preview")}
+              icon={<Eye />}
+            >
+              Förhandsgranska
+            </MobileTabButton>
+          </div>
+        </div>
+
+        {/* Fälten */}
+        <div
+          id="sidredigerare-falt"
+          ref={editorRootRef}
+          className={cn(
+            mobileTab !== "edit" && "max-lg:hidden",
+            "lg:flex lg:w-[clamp(400px,40%,520px)] lg:shrink-0 lg:flex-col lg:border-r lg:border-neutral-200",
+          )}
+        >
+          <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain lg:px-6 lg:pt-5">
+            <div className="mb-5 hidden lg:block">
+              <Link
+                href={`/admin/sites/${siteId}/pages`}
+                className="-ml-1 inline-flex items-center gap-0.5 rounded-md px-1 text-xs font-medium text-neutral-500 transition-colors duration-150 hover:text-neutral-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50"
+              >
+                <ChevronLeft aria-hidden className="size-3.5" />
+                Sidor
+              </Link>
+              <h2 className="mt-1 truncate text-lg font-semibold tracking-tight text-neutral-900">{preview.pageTitle}</h2>
+              <p className="mt-0.5 text-xs text-neutral-500">{preview.pageMeta}</p>
+            </div>
+            {content}
+            {saveBar}
+          </div>
+        </div>
+
+        {/* Sajten */}
+        <div
+          id="sidredigerare-forhandsgranskning"
+          ref={previewPaneRef}
+          className={cn(
+            mobileTab !== "preview" && "max-lg:hidden",
+            "-mx-4 -mb-6 h-[calc(100dvh-6.75rem)] scroll-mt-[6.75rem] sm:-mx-6 md:-mx-8 md:-mb-8",
+            "lg:m-0 lg:h-auto lg:min-w-0 lg:flex-1",
+          )}
+        >
+          <LivePreview
+            ref={livePreviewRef}
+            siteId={siteId}
+            pageSlug={pageSlug}
+            initialPath={previewPathForPage(pageSlug)}
+            isOwner={preview.isOwner}
+            getUnsaved={getUnsaved}
+            unsavedKey={JSON.stringify(groups.flatMap((group) => changedInGroup(group)))}
+            onFocusField={focusFieldFromPreview}
+            device={previewPrefs.device}
+            onDeviceChange={(device) => setPreviewPrefs({ device })}
+            overlays={previewPrefs.overlays}
+            onOverlaysChange={(overlays) => setPreviewPrefs({ overlays })}
+            onClose={() => setPreviewPrefs({ open: false })}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (groups.length === 0) {
+    return <div className="lg:max-w-3xl">{content}</div>;
   }
 
   return (
     <div className="lg:flex lg:gap-10">
       {/* Innehållskolumn */}
       <div className="min-w-0 flex-1 lg:max-w-3xl">
-        <div className="space-y-6">
-          {groups.map((group) => {
-            const status = groupStatus[group.key] ?? "idle";
-            const dirty = changedInGroup(group).length > 0;
-            const description = groupDescription(group.key);
-            const titleId = `${groupAnchor(group.key)}-titel`;
-
-            return (
-              <section
-                key={group.key}
-                id={groupAnchor(group.key)}
-                aria-labelledby={titleId}
-                tabIndex={-1}
-                className="scroll-mt-20 rounded-xl focus:outline-none"
-              >
-                <Card>
-                  <CardHeader
-                    actions={
-                      <>
-                        <span aria-live="polite" className="flex items-center">
-                          {status === "saved" && !dirty ? (
-                            <Badge tone="success">Sparat ✓</Badge>
-                          ) : dirty && status !== "saving" ? (
-                            <span className="flex items-center gap-1.5 text-xs font-medium text-amber-700">
-                              <span aria-hidden className="size-1.5 rounded-full bg-amber-500" />
-                              Ej sparat
-                            </span>
-                          ) : null}
-                        </span>
-                        <Button
-                          size="sm"
-                          variant={dirty ? "primary" : "secondary"}
-                          onClick={() => saveGroup(group)}
-                          disabled={!dirty || status === "saving" || savingAll}
-                        >
-                          {status === "saving" ? "Sparar…" : "Spara"}
-                        </Button>
-                      </>
-                    }
-                  >
-                    <CardTitle id={titleId}>{group.title}</CardTitle>
-                    {description ? <CardDescription>{description}</CardDescription> : null}
-                  </CardHeader>
-
-                  <CardContent className="space-y-5">
-                    {status === "error" && groupError[group.key] ? (
-                      <Alert tone="danger">{groupError[group.key]}</Alert>
-                    ) : null}
-
-                    {group.blocks.map((block) => (
-                      <BlockField
-                        key={block.id}
-                        block={block}
-                        siteId={siteId}
-                        value={values[block.id] ?? ""}
-                        alt={alts[block.id] ?? ""}
-                        dirty={isBlockDirty(block)}
-                        onChange={(value) => handleChange(block.id, value)}
-                        onImageChange={(next) => handleImageChange(block.id, next)}
-                        manage={manage}
-                        pageHasUnsaved={anyDirty}
-                      />
-                    ))}
-                  </CardContent>
-                </Card>
-              </section>
-            );
-          })}
-
-          {structureSlot}
-        </div>
-
-        {/* Sparrad: sticky inuti innehållskolumnen – aldrig fixed över sidomenyn. */}
-        <div className="sticky bottom-0 z-10 -mx-4 mt-6 -mb-6 border-t border-neutral-200 bg-white/90 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 md:-mx-8 md:-mb-8 md:px-8">
-          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-            <div aria-live="polite" className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-              {undoNotice && !anyDirty ? (
-                <span className="text-neutral-600">{undoNotice}</span>
-              ) : anyDirty ? (
-                <span className="flex items-center gap-2 font-medium text-amber-700">
-                  <span aria-hidden className="size-2 rounded-full bg-amber-500" />
-                  {unsavedLabel(dirtyCount)}
-                </span>
-              ) : lastSave?.undoId ? (
-                <>
-                  <span className="flex items-center gap-1.5 text-neutral-700">
-                    <CircleCheck aria-hidden className="size-4 text-emerald-600" />
-                    Sparat på sajten
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    icon={<Undo2 />}
-                    loading={undoing}
-                    onClick={() => lastSave && undoSave(lastSave)}
-                    className="-ml-1"
-                  >
-                    {undoing ? "Ångrar…" : "Ångra"}
-                  </Button>
-                  {pageUrl ? (
-                    <a
-                      href={pageUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 rounded-md text-sm text-brand-700 underline-offset-2 hover:text-brand-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50 focus-visible:ring-offset-2"
-                    >
-                      Visa sidan
-                      <ExternalLink aria-hidden className="size-3.5" />
-                      <span className="sr-only">(öppnas i ny flik)</span>
-                    </a>
-                  ) : null}
-                </>
-              ) : savingAll ? (
-                <span className="text-neutral-500">Sparar…</span>
-              ) : (
-                <span className="text-neutral-500">Inga osparade ändringar</span>
-              )}
-            </div>
-
-            <div className="flex items-center gap-3">
-              <span className="hidden items-center gap-1.5 text-xs text-neutral-500 sm:flex">
-                <Kbd>{isMac ? "⌘S" : "Ctrl+S"}</Kbd>
-              </span>
-              <Button onClick={() => saveAll()} disabled={!anyDirty} loading={savingAll}>
-                {savingAll ? "Sparar hela sidan…" : "Spara hela sidan"}
-              </Button>
-            </div>
-          </div>
-        </div>
+        {content}
+        {saveBar}
       </div>
 
       {/* Sektionsnavigering (desktop) */}
@@ -608,6 +924,40 @@ export default function PageBlockEditor({
         </nav>
       </aside>
     </div>
+  );
+}
+
+function MobileTabButton({
+  selected,
+  controls,
+  onClick,
+  icon,
+  children,
+}: {
+  selected: boolean;
+  controls: string;
+  onClick: () => void;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={selected}
+      aria-controls={controls}
+      onClick={onClick}
+      className={cn(
+        "inline-flex h-9 items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors duration-150",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50",
+        selected ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-600 hover:text-neutral-900",
+      )}
+    >
+      <span aria-hidden className="inline-flex [&>svg]:size-4">
+        {icon}
+      </span>
+      {children}
+    </button>
   );
 }
 

@@ -12,6 +12,7 @@ import { slugify } from "@/components/content/slugify";
 import { apiKeyColumns, generateApiKey } from "@/lib/api-keys";
 import { setReveal } from "@/lib/reveal-flash";
 import { revalidateUrlForDomain, revalidateUrlProblem } from "@/lib/webhook-url";
+import { normalizePreviewUrl, previewUrlProblem } from "@/lib/preview";
 
 function readString(formData: FormData, key: string): string {
   const value = formData.get(key);
@@ -154,6 +155,10 @@ export async function createSite(formData: FormData): Promise<void> {
  * A new revalidate URL is validated (revalidateUrlProblem): http(s) only, no
  * credentials, no localhost/private IP literal. Errors redirect back with
  * `?error=revalidate-url-…`.
+ *
+ * "Adress för förhandsgranskning" (`previewUrl`, live preview) must be
+ * https:// or http://localhost[:port] (previewUrlProblem); empty clears it.
+ * Errors redirect back with `?error=preview-url-invalid`.
  */
 export async function updateSiteSettings(siteId: string, formData: FormData): Promise<void> {
   const user = await requireSiteOwner(siteId);
@@ -162,12 +167,19 @@ export async function updateSiteSettings(siteId: string, formData: FormData): Pr
   const domain = readString(formData, "domain") || null;
   let revalidateUrl = readString(formData, "revalidateUrl") || null;
   const notifyEmail = readString(formData, "notifyEmail") || null;
+  const previewUrlInput = readString(formData, "previewUrl");
 
   if (!name) {
     redirect(`${settingsPath(siteId, formData)}?error=missing`);
   }
   if (notifyEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(notifyEmail)) {
     redirect(`${settingsPath(siteId, formData)}?error=notify-email`);
+  }
+  if (previewUrlInput) {
+    const problem = previewUrlProblem(previewUrlInput);
+    if (problem) {
+      redirect(`${settingsPath(siteId, formData)}?error=${problem}`);
+    }
   }
 
   const [current] = await db
@@ -209,6 +221,7 @@ export async function updateSiteSettings(siteId: string, formData: FormData): Pr
   if (hasDomainField) update.domain = domain;
   if (hasRevalidateField || autoRevalidateUrl) update.revalidateUrl = revalidateUrl;
   if (formData.has("notifyEmail")) update.notifyEmail = notifyEmail;
+  if (formData.has("previewUrl")) update.previewUrl = previewUrlInput ? normalizePreviewUrl(previewUrlInput) : null;
 
   await db.update(sites).set(update).where(eq(sites.id, siteId));
 

@@ -45,6 +45,10 @@ export const sites = pgTable("sites", {
   // Where new quote requests (offertförfrågningar) are e-mailed. Null = the
   // request is only stored and listed in the panel.
   notifyEmail: text("notify_email"),
+  // Optional base URL for the live preview (e.g. a branch deploy). Null =
+  // fall back to https://{domain}, then the revalidate URL's origin
+  // (lib/preview.ts → previewBaseUrl). See docs/LIVE-PREVIEW.md.
+  previewUrl: text("preview_url"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
@@ -251,6 +255,33 @@ export const authTokens = pgTable("auth_tokens", {
 ]);
 
 // ---------------------------------------------------------------------------
+// preview_sessions (live preview in the page editor, docs/LIVE-PREVIEW.md)
+// ---------------------------------------------------------------------------
+/** Unsaved block values shown only in a preview session. Replaced wholesale on every update. */
+export type PreviewOverrides = {
+  blocks: Record<string, { value: string; alt: string | null }>;
+};
+
+export const previewSessions = pgTable("preview_sessions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  // sha256-hex of the raw token ("scp_…"). The raw token is never stored.
+  tokenHash: text("token_hash").notNull(),
+  // Origin the panel ran on when the session was created (from the request,
+  // never from the client), e.g. https://sitecms.se or http://localhost:3000.
+  panelOrigin: text("panel_origin").notNull(),
+  overrides: jsonb("overrides").$type<PreviewOverrides>().notNull().default({ blocks: {} }),
+  // now + 2 h, sliding on every setPreviewOverrides.
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("preview_sessions_token_hash_idx").on(table.tokenHash),
+  index("preview_sessions_site_expires_idx").on(table.siteId, table.expiresAt),
+]);
+
+// ---------------------------------------------------------------------------
 // audit_logs
 // ---------------------------------------------------------------------------
 export const auditLogs = pgTable("audit_logs", {
@@ -319,11 +350,18 @@ export const sitesRelations = relations(sites, ({ many }) => ({
   apiKeys: many(apiKeys),
   auditLogs: many(auditLogs),
   quoteRequests: many(quoteRequests),
+  previewSessions: many(previewSessions),
 }));
 
 export const usersRelations = relations(users, ({ many }) => ({
   memberships: many(memberships),
   authTokens: many(authTokens),
+  previewSessions: many(previewSessions),
+}));
+
+export const previewSessionsRelations = relations(previewSessions, ({ one }) => ({
+  site: one(sites, { fields: [previewSessions.siteId], references: [sites.id] }),
+  user: one(users, { fields: [previewSessions.userId], references: [users.id] }),
 }));
 
 export const authTokensRelations = relations(authTokens, ({ one }) => ({

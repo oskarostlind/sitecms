@@ -3,6 +3,8 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import { db, blocks, pages, seoMeta, services } from "@/lib/db";
 import { CONTENT_CACHE_HEADERS, type ApiSite } from "@/app/api/v1/_lib/auth";
 import { markdownToHtml } from "@/lib/markdown";
+import { applyPreviewOverrides, findValidPreviewSession, readPreviewHeader } from "@/lib/preview";
+import { previewInvalidResponse } from "@/app/api/v1/_lib/preview";
 
 /**
  * Shared body of GET /api/v1/sites/[slug]/content and GET /api/v1/site/content.
@@ -19,8 +21,21 @@ import { markdownToHtml } from "@/lib/markdown";
  *         instead of literal ** characters)
  *   label, help  editor label/help text (usually from schema sync), or null
  * Pages likewise carry `description` (or null).
+ *
+ * Live preview (docs/LIVE-PREVIEW.md §3.1): when the request carries
+ * `x-sitecms-preview: <token>` for a valid session on this site, the
+ * session's unsaved values replace `value` (and `alt` when the override has
+ * one), `html` is recomputed from the merged markdown, and the body gets
+ * `"preview": true`. Invalid/expired token → 401 `preview_invalid`. Without
+ * the header the response is exactly as before.
  */
-export async function contentResponse(site: ApiSite): Promise<Response> {
+export async function contentResponse(site: ApiSite, request?: Request): Promise<Response> {
+  const previewToken = request ? readPreviewHeader(request) : null;
+  const previewSession = previewToken ? await findValidPreviewSession(site.id, previewToken) : null;
+  if (previewToken && !previewSession) {
+    return previewInvalidResponse();
+  }
+
   const [sitePages, siteServices, siteSeo] = await Promise.all([
     db.select().from(pages).where(eq(pages.siteId, site.id)).orderBy(asc(pages.sortOrder)),
     db
@@ -32,13 +47,14 @@ export async function contentResponse(site: ApiSite): Promise<Response> {
   ]);
 
   const pageIds = sitePages.map((page) => page.id);
-  const allBlocks = pageIds.length
+  const savedBlocks = pageIds.length
     ? await db
         .select()
         .from(blocks)
         .where(inArray(blocks.pageId, pageIds))
         .orderBy(asc(blocks.sortOrder))
     : [];
+  const allBlocks = previewSession ? applyPreviewOverrides(savedBlocks, previewSession.overrides) : savedBlocks;
 
   const blocksByPageId = new Map<string, typeof allBlocks>();
   for (const block of allBlocks) {
@@ -77,6 +93,7 @@ export async function contentResponse(site: ApiSite): Promise<Response> {
       description: entry.description,
       ogImage: entry.ogImage,
     })),
+    ...(previewSession ? { preview: true } : {}),
   };
 
   return NextResponse.json(body, { headers: CONTENT_CACHE_HEADERS });

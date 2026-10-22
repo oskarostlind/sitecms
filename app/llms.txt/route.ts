@@ -11,6 +11,14 @@ import {
   npmRevalidateSnippet,
   npmSeoSnippet,
   npmUsageSnippet,
+  PREVIEW_FILES,
+  PREVIEW_INSTALL,
+  PREVIEW_ROUTE_PATH,
+  PREVIEW_STEPS,
+  previewEditableSnippet,
+  previewLayoutSnippet,
+  previewNextConfigSnippet,
+  previewRouteSnippet,
   REVALIDATE_ROUTE_PATH,
   SITE_API_PATH,
   SNIPPET_FILES,
@@ -97,6 +105,51 @@ ${code("tsx", npmSeoSnippet())}
 
 ${code("tsx", npmPostsSnippet())}
 
+## Live-förhandsgranskning (sitecms-next 0.4+)
+
+När kunden redigerar en sida i panelen visas den riktiga sajten i en iframe bredvid fälten och uppdateras medan hen skriver, innan något sparas. Osparade ändringar ligger bara i en kortlivad session (2 h, förlängs medan kunden skriver) och syns bara i förhandsgranskningen. Det finns inga utkast — Spara går live direkt som vanligt. Inga nya miljövariabler.
+
+Steg på kundsajten:
+
+${PREVIEW_STEPS.map((s, i) => `${i + 1}. ${s}`).join("\n")}
+
+${code("bash", PREVIEW_INSTALL)}
+
+### ${PREVIEW_FILES.route}
+
+${code("ts", previewRouteSnippet())}
+
+\`GET ${PREVIEW_ROUTE_PATH}?token=<t>&path=<p>\` verifierar token mot \`GET ${SITE_API_PATH}/preview\`, slår på draft mode, sätter cookies (SameSite=None; Secure; Partitioned — på http://localhost vanliga cookies) och svarar 307 till \`path\`. \`?disable=1&path=/\` stänger av draft mode.
+
+### ${PREVIEW_FILES.layout}
+
+${code("tsx", previewLayoutSnippet())}
+
+### Markera redigerbara element
+
+${code("tsx", previewEditableSnippet())}
+
+- \`editable(sida, nyckel)\` → \`{ "data-sitecms": "sida:nyckel" }\`. Samma sida (slug) och nyckel som i \`${SNIPPET_FILES.config}\`; båda matchar \`^[a-z0-9._-]+$\`. Attributet renderas alltid och är ofarligt i produktion.
+- Sätt det på elementet som innehåller texten (direkta textbyten kräver att elementet saknar barnelement) eller på \`<img>\`/ett element runt bilden.
+- I draft mode hämtar \`getContent()\` automatiskt med headern \`x-sitecms-preview\` och utan cache. Vid fel visas vanligt innehåll — sajten går aldrig sönder.
+
+### ${PREVIEW_FILES.nextConfig}
+
+${code("ts", previewNextConfigSnippet())}
+
+- \`previewFrameHeaders(panelOrigins?)\` → \`[{ key: "Content-Security-Policy", value: "frame-ancestors 'self' https://sitecms.se https://www.sitecms.se" }]\`. Ange egna origins om panelen körs någon annanstans (t.ex. \`["http://localhost:3000"]\`).
+- Ta bort \`X-Frame-Options\` — den blockerar iframen. Har sajten redan en CSP: lägg till \`frame-ancestors\` i den.
+
+### Adressen panelen öppnar
+
+"Adress för förhandsgranskning" under Inställningar (https:// eller http://localhost) → \`https://\` + sajtens domän → origin för revalidate-URL:en om den slutar på \`${REVALIDATE_ROUTE_PATH}\`. Startsidan (\`home\`) öppnas som \`/\`, övriga sidor som \`/slug\`.
+
+### postMessage (hanteras av \`<SitecmsPreview />\`, v1)
+
+- Panel → sajt (\`source: "sitecms"\`, \`v: 1\`): \`refresh\`, \`patch { page, key, kind: "text" | "image", value, alt? }\`, \`highlight { page, key }\`, \`overlays { enabled }\`.
+- Sajt → panel (\`source: "sitecms-preview"\`, \`v: 1\`): \`ready { path, title, fields }\`, \`refreshed { path }\`, \`focus { page, key }\`.
+- Sajten tar bara emot från \`panelOrigin\` och postar bara dit; panelen bara till och från iframens origin.
+
 ## Vanliga misstag
 
 - Hämta innehållet i en klientkomponent (\`"use client"\`) eller i webbläsaren: API-nyckeln exponeras. Hämta alltid på servern.
@@ -116,6 +169,8 @@ Bas-URL: \`${API}\`. Autentisering: headern \`x-api-key: <CMS_API_KEY>\` — nyc
 - \`GET ${SITE_API_PATH}/schema\` → nuvarande struktur, med \`hasValue\` per block.
 - \`POST ${SITE_API_PATH}/schema\` → synka struktur. Body: \`{ "version": 1, "pages": [...], "prune"?: false, "siteUrl"?: "https://kund.se" }\`. Svar: \`{ "ok": true, "created": { "pages", "blocks" }, "updated": { "pages", "blocks" }, "orphans": [{ "pageSlug", "key" }], "revalidateUrl": string | null }\`. Ogiltigt schema → 400 \`{ "error", "issues": [...] }\`. \`siteUrl\` (publik https-adress) används för att fylla i revalidate-URL:en om den saknas — befintliga värden skrivs aldrig över.
 - \`GET ${SITE_API_PATH}/health\` → \`{ "ok": true, "site": { "name", "slug" }, "pages", "lastSchemaSyncAt", "revalidateUrl", "webhook": { "configured", "lastStatus": "ok" | "failed" | null, "lastAt", "lastError" } }\` — \`revalidateUrl\` visas i sin helhet bara när sökvägen är \`/api/sitecms/revalidate\`, annars maskerad som \`https://värd/••••\`.
+- \`GET ${SITE_API_PATH}/preview\` (headers \`x-api-key\` + \`x-sitecms-preview\`) → \`{ "ok": true, "expiresAt", "panelOrigin" }\` eller 401 \`{ "error", "code": "preview_invalid" }\`. Används av preview-routen.
+- \`x-sitecms-preview: <token>\` på \`GET ${SITE_API_PATH}/content\` → panelens osparade värden i \`value\`/\`alt\`/\`html\` och \`"preview": true\`; ogiltig/utgången token → 401 \`preview_invalid\`. Utan headern är svaret oförändrat.
 - \`POST ${SITE_API_PATH}/quote-requests\` → offertförfrågan från sajtens formulär (server-till-server).
 - Fel: \`{ "error": "…" }\` med 400 (ogiltig förfrågan), 401 (nyckel saknas/ogiltig), 404 (hittades inte), 413 (för stor body).
 - Äldre slug-routes \`${LEGACY_SITE_API_PATH}/<slug>/…\` finns kvar med identiska svar.
@@ -149,6 +204,7 @@ ${aiPromptSnippet()}
 - [API-referens](${DOCS_URL}#api)
 - [Webhook-signaturen](${DOCS_URL}#api-webhook)
 - [Deploy hooks](${DOCS_URL}#deploy-hooks)
+- [Live-förhandsgranskning](${DOCS_URL}#forhandsgranskning)
 - [Uppgradera från sitecms-next 0.2](${DOCS_URL}#uppgradera)
 - [npm: sitecms-next](https://www.npmjs.com/package/sitecms-next)
 `;

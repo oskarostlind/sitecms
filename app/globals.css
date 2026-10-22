@@ -228,3 +228,46 @@
   from { opacity: 0.35; }
   to { opacity: 0.85; }
 }
+
+/* ---------------------------------------------------------------------------
+   Live-förhandsgranskning (components/admin/LivePreview.tsx): tunn,
+   obestämd laddningslist överst i förhandsgranskningen.
+--------------------------------------------------------------------------- */
+
+@keyframes live-preview-progress {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+
+.live-preview-progress {
+  animation: live-preview-progress 1.1s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+/* Fältet som just valts genom klick i förhandsgranskningen blinkar kort. */
+@keyframes live-preview-flash {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  20%,
+  60% {
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-brand-400) 70%, transparent);
+  }
+}
+
+[data-preview-flash="true"] {
+  border-radius: 0.625rem;
+  animation: live-preview-flash 1.2s ease-out 1;
+}
+
+/* Delad förhandsgranskningsvy (≥1024 px) täcker innehållsytan och har egen
+   rubrik — sidhuvudet bakom döljs så att det inte går att tabba till. */
+@media (min-width: 1024px) {
+  body:has([data-preview-workspace]) [data-editor-header] {
+    display: none;
+  }
+}

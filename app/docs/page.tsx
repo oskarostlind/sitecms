@@ -38,6 +38,13 @@ import {
   npmVerifyWebhookSnippet,
   packageJsonSnippet,
   PLACEHOLDER_SITE,
+  PREVIEW_FILES,
+  PREVIEW_INSTALL,
+  PREVIEW_ROUTE_PATH,
+  previewEditableSnippet,
+  previewLayoutSnippet,
+  previewNextConfigSnippet,
+  previewRouteSnippet,
   REVALIDATE_ROUTE_PATH,
   revalidateCurlSnippet,
   revalidateRouteSnippet,
@@ -170,6 +177,29 @@ const HEALTH_RESPONSE = `{
 
 const ERROR_RESPONSE = `{ "error": "Ogiltig API-nyckel." }`;
 
+const PREVIEW_VERIFY_RESPONSE = `{
+  "ok": true,
+  "expiresAt": "2026-10-21T16:42:00.000Z",
+  "panelOrigin": "https://sitecms.se"
+}`;
+
+const PREVIEW_INVALID_RESPONSE = `{
+  "error": "Förhandsgranskningen har gått ut. Öppna den igen i sitecms.",
+  "code": "preview_invalid"
+}`;
+
+/** Panelen bäddar in sajten via kundsajtens preview-route. */
+const PREVIEW_FLOW = `Panelen                                     Kundsajten
+────────                                     ──────────
+Förhandsgranska → kortlivad session (2 h)
+iframe: https://din-sajt.se${PREVIEW_ROUTE_PATH}?token=…&path=/
+                                       ───►  verifierar token (GET …/preview)
+                                             draft mode på + cookies → 307 till /
+                                       ◄───  sidan renderas med osparade värden
+kunden skriver   ── text/bild direkt   ───►  byts i sidan
+                 ── efter 400 ms       ───►  sidan renderas om
+klick på ett markerat element          ◄───  fältet fokuseras i panelen`;
+
 const WEBHOOK_HEADERS = `POST https://jjbygg.se${REVALIDATE_ROUTE_PATH}
 content-type: application/json
 user-agent: sitecms-webhook
@@ -223,6 +253,15 @@ const TOC: { id: string; label: string; children?: { id: string; label: string }
       { id: "npm-manuellt", label: "Utan init" },
     ],
   },
+  {
+    id: "forhandsgranskning",
+    label: "Live-förhandsgranskning",
+    children: [
+      { id: "forhandsgranskning-steg", label: "Slå på den" },
+      { id: "forhandsgranskning-adress", label: "Vilken adress öppnas" },
+      { id: "forhandsgranskning-felsok", label: "Felsökning" },
+    ],
+  },
   { id: "ai", label: "Med en AI-assistent" },
   { id: "deploy-hooks", label: "Andra ramverk: deploy hooks" },
   { id: "cli", label: "CLI: sitecms-next" },
@@ -238,6 +277,7 @@ const TOC: { id: string; label: string; children?: { id: string; label: string }
       { id: "api-schema-get", label: "GET schema" },
       { id: "api-schema-post", label: "POST schema" },
       { id: "api-health", label: "GET health" },
+      { id: "api-preview", label: "GET preview" },
       { id: "api-webhook", label: "Webhook och signatur" },
       { id: "api-verifiera", label: "verifyWebhook()" },
       { id: "api-fel", label: "Felkoder" },
@@ -486,7 +526,7 @@ function Toc() {
   );
 }
 
-const DOCS_MODIFIED = "2026-10-21";
+const DOCS_MODIFIED = "2026-10-22";
 
 export default function DocsPage() {
   return (
@@ -745,6 +785,157 @@ export default function DocsPage() {
             </SubSection>
           </Section>
 
+
+          {/* Live-förhandsgranskning */}
+          <Section
+            id="forhandsgranskning"
+            eyebrow="sitecms-next 0.4"
+            title="Live-förhandsgranskning"
+            intro={
+              <>
+                Kunden ser sin riktiga sajt bredvid fälten när hen redigerar en sida, och den uppdateras medan hen skriver
+                — innan något sparas. Klick på en rubrik eller bild i sajten öppnar rätt fält. <strong>Spara</strong>{" "}
+                fungerar som vanligt och går ut på sajten direkt.
+              </>
+            }
+          >
+            <Prose>
+              <ul>
+                <li>
+                  Osparade ändringar ligger bara i en kortlivad session (2 timmar, förlängs medan kunden skriver) och
+                  syns bara i förhandsgranskningen — aldrig för besökare.
+                </li>
+                <li>
+                  Sajten visas i draft mode i en iframe. Bara förhandsgranskningen renderas dynamiskt; vanliga besök
+                  får samma statiska, cachade sidor som förut.
+                </li>
+                <li>
+                  Textfält och bilder byts direkt i sidan. Formaterad text och allt annat visas när sidan renderats om,
+                  cirka en halv sekund efter att kunden slutat skriva.
+                </li>
+                <li>Inga utkast: en sida är antingen sparad (live) eller osparad i panelen.</li>
+              </ul>
+            </Prose>
+            <CodeBlock code={PREVIEW_FLOW} filename="Flödet" language="text" maxHeight={null} />
+
+            <SubSection id="forhandsgranskning-steg" title="Slå på den — fem steg">
+              <Prose>
+                <p>
+                  <strong>1. Uppgradera paketet</strong> till 0.4 eller senare. Sajter på 0.2/0.3 fungerar som förut,
+                  men utan förhandsgranskning.
+                </p>
+              </Prose>
+              <CodeBlock code={PREVIEW_INSTALL} language="bash" maxHeight={null} />
+              <Prose>
+                <p>
+                  <strong>2. Skapa routen</strong> som panelens iframe öppnar. Den verifierar token mot sitecms, slår på
+                  draft mode och skickar vidare till sidan.
+                </p>
+              </Prose>
+              <CodeBlock code={previewRouteSnippet()} filename={PREVIEW_FILES.route} language="ts" maxHeight={null} />
+              <Prose>
+                <p>
+                  <strong>3. Lägg <code>&lt;SitecmsPreview /&gt;</code> i layouten</strong>, sist i{" "}
+                  <code>&lt;body&gt;</code>. Den renderar ingenting utanför förhandsgranskningen och tar emot
+                  ändringarna från panelen. Öppnar du sajten i draft mode utanför panelen visas en liten list med{" "}
+                  <strong>Avsluta</strong>.
+                </p>
+              </Prose>
+              <CodeBlock code={previewLayoutSnippet()} filename={PREVIEW_FILES.layout} language="tsx" maxHeight={null} />
+              <Prose>
+                <p>
+                  <strong>4. Markera vad som går att klicka på</strong> med <code>editable(sida, nyckel)</code> — samma
+                  sida och nyckel som i <code>{SNIPPET_FILES.config}</code>. Det sätter{" "}
+                  <code>data-sitecms=&quot;sida:nyckel&quot;</code> på elementet (ofarligt i produktion). Sätt det på
+                  elementet som innehåller själva texten: direkta textbyten fungerar bara när elementet inte har egna
+                  barnelement. För bilder: på <code>&lt;img&gt;</code> eller ett element runt den.
+                </p>
+              </Prose>
+              <CodeBlock code={previewEditableSnippet()} filename="app/page.tsx" language="tsx" />
+              <Prose>
+                <p>
+                  <strong>5. Tillåt att panelen bäddar in sajten.</strong> <code>previewFrameHeaders()</code> ger en{" "}
+                  <code>Content-Security-Policy</code> med <code>frame-ancestors</code> för sitecms. Ta bort{" "}
+                  <code>X-Frame-Options</code> om sajten sätter den (CSP:n ersätter den). Har sajten redan en CSP: lägg
+                  till <code>frame-ancestors</code> i den i stället för en andra header.
+                </p>
+              </Prose>
+              <CodeBlock code={previewNextConfigSnippet()} filename={PREVIEW_FILES.nextConfig} language="ts" maxHeight={null} />
+              <Prose>
+                <p>
+                  Deploya och öppna en sida i panelen → <strong>Förhandsgranska</strong>. Inga nya miljövariabler
+                  behövs — routen använder samma <code>CMS_API_KEY</code>.
+                </p>
+              </Prose>
+            </SubSection>
+
+            <SubSection id="forhandsgranskning-adress" title="Vilken adress öppnas">
+              <Prose>
+                <p>Panelen öppnar den första av:</p>
+                <ol>
+                  <li>
+                    <strong>Adress för förhandsgranskning</strong> under Inställningar — t.ex. en testadress hos
+                    webbhotellet (<code>https://min-sajt-git-utveckling.vercel.app</code>), eller{" "}
+                    <code>http://localhost:3000</code> när du utvecklar,
+                  </li>
+                  <li>
+                    <code>https://</code> + sajtens domän,
+                  </li>
+                  <li>
+                    adressen i revalidate-URL:en, om den slutar på <code>{REVALIDATE_ROUTE_PATH}</code>.
+                  </li>
+                </ol>
+                <p>
+                  Startsidan (<code>home</code>) öppnas som <code>/</code>, andra sidor som <code>/slug</code>. Kunden
+                  kan sedan klicka sig runt fritt i sajten.
+                </p>
+              </Prose>
+            </SubSection>
+
+            <SubSection id="forhandsgranskning-felsok" title="Felsökning">
+              <DocTable
+                head={["Det kunden ser", "Vanlig orsak"]}
+                rows={[
+                  [
+                    "Sajten svarar inte på förhandsgranskning",
+                    <>
+                      Panelen fick inget svar från sajten inom 10 sekunder: paketet är äldre än 0.4, routen eller{" "}
+                      <code>&lt;SitecmsPreview /&gt;</code> saknas, eller sajten skickar <code>X-Frame-Options</code> /
+                      saknar <code>frame-ancestors</code> för panelen.
+                    </>,
+                  ],
+                  [
+                    "Förhandsgranskningen kunde inte startas (på sajten)",
+                    <>
+                      Routen fick 401 när den verifierade token: <code>CMS_API_KEY</code> hör till en annan sajt, eller
+                      sessionen har gått ut. Stäng och öppna förhandsgranskningen igen.
+                    </>,
+                  ],
+                  [
+                    "Ange sajtens adress",
+                    "Sajten har varken adress för förhandsgranskning, domän eller revalidate-URL. Fyll i adressen under Inställningar.",
+                  ],
+                  [
+                    "Ändringar syns först efter Spara",
+                    <>
+                      Sidan hämtar inte innehållet med <code>getContent()</code> från sitecms-next 0.4 (t.ex. en egen
+                      klient), så den vet inte om förhandsgranskningen. Textbyten fungerar ändå på element med{" "}
+                      <code>editable()</code>.
+                    </>,
+                  ],
+                ]}
+              />
+              <Prose>
+                <p>
+                  Kör du sitecms lokalt (panelen på <code>http://localhost:3000</code>): ge panelens adress till{" "}
+                  <code>previewFrameHeaders([&quot;http://localhost:3000&quot;])</code> och ange kundsajtens lokala
+                  adress som adress för förhandsgranskning. På <code>http://localhost</code> sätter routen vanliga
+                  cookies utan <code>Secure</code>.
+                </p>
+              </Prose>
+            </SubSection>
+          </Section>
+
           {/* AI */}
           <Section
             id="ai"
@@ -952,6 +1143,13 @@ export default function DocsPage() {
                   finns färdig <code>html</code>; för bilder <code>alt</code>. <code>label</code> och{" "}
                   <code>description</code> kommer från schemat.
                 </p>
+                <p>
+                  Med headern <code>x-sitecms-preview: &lt;token&gt;</code> (bara i{" "}
+                  <DocLink href="#forhandsgranskning">förhandsgranskningen</DocLink>) innehåller svaret panelens osparade
+                  värden — <code>value</code>, <code>alt</code> och omräknad <code>html</code> — och{" "}
+                  <code>{`"preview": true`}</code>. Ogiltig eller utgången token ger <code>401</code> med{" "}
+                  <code>{`"code": "preview_invalid"`}</code>. Utan headern är svaret oförändrat.
+                </p>
               }
             >
               <CodeBlock code={CONTENT_RESPONSE} filename="200 OK" language="json" />
@@ -1040,6 +1238,24 @@ export default function DocsPage() {
             >
               <CodeBlock code={healthCurlSnippet(ctx)} language="bash" maxHeight={null} />
               <CodeBlock code={HEALTH_RESPONSE} filename="200 OK" language="json" maxHeight={null} />
+            </Endpoint>
+
+            <Endpoint
+              id="api-preview"
+              method="GET"
+              path={`${BASE}/preview`}
+              title="Verifiera en förhandsgranskning"
+              description={
+                <p>
+                  Används av kundsajtens preview-route (<code>sitecms-next/preview</code>) innan draft mode slås på.
+                  Headers: <code>x-api-key</code> och <code>x-sitecms-preview</code>. <code>panelOrigin</code> är den
+                  enda origin sajten ska ta emot meddelanden från. Fel eller utgången token, eller en token för en annan
+                  sajt, ger <code>401</code> med <code>preview_invalid</code>.
+                </p>
+              }
+            >
+              <CodeBlock code={PREVIEW_VERIFY_RESPONSE} filename="200 OK" language="json" maxHeight={null} />
+              <CodeBlock code={PREVIEW_INVALID_RESPONSE} filename="401 Unauthorized" language="json" maxHeight={null} />
             </Endpoint>
 
             <Card id="api-webhook" className="scroll-mt-28">
@@ -1142,6 +1358,7 @@ export default function DocsPage() {
                 rows={[
                   [<code key="400">400</code>, "Ogiltig förfrågan", "Schemat följer inte formatet (fel slug/key, okänd typ, fler än 100 sidor eller 200 block per sida), eller body är inte giltig JSON. Se issues."],
                   [<code key="401">401</code>, "Nyckel saknas eller är fel", <>Headern <code>x-api-key</code> saknas eller nyckeln är borttagen (med slug-adresserna även: nyckeln hör till en annan sajt).</>],
+                  [<code key="401p">401</code>, <><code>preview_invalid</code></>, <>Token i <code>x-sitecms-preview</code> är fel, har gått ut eller hör till en annan sajt. Kundsajten ska då visa vanligt innehåll.</>],
                   [<code key="404">404</code>, "Hittades inte", "Inlägget finns inte eller är inte publicerat (med slug-adresserna även: okänd sajt-slug)."],
                   [<code key="413">413</code>, "För stort", "Request-bodyn är för stor för att tas emot. Kontrollera att schemat inte innehåller stora default-värden (t.ex. base64-bilder i stället för URL:er)."],
                 ]}
