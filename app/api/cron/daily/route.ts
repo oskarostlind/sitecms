@@ -13,6 +13,15 @@ export const maxDuration = 300;
 const BATCH_SIZE = 5;
 
 /**
+ * Total deadline för PageSpeed, räknat från start. Fem parallella PSI à upp
+ * till 60 s per grupp räcker bara till ~20 sajter innan maxDuration (300 s)
+ * dödar funktionen och svaret går förlorat. När deadlinen passerat avbryts
+ * pågående PSI-anrop och resterande sajter poängsätts content-only, så alla
+ * sajter alltid får en dagsrad.
+ */
+const PAGESPEED_DEADLINE_MS = 240_000;
+
+/**
  * GET /api/cron/daily  (docs/SEO-TRAFIK.md §7) — Vercel Cron 03:15 UTC.
  *
  * Kräver `Authorization: Bearer ${CRON_SECRET}` (Vercel skickar den själv;
@@ -43,6 +52,8 @@ export async function GET(request: Request) {
 
   // 2. SEO-poäng för alla sajter.
   let scored = 0;
+  // Sajter som fick content-only för att deadlinen hade passerat (inte de utan domän).
+  let contentOnly = 0;
   const failed: { siteId: string; error: string }[] = [];
 
   let allSites: { id: string; domain: string | null }[] = [];
@@ -52,29 +63,47 @@ export async function GET(request: Request) {
     console.error("cron/daily: kunde inte lista sajter", err);
   }
 
-  for (let i = 0; i < allSites.length; i += BATCH_SIZE) {
-    const batch = allSites.slice(i, i + BATCH_SIZE);
-    const results = await Promise.allSettled(
-      batch.map((site) => runSeoScore(site.id, { skipPageSpeed: !siteUrl(site.domain) })),
-    );
-    results.forEach((result, index) => {
-      if (result.status === "fulfilled") {
-        scored += 1;
-      } else {
-        const error = result.reason instanceof Error ? result.reason.message : String(result.reason);
-        failed.push({ siteId: batch[index].id, error });
-        console.error(`cron/daily: runSeoScore misslyckades för sajt ${batch[index].id}: ${error}`);
-      }
-    });
+  // Deadline-signalen avbryter PSI-anrop som pågår när tiden går ut; fetchPageSpeed
+  // svarar då med null och sajten får content-only i stället för att kasta.
+  const deadlineAt = started + PAGESPEED_DEADLINE_MS;
+  const deadline = new AbortController();
+  const deadlineTimer = setTimeout(
+    () => deadline.abort(new Error(`cronens PageSpeed-deadline (${PAGESPEED_DEADLINE_MS / 1000} s) passerad`)),
+    PAGESPEED_DEADLINE_MS,
+  );
+
+  try {
+    for (let i = 0; i < allSites.length; i += BATCH_SIZE) {
+      const batch = allSites.slice(i, i + BATCH_SIZE);
+      const pastDeadline = Date.now() >= deadlineAt;
+      const results = await Promise.allSettled(
+        batch.map((site) => {
+          const hasDomain = Boolean(siteUrl(site.domain));
+          if (hasDomain && pastDeadline) contentOnly += 1;
+          return runSeoScore(site.id, { skipPageSpeed: !hasDomain || pastDeadline, signal: deadline.signal });
+        }),
+      );
+      results.forEach((result, index) => {
+        if (result.status === "fulfilled") {
+          scored += 1;
+        } else {
+          const error = result.reason instanceof Error ? result.reason.message : String(result.reason);
+          failed.push({ siteId: batch[index].id, error });
+          console.error(`cron/daily: runSeoScore misslyckades för sajt ${batch[index].id}: ${error}`);
+        }
+      });
+    }
+  } finally {
+    clearTimeout(deadlineTimer);
   }
 
   const ms = Date.now() - started;
   console.log(
-    `cron/daily: rensade ${purgedVisitors} besökarrader, poängsatte ${scored} sajter, ${failed.length} fel, ${ms} ms`,
+    `cron/daily: rensade ${purgedVisitors} besökarrader, poängsatte ${scored} sajter (${contentOnly} content-only p.g.a. deadline), ${failed.length} fel, ${ms} ms`,
   );
 
   return NextResponse.json(
-    { purgedVisitors, scored, failed, ms },
+    { purgedVisitors, scored, contentOnly, failed, ms },
     { headers: { "Cache-Control": "private, no-store" } },
   );
 }

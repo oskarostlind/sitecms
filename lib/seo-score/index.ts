@@ -16,9 +16,11 @@ import { combineScore, lighthouseSubScore } from "./combine";
 import { scoreContent } from "./content";
 import { loadContentInput } from "./content-load";
 import { fetchPageSpeed } from "./pagespeed";
-import type { Finding, LighthouseResult, SeoScore } from "./types";
+import { sanitizeFindings, sanitizeLighthouse } from "./sanitize";
+import type { LighthouseResult, SeoScore } from "./types";
 
 export { combineScore, lighthouseSubScore } from "./combine";
+export { sanitizeFindings, sanitizeLighthouse } from "./sanitize";
 export { scoreContent } from "./content";
 export type { ContentInput, ContentBlockInput, ContentPageInput, ContentPostInput, ContentSeoMetaInput } from "./content";
 export { loadContentInput } from "./content-load";
@@ -32,6 +34,7 @@ export function utcDay(date = new Date()): string {
 
 type SeoScoreRow = typeof seoScores.$inferSelect;
 
+/** Mappar en db-rad till SeoScore; jsonb-fälten valideras så panelen aldrig kraschar på trasig data. */
 function toSeoScore(row: SeoScoreRow): SeoScore {
   return {
     day: String(row.day),
@@ -39,8 +42,8 @@ function toSeoScore(row: SeoScoreRow): SeoScore {
     contentScore: row.contentScore,
     lighthouseScore: row.lighthouseScore ?? null,
     techScore: row.techScore ?? null,
-    findings: (row.findings ?? []) as Finding[],
-    lighthouse: (row.lighthouse ?? null) as LighthouseResult | null,
+    findings: sanitizeFindings(row.findings),
+    lighthouse: sanitizeLighthouse(row.lighthouse),
     createdAt: new Date(row.createdAt),
   };
 }

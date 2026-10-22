@@ -9,7 +9,8 @@ import {
   type ContentSeoMetaInput,
 } from "../lib/seo-score/content";
 import { combineScore, lighthouseSubScore } from "../lib/seo-score/combine";
-import { pageSpeedUrl, parsePageSpeed } from "../lib/seo-score/pagespeed";
+import { fetchPageSpeed, pageSpeedUrl, parsePageSpeed } from "../lib/seo-score/pagespeed";
+import { sanitizeFindings, sanitizeLighthouse } from "../lib/seo-score/sanitize";
 
 const NOW = new Date("2026-10-22T12:00:00.000Z");
 
@@ -511,4 +512,133 @@ assert.equal(lighthouseSubScore({ seo: 85, performance: 43, accessibility: 97 })
   );
 }
 
-console.log("seo-score: alla tester gick igenom");
+// --- sanitize: trasig jsonb får aldrig krascha panelen -------------------------
+
+{
+  assert.deepEqual(sanitizeFindings(null), []);
+  assert.deepEqual(sanitizeFindings("nope"), []);
+  assert.deepEqual(sanitizeFindings({ id: "x" }), []);
+  const cleaned = sanitizeFindings([
+    { id: "seo.title.missing", title: "1 sida saknar SEO-titel", points: 6, severity: "high", href: "/seo", count: 1, detail: "d" },
+    { id: "utan.points", title: "x" },
+    { id: 12, title: "fel typ", points: 3 },
+    { id: "nan", title: "x", points: Number.NaN },
+    { id: "okand.severity", title: "y", points: 2, severity: "critical", count: "3" },
+    null,
+    "sträng",
+  ]);
+  assert.equal(cleaned.length, 2);
+  assert.deepEqual(cleaned[0], {
+    id: "seo.title.missing",
+    title: "1 sida saknar SEO-titel",
+    points: 6,
+    severity: "high",
+    detail: "d",
+    href: "/seo",
+    count: 1,
+  });
+  assert.deepEqual(cleaned[1], { id: "okand.severity", title: "y", points: 2, severity: "low" });
+
+  assert.equal(sanitizeLighthouse(null), null);
+  assert.equal(sanitizeLighthouse(undefined), null);
+  assert.equal(sanitizeLighthouse([]), null);
+  assert.equal(sanitizeLighthouse({ performance: 50 }), null);
+  assert.equal(sanitizeLighthouse({ performance: "50", seo: 90, accessibility: 80, bestPractices: 70 }), null);
+  const lh = sanitizeLighthouse({ performance: 50, seo: 90, accessibility: 80, bestPractices: 70, lcpMs: "x", inpMs: 120 });
+  assert.deepEqual(lh, {
+    performance: 50,
+    seo: 90,
+    accessibility: 80,
+    bestPractices: 70,
+    lcpMs: null,
+    cls: null,
+    inpMs: 120,
+    strategy: "mobile",
+    fetchedAt: "",
+    url: "",
+  });
+  // Ett riktigt resultat passerar oförändrat.
+  const real = parsePageSpeed(
+    {
+      lighthouseResult: {
+        categories: { performance: { score: 0.5 }, seo: { score: 0.9 }, accessibility: { score: 0.8 }, "best-practices": { score: 0.7 } },
+        audits: { "largest-contentful-paint": { numericValue: 1000 }, "cumulative-layout-shift": { numericValue: 0.1 } },
+      },
+    },
+    "https://firma.se",
+    NOW,
+  );
+  assert.deepEqual(sanitizeLighthouse(real), real);
+}
+
+// --- fetchPageSpeed: fel och avbrott ger null, kastar aldrig -------------------
+
+(async () => {
+  const warnings: string[] = [];
+  const originalWarn = console.warn;
+  console.warn = (...args: unknown[]) => {
+    warnings.push(args.map(String).join(" "));
+  };
+  try {
+    // Redan avbruten signal (cronens deadline) → null utan nätverksanrop.
+    const aborted = new AbortController();
+    aborted.abort(new Error("deadline passerad"));
+    let called = 0;
+    const neverFetch: typeof fetch = async (_input, init) => {
+      called += 1;
+      if (init?.signal?.aborted) throw init.signal.reason;
+      return new Response("{}");
+    };
+    assert.equal(await fetchPageSpeed("https://firma.se", { signal: aborted.signal, fetchImpl: neverFetch }), null);
+    assert.equal(called, 1);
+    assert.match(warnings.at(-1) ?? "", /deadline passerad/);
+
+    // Signal som avbryts medan anropet pågår.
+    const controller = new AbortController();
+    const hanging: typeof fetch = (_input, init) =>
+      new Promise((_, reject) => init?.signal?.addEventListener("abort", () => reject(init.signal?.reason)));
+    const pending = fetchPageSpeed("https://firma.se", { signal: controller.signal, fetchImpl: hanging });
+    controller.abort(new Error("cronens deadline"));
+    assert.equal(await pending, null);
+    assert.match(warnings.at(-1) ?? "", /cronens deadline/);
+
+    // Egen timeout.
+    assert.equal(await fetchPageSpeed("https://firma.se", { fetchImpl: hanging, timeoutMs: 20 }), null);
+    assert.match(warnings.at(-1) ?? "", /timeout efter 20 ms/);
+
+    // HTTP-fel med Google-felmeddelande.
+    const quota: typeof fetch = async () =>
+      new Response(JSON.stringify({ error: { message: "Quota exceeded" } }), { status: 429 });
+    assert.equal(await fetchPageSpeed("https://firma.se", { fetchImpl: quota }), null);
+    assert.match(warnings.at(-1) ?? "", /HTTP 429 – Quota exceeded/);
+
+    // Fetch som kastar.
+    const throwing: typeof fetch = async () => {
+      throw new TypeError("fetch failed");
+    };
+    assert.equal(await fetchPageSpeed("https://firma.se", { fetchImpl: throwing }), null);
+    assert.match(warnings.at(-1) ?? "", /fetch failed/);
+
+    // Lyckat svar.
+    const ok: typeof fetch = async () =>
+      new Response(
+        JSON.stringify({
+          lighthouseResult: {
+            categories: { performance: { score: 0.5 }, seo: { score: 0.9 }, accessibility: { score: 0.8 }, "best-practices": { score: 0.7 } },
+            audits: {},
+          },
+        }),
+      );
+    const result = await fetchPageSpeed("https://firma.se", { fetchImpl: ok, apiKey: "k" });
+    assert.equal(result?.seo, 90);
+    assert.equal(result?.lcpMs, null);
+  } finally {
+    console.warn = originalWarn;
+  }
+})().then(
+  () => console.log("seo-score: alla tester gick igenom"),
+  (err) => {
+    console.error(err);
+    process.exit(1);
+  },
+);

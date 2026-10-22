@@ -12,6 +12,16 @@ import { getTodaySeoScoreRow, runSeoScore } from "@/lib/seo-score";
 /** Minsta tid mellan två manuella omräkningar per sajt (docs/SEO-TRAFIK.md §6). */
 const SCORE_RUN_COOLDOWN_MS = 10 * 60 * 1000;
 
+/**
+ * Sajter med en omräkning som pågår just nu. Db-läsningen av dagens rad
+ * stoppar omräkningar efter att en körning sparats, men två klick inom samma
+ * sekund läser båda den gamla raden och skulle båda starta PageSpeed. Det här
+ * låset sätts synkront före första await i körningen och stoppar dubbelklick
+ * på samma serverinstans. Spärren är per instans – två olika Vercel-instanser
+ * kan fortfarande köra samtidigt, vilket bara kostar ett extra PSI-anrop.
+ */
+const scoreRunsInFlight = new Set<string>();
+
 function readString(formData: FormData, key: string): string {
   const value = formData.get(key);
   return typeof value === "string" ? value.trim() : "";
@@ -121,6 +131,13 @@ export async function runSeoScoreNow(siteId: string): Promise<void> {
     redirect(`${target}?score=recent`);
   }
 
+  // Kontroll + reservation utan await emellan, så två samtidiga anrop på
+  // samma instans inte båda passerar.
+  if (scoreRunsInFlight.has(siteId)) {
+    redirect(`${target}?score=recent`);
+  }
+  scoreRunsInFlight.add(siteId);
+
   let status: "ok" | "failed" = "ok";
   try {
     const result = await runSeoScore(siteId);
@@ -137,6 +154,8 @@ export async function runSeoScoreNow(siteId: string): Promise<void> {
   } catch (err) {
     console.error(`runSeoScoreNow: misslyckades för sajt ${siteId}`, err);
     status = "failed";
+  } finally {
+    scoreRunsInFlight.delete(siteId);
   }
 
   revalidatePath(target);
