@@ -76,10 +76,12 @@ export async function eventsResponse(site: ApiSite, request: Request): Promise<R
     return error(400, "Ogiltig JSON.");
   }
 
+  // Samma UTC-dag för hashen och raden som skrivs (annars kan de glida isär vid midnatt).
+  const day = utcDay();
   const result = normalizeEvents(body, {
     siteId: site.id,
     domain: site.domain,
-    day: utcDay(),
+    day,
     salt: analyticsSalt(),
     fallbackIp: requestIp(request),
   });
@@ -91,6 +93,6 @@ export async function eventsResponse(site: ApiSite, request: Request): Promise<R
   }
 
   if (result.events.length === 0) return noContent();
-  await recordPageviews(site.id, result.events);
+  await recordPageviews(site.id, result.events, day);
   return noContent();
 }

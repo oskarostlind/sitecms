@@ -28,6 +28,17 @@ export const ANALYTICS_ROUTE_PATH = "/api/sitecms/events";
 
 /** Max storlek på body från webbläsaren (bytes). */
 const MAX_BODY_BYTES = 2048;
+/** Max väntetid på sitecms (ms) — kundens funktion får aldrig hänga på pixeln. */
+const FORWARD_TIMEOUT_MS = 5000;
+
+/** `AbortSignal.timeout` när det finns (Node 17.3+), annars egen AbortController. */
+function timeoutSignal(ms: number): { signal: AbortSignal; clear: () => void } {
+  const AS = AbortSignal as typeof AbortSignal & { timeout?: (ms: number) => AbortSignal };
+  if (typeof AS.timeout === "function") return { signal: AS.timeout(ms), clear: () => {} };
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new Error("timeout")), ms);
+  return { signal: controller.signal, clear: () => clearTimeout(timer) };
+}
 
 function env(name: string): string {
   return (typeof process !== "undefined" && process.env?.[name]?.trim()) || "";
@@ -98,6 +109,8 @@ export type AnalyticsRouteOptions = {
   apiKey?: string;
   /** Egen fetch, t.ex. för tester. Default globalThis.fetch. */
   fetch?: typeof fetch;
+  /** Max väntetid på sitecms i ms. Default 5000. */
+  timeoutMs?: number;
 };
 
 /**
@@ -106,9 +119,10 @@ export type AnalyticsRouteOptions = {
  *
  * `POST` läser `{ p, r, q }` från webbläsaren (max 2 kB), lägger till `ua`,
  * `ip` och `c` från anropet och skickar `{ events: [{…}] }` till
- * `${apiBase}/events` med `x-api-key`. Svarar alltid 204 till webbläsaren —
- * även när sitecms svarar fel (en varning i loggen, högst en per process)
- * och även utan CMS_API_KEY (då skickas inget vidare).
+ * `${apiBase}/events` med `x-api-key` och 5 s timeout. Svarar alltid 204
+ * till webbläsaren — även när sitecms svarar fel eller inte svarar i tid (en
+ * varning i loggen, högst en per process) och även utan CMS_API_KEY (då
+ * skickas inget vidare).
  */
 export function createAnalyticsRoute(options: AnalyticsRouteOptions = {}) {
   return async function POST(request: Request): Promise<Response> {
@@ -147,18 +161,22 @@ export function createAnalyticsRoute(options: AnalyticsRouteOptions = {}) {
 
     const base = apiBase(options.apiUrl ?? env("CMS_API_URL"), options.site ?? (explicitKey ? "" : env("CMS_SITE")));
     const doFetch = options.fetch ?? globalThis.fetch;
+    const timeout = timeoutSignal(options.timeoutMs ?? FORWARD_TIMEOUT_MS);
     try {
       const res = await doFetch(`${base}/events`, {
         method: "POST",
         headers: { "content-type": "application/json", "x-api-key": apiKey },
         body: JSON.stringify({ events: [event] }),
         cache: "no-store",
+        signal: timeout.signal,
       });
       if (!res.ok && res.status !== 204) {
         warnOnce(`sitecms: trafikpixeln fick ${res.status} från ${base}/events — kontrollera CMS_API_KEY och att sitecms är uppdaterat.`);
       }
     } catch (error) {
       warnOnce(`sitecms: trafikpixeln kunde inte nå ${base}/events (${error instanceof Error ? error.message : String(error)}).`);
+    } finally {
+      timeout.clear();
     }
     return noContent();
   };

@@ -110,6 +110,16 @@ assert.equal(isBot("Mozilla/5.0 (Linux) AppleWebKit Chrome/120.0 Safari/537.36 P
 assert.equal(isBot("Slackbot-LinkExpanding 1.0"), true);
 assert.equal(isBot("Mozilla/5.0 (compatible; Yahoo! Slurp)"), true);
 assert.equal(isBot("vercel-screenshot/1.0 preview"), true);
+assert.equal(isBot("Mozilla/5.0 (compatible; YandexBot/3.0; +http://yandex.com/bots)"), true);
+assert.equal(isBot("Mozilla/5.0 (compatible; DuckDuckBot-Https/1.1; https://duckduckgo.com/duckduckbot)"), true);
+assert.equal(isBot("Mozilla/5.0 (compatible; Googlebot/2.1)"), true, "Googlebot utan /bot.html");
+assert.equal(isBot("Twitterbot/1.0"), true);
+// Telefoner med BOT i modellnamnet är inte robotar.
+const UA_CUBOT = "Mozilla/5.0 (Linux; Android 11; CUBOT KINGKONG 5 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36";
+assert.equal(isBot(UA_CUBOT), false, "CUBOT är en telefon");
+assert.equal(isBot("Mozilla/5.0 (Linux; Android 10; CUBOT_X30) AppleWebKit/537.36 Chrome/120.0 Mobile Safari/537.36"), false);
+assert.equal(isBot("Mozilla/5.0 (Linux; Android 12; Botswana Edition) Chrome/120.0 Mobile Safari/537.36"), false, "Botswana är inget robotord");
+assert.equal(classifyDevice(UA_CUBOT), "mobile");
 assert.equal(isBot(UA_DESKTOP), false);
 assert.equal(isBot(UA_IPHONE), false);
 assert.equal(isBot(UA_MAC), false);

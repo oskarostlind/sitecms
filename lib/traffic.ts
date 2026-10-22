@@ -6,7 +6,7 @@
  * Fungerar med båda db-drivrutinerna: `db.batch` används när den finns
  * (neon-http), annars körs frågorna i tur och ordning (pg lokalt).
  */
-import { and, desc, eq, gte, inArray, lt, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lt, lte, ne, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { db, trafficDaily, trafficDailyDims, trafficVisitors } from "@/lib/db";
 import { OVERFLOW_PATH, dayRange, shiftDay, utcDay, type NormalizedEvent } from "@/lib/traffic-normalize";
@@ -31,8 +31,16 @@ export type TrafficBreakdownRow = { value: string; views: number; share: number 
 
 /** Max sidvisningar per besökare och dag som räknas (§2). */
 export const MAX_VIEWS_PER_VISITOR_PER_DAY = 100;
-/** Max distinkta sökvägar per sajt och dag; därefter bokförs `/…` (§2). */
-export const MAX_PATHS_PER_DAY = 500;
+/**
+ * Max distinkta värden per dimension, sajt och dag (§2 för `path`; samma tak
+ * för `source`, vars värden också styrs av besökaren). Därefter bokförs
+ * överskottet på en samlingsrad (`/…` resp. `ref:…`), som inte räknas in.
+ */
+export const MAX_VALUES_PER_DIM_PER_DAY = 500;
+/** Bakåtkompatibelt namn. */
+export const MAX_PATHS_PER_DAY = MAX_VALUES_PER_DIM_PER_DAY;
+/** Samlingsrad för källor när taket är nått. */
+export const OVERFLOW_SOURCE = "ref:…";
 
 type Queries = [BatchItem<"pg">, ...BatchItem<"pg">[]];
 
@@ -52,23 +60,68 @@ function bump<K>(map: Map<K, number>, key: K, by = 1) {
   map.set(key, (map.get(key) ?? 0) + by);
 }
 
+/**
+ * Begränsar antalet distinkta värden för en dimension till
+ * MAX_VALUES_PER_DIM_PER_DAY per sajt och dag. Värden som redan har en rad i
+ * dag släpps alltid igenom; nya värden får plats tills taket är nått och
+ * bokförs därefter på `overflow`-raden. Två frågor (en batch på neon-http):
+ * count(*) på dagens rader (utan samlingsraden) och vilka av de inkommande
+ * värdena som redan finns — aldrig alla dagens rader.
+ */
+async function capDimValues(
+  siteId: string,
+  day: string,
+  dim: TrafficDim,
+  counts: Map<string, number>,
+  overflow: string,
+): Promise<Map<string, number>> {
+  const incoming = Array.from(counts.keys()).filter((value) => value !== overflow);
+  if (incoming.length === 0) return counts;
+
+  const scope = and(eq(trafficDailyDims.siteId, siteId), eq(trafficDailyDims.day, day), eq(trafficDailyDims.dim, dim));
+  const [countRows, existingRows] = (await runAll([
+    db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(trafficDailyDims)
+      .where(and(scope, ne(trafficDailyDims.value, overflow))),
+    db.select({ value: trafficDailyDims.value }).from(trafficDailyDims).where(and(scope, inArray(trafficDailyDims.value, incoming))),
+  ])) as [{ n: number }[], { value: string }[]];
+
+  let used = Number(countRows[0]?.n ?? 0);
+  const existing = new Set(existingRows.map((r) => r.value));
+  const capped = new Map<string, number>();
+  for (const [value, views] of counts) {
+    if (value === overflow || existing.has(value)) {
+      bump(capped, value, views);
+    } else if (used < MAX_VALUES_PER_DIM_PER_DAY) {
+      used += 1;
+      bump(capped, value, views);
+    } else {
+      bump(capped, overflow, views);
+    }
+  }
+  return capped;
+}
+
 // ---------------------------------------------------------------------------
 // Skrivning
 // ---------------------------------------------------------------------------
 
 /**
- * Bokför sidvisningar för dagens UTC-dag. Två steg:
+ * Bokför sidvisningar för UTC-dagen `day` (default i dag). Anroparen skickar
+ * samma dag som besökarhashen bands till, så hash och rad aldrig glider isär
+ * runt midnatt. Tre steg:
  *
  * 1. Upsert i `traffic_visitors` per besökarhash (RETURNING views). Returen
  *    avslöjar om besökaren är ny i dag (visitors +1) och hur många av
  *    besökarens visningar som ryms under taket på 100/dag — resten ignoreras.
- * 2. En upsert i `traffic_daily` och en i `traffic_daily_dims` (alla
- *    dimensioner på en gång) med de visningar som räknas. Passerar sajten
- *    500 distinkta sökvägar bokförs nya sökvägar som `/…`.
+ * 2. Tak på 500 distinkta värden för `path` och `source` (`capDimValues`);
+ *    överskott bokförs som `/…` resp. `ref:…`. Land och enhet är ändliga.
+ * 3. En upsert i `traffic_daily` och en i `traffic_daily_dims` (alla
+ *    dimensioner på en gång) med de visningar som räknas.
  */
-export async function recordPageviews(siteId: string, events: NormalizedEvent[]): Promise<void> {
+export async function recordPageviews(siteId: string, events: NormalizedEvent[], day: string = utcDay()): Promise<void> {
   if (events.length === 0) return;
-  const day = utcDay();
 
   // 1. Besökare: gruppera i ankomstordning.
   const byVisitor = new Map<string, NormalizedEvent[]>();
@@ -102,17 +155,7 @@ export async function recordPageviews(siteId: string, events: NormalizedEvent[])
   });
   if (accepted.length === 0 && newVisitors === 0) return;
 
-  // 2. Sökvägstak: vilka sökvägar finns redan i dag?
-  const existingPaths = new Set(
-    (
-      await db
-        .select({ value: trafficDailyDims.value })
-        .from(trafficDailyDims)
-        .where(and(eq(trafficDailyDims.siteId, siteId), eq(trafficDailyDims.day, day), eq(trafficDailyDims.dim, "path")))
-    ).map((r) => r.value),
-  );
-  let pathCount = existingPaths.size;
-
+  // 2. Aggregera per dimension och begränsa path/source till 500 värden per dag.
   const dims: Record<TrafficDim, Map<string, number>> = {
     path: new Map(),
     source: new Map(),
@@ -120,29 +163,20 @@ export async function recordPageviews(siteId: string, events: NormalizedEvent[])
     device: new Map(),
   };
   for (const event of accepted) {
-    let path = event.path;
-    if (!existingPaths.has(path)) {
-      if (pathCount >= MAX_PATHS_PER_DAY && path !== OVERFLOW_PATH) {
-        path = OVERFLOW_PATH;
-        if (!existingPaths.has(path)) {
-          existingPaths.add(path);
-        }
-      } else {
-        existingPaths.add(path);
-        pathCount += 1;
-      }
-    }
-    bump(dims.path, path);
+    bump(dims.path, event.path);
     bump(dims.source, event.source);
     bump(dims.country, event.country);
     bump(dims.device, event.device);
   }
+  dims.path = await capDimValues(siteId, day, "path", dims.path, OVERFLOW_PATH);
+  dims.source = await capDimValues(siteId, day, "source", dims.source, OVERFLOW_SOURCE);
 
   const dimRows: { siteId: string; day: string; dim: TrafficDim; value: string; views: number }[] = [];
   for (const dim of Object.keys(dims) as TrafficDim[]) {
     for (const [value, views] of dims[dim]) dimRows.push({ siteId, day, dim, value, views });
   }
 
+  // 3. Skriv aggregaten.
   const writes: BatchItem<"pg">[] = [
     db
       .insert(trafficDaily)
@@ -283,6 +317,10 @@ export async function getVisitorSeriesForSites(siteIds: string[], days = 7): Pro
 /** Raderar `traffic_visitors` äldre än 2 dagar (day < idag − 2). Returnerar antal rader. */
 export async function purgeOldVisitors(now: Date = new Date()): Promise<number> {
   const cutoff = shiftDay(utcDay(now), -2);
-  const deleted = await db.delete(trafficVisitors).where(lt(trafficVisitors.day, cutoff)).returning({ day: trafficVisitors.day });
-  return deleted.length;
+  // Både neon-http (NeonHttpQueryResult) och pg (QueryResult) exponerar rowCount.
+  const result = (await db.delete(trafficVisitors).where(lt(trafficVisitors.day, cutoff))) as unknown as {
+    rowCount?: number | null;
+  } | null;
+  const rowCount = Number(result?.rowCount ?? 0);
+  return Number.isFinite(rowCount) && rowCount > 0 ? rowCount : 0;
 }

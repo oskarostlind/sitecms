@@ -58,7 +58,13 @@ export const MAX_SOURCE_LENGTH = 80;
 /** Sökvägen som bokförs när sajten passerat 500 distinkta sökvägar på en dag. */
 export const OVERFLOW_PATH = "/…";
 
-const BOT_RE = /bot|crawl|spider|slurp|headless|lighthouse|pagespeed|preview|facebookexternalhit|curl|wget|python|node-fetch|go-http/i;
+const BOT_RE = /crawl|spider|slurp|headless|lighthouse|pagespeed|preview|facebookexternalhit|curl|wget|python|node-fetch|go-http/i;
+/**
+ * "bot" som ordslut med gemener (Googlebot, bingbot, YandexBot, /bot.html) —
+ * men inte versalt BOT inuti ett modellnamn (telefonen CUBOT) och inte
+ * "Botswana"/"Abbott". Därför skiftlägeskänslig, till skillnad från BOT_RE.
+ */
+const BOT_WORD_RE = /[bB]ot(?![A-Za-z])/;
 
 // ---------------------------------------------------------------------------
 // Dagar (UTC)
@@ -171,7 +177,7 @@ export function isBot(ua: unknown): boolean {
   if (typeof ua !== "string") return true;
   const value = ua.trim();
   if (!value) return true;
-  return BOT_RE.test(value);
+  return BOT_RE.test(value) || BOT_WORD_RE.test(value);
 }
 
 /** ISO 3166-1 alpha-2 i versaler, annars `ZZ`. */

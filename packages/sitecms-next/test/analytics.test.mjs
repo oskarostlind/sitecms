@@ -115,6 +115,7 @@ test("POST: skickar { events: [{ p, r, q, ua, ip, c }] } till …/events med x-a
     assert.equal(call.init.cache, "no-store");
     assert.equal(call.headers.get("x-api-key"), KEY);
     assert.equal(call.headers.get("content-type"), "application/json");
+    assert.ok(call.init.signal instanceof AbortSignal, "vidarebefordran har en timeout-signal");
     assert.deepEqual(call.body, {
       events: [{ p: "/om-oss", r: "https://www.google.com/", q: "utm_source=linkedin", ua: UA, ip: "1.2.3.4", c: "SE" }],
     });
@@ -183,6 +184,30 @@ test("POST: fel från sitecms → 204 ändå, console.warn högst en gång per p
   assert.match(warnings[0], /trafikpixeln/);
   assert.match(warnings[0], /401/);
   assert.doesNotMatch(warnings[0], new RegExp(KEY), "nyckeln loggas aldrig");
+});
+
+test("POST: sitecms som inte svarar → 204 efter timeout, funktionen hänger inte", async () => {
+  const hanging = mockFetch((url, init) =>
+    new Promise((_, reject) => {
+      init.signal.addEventListener("abort", () => reject(init.signal.reason ?? new Error("aborted")));
+    }),
+  );
+  const handler = createAnalyticsRoute({ apiKey: KEY, apiUrl: API, fetch: hanging, timeoutMs: 50 });
+  // AbortSignal.timeout använder en unref:ad timer; i en server håller sockets
+  // loopen igång, men här behövs en egen timer så att testet inte avbryts.
+  const keepAlive = setTimeout(() => {}, 5000);
+  const started = Date.now();
+  let res;
+  try {
+    await captureWarnings(async () => {
+      res = await handler(browserRequest({ p: "/" }));
+    });
+  } finally {
+    clearTimeout(keepAlive);
+  }
+  assert.equal(res.status, 204);
+  assert.ok(Date.now() - started < 2000, "svarar strax efter timeouten");
+  assert.equal(hanging.calls.length, 1);
 });
 
 // ---------------------------------------------------------------------------
