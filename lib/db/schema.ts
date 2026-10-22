@@ -6,11 +6,14 @@ import {
   integer,
   jsonb,
   timestamp,
+  date,
   uniqueIndex,
   index,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import type { UndoData } from "@/lib/undo-data";
+import type { Finding, LighthouseResult } from "@/lib/seo-score/types";
 
 /**
  * Multi-tenant CMS schema.
@@ -381,6 +384,72 @@ export const quoteUploads = pgTable("quote_uploads", {
 }, (table) => [
   index("quote_uploads_site_ip_created_idx").on(table.siteId, table.ipHash, table.createdAt),
   uniqueIndex("quote_uploads_url_idx").on(table.url),
+]);
+
+// ---------------------------------------------------------------------------
+// traffic_* (egen cookiefri pixel, docs/SEO-TRAFIK.md §2)
+// ---------------------------------------------------------------------------
+/** Sajtens totaler per dag. Aldrig råevents. */
+export const trafficDaily = pgTable("traffic_daily", {
+  siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+  day: date("day").notNull(),
+  views: integer("views").notNull().default(0),
+  visitors: integer("visitors").notNull().default(0),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  primaryKey({ name: "traffic_daily_pk", columns: [table.siteId, table.day] }),
+]);
+
+export const trafficDimValues = ["path", "source", "country", "device"] as const;
+export type TrafficDim = (typeof trafficDimValues)[number];
+
+/** Sidvisningar per dag och dimension (sökväg, källa, land, enhet). */
+export const trafficDailyDims = pgTable("traffic_daily_dims", {
+  siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+  day: date("day").notNull(),
+  dim: text("dim", { enum: trafficDimValues }).notNull(),
+  value: text("value").notNull(),
+  views: integer("views").notNull().default(0),
+}, (table) => [
+  primaryKey({ name: "traffic_daily_dims_pk", columns: [table.siteId, table.day, table.dim, table.value] }),
+  index("traffic_daily_dims_site_day_dim_idx").on(table.siteId, table.day, table.dim),
+]);
+
+/**
+ * Finns bara för att räkna unika besökare per dag. Hashen är
+ * sha256(salt:day:siteId:ip:ua) och går inte att koppla till nästa dag.
+ * Raderas av den dagliga cronen när day < idag − 2.
+ */
+export const trafficVisitors = pgTable("traffic_visitors", {
+  siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+  day: date("day").notNull(),
+  visitorHash: text("visitor_hash").notNull(),
+  views: integer("views").notNull().default(1),
+}, (table) => [
+  primaryKey({ name: "traffic_visitors_pk", columns: [table.siteId, table.day, table.visitorHash] }),
+  index("traffic_visitors_day_idx").on(table.day),
+]);
+
+// ---------------------------------------------------------------------------
+// seo_scores (docs/SEO-TRAFIK.md §6)
+// ---------------------------------------------------------------------------
+/** En rad per sajt och dag: totalpoäng, delpoäng, fynd och Lighthouse-resultat. */
+export const seoScores = pgTable("seo_scores", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+  day: date("day").notNull(),
+  score: integer("score").notNull(),
+  contentScore: integer("content_score").notNull(),
+  // Null när PageSpeed inte kunde köras (ingen domän, fel, kvot).
+  lighthouseScore: integer("lighthouse_score"),
+  // Reserverad för nivå 2 (teknisk sajtcheck). Alltid null tills vidare.
+  techScore: integer("tech_score"),
+  findings: jsonb("findings").$type<Finding[]>().notNull().default([]),
+  lighthouse: jsonb("lighthouse").$type<LighthouseResult | null>(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("seo_scores_site_day_idx").on(table.siteId, table.day),
 ]);
 
 // ---------------------------------------------------------------------------
