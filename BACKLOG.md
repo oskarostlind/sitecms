@@ -6,6 +6,9 @@ Skriv gärna in egna punkter här mellan körningarna — det är det enklaste s
 
 ## Att göra
 
+- [ ] Jjbygg: byt formulärets server action till sitecms-next 0.5 (`submitQuoteRequest` + `uploadQuoteAttachment`, se /docs#kod-quote). Kräver två ändringar i formuläret: telefon måste bli obligatoriskt (sitecms kräver svenskt nummer) och en samtyckesruta (`consent: true`) behöver läggas till. Mappa kalla→source, kundtyp→customerType, postnummer→postalCode, bilder→attachments. Fyll i "E-post för förfrågningar" på JJ Bygg under Inställningar.
+- [ ] Beslut (Oskar): bilagor större än 4,5 MB — Vercels funktioner tar emot högst 4,5 MB per anrop, så gränsen på 10 MB nås inte via upload-endpointen. Antingen acceptera 4,5 MB (dokumentera) eller låta sajten ladda upp direkt till Blob via klient-token (`handleUpload`).
+- [ ] scripts/preview-test.ts faller på rad 373 sedan b40ec72 (versaler tillåts nu i fältnycklar men testet förväntar null för page "Home") — uppdatera testet.
 - [ ] Skriv alt-texter för de tre bilder som ligger i CMS:et (jjbygg hero, timringskurs hero + porträtt) — fälten finns nu i panelen men är tomma. Kräver att någon beskriver bilderna.
 - [ ] timringskurs-sajten läser fortfarande `value` för richtext-block (kör Sanity idag, se beslutspunkten nedan). Samma byte som gjordes i Jjbygg behövs den dagen sajten kopplas till sitecms.
 - [ ] Vercel-projektet jjbygg saknar CMS_API_URL/CMS_API_KEY i Preview-miljön — preview-deployer visar därför statiskt reservinnehåll i stället för CMS-innehåll, vilket gör dem oanvändbara för att granska CMS-ändringar. Lägg till variablerna under Settings → Environment Variables → Preview (kräver Oskar).
@@ -16,6 +19,7 @@ Skriv gärna in egna punkter här mellan körningarna — det är det enklaste s
 
 ## Klart
 
+- [x] Offertförfrågningar v2 (2026-10-22, branch quote-requests-v2): nya fält (kundtyp, budget, ROT, postnummer, leadkälla, bilagor, extra), upload-endpoint mot Vercel Blob med blob-städning, panel + mejl, sitecms-next 0.5.0 med submitQuoteRequest/uploadQuoteAttachment/hashIp, docs + llms.txt. Migration 0008 körd mot Neon. Verifierat med curl, Playwright och riktig uppladdning via preview-deployen.
 - [x] Jjbygg renderar kundens formatering och alt-texter: sajten läser `html` per richtext-block och `bodyHtml` per inlägg (med `value` som fallback), FAQ-svar och hero-underrubrik visar fet/kursiv/listor/länkar, bilder använder `alt` från API:t, och JSON-LD håller ren text. Verifierat skarpt 2026-08-16: fetmarkering i panelen syntes på jjbyggboden.se efter 2 s och var borta 1 s efter Ångra; innehållet återställt byte-identiskt.
 - [x] WYSIWYG-editor för brödtext och richtext-block (tiptap), markdown behålls som lagringsformat via lib/markdown.ts — kunden ser aldrig markdown-syntax
 - [x] Omslagsbild på inlägg: uppladdare med förhandsvisning och dra-och-släpp i stället för URL-fält
