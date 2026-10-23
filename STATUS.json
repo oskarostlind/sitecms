@@ -1,11 +1,11 @@
 {
   "project": "sitecms",
-  "updated": "2026-10-23T09:00:00Z",
+  "updated": "2026-10-23T21:00:00Z",
   "phase": "polish",
   "progress": 100,
-  "deploy_url": "https://sitecms-zeta.vercel.app",
+  "deploy_url": "https://sitecms.se",
   "repo_url": "https://github.com/oskarostlind/sitecms",
-  "last_run_summary": "SEO & Trafik (branch feat/seo-trafik, fyra agenter enligt docs/SEO-TRAFIK.md): egen cookiefri trafikpixel i sitecms-next 0.6.0 (sitecms-next/analytics: POST-route + <SitecmsAnalytics />, init skapar events-routen), POST /api/v1/site/events med robotfilter och rate limit, migration 0009 (traffic_daily, traffic_daily_dims, traffic_visitors, seo_scores — aldrig IP/UA/råevents), SEO-poäng 0–100 (tolv innehållsregler 60 % + Google PageSpeed 40 %), daglig cron /api/cron/daily (03:15 UTC) och panelfliken 'SEO & Trafik' + stat-rutor på översikten och 'Dina sajter'. Dokumentation: /docs#trafik, #seo-poang, #api-events, llms.txt, README 'Trafik', CHANGELOG. Återstår innan det syns i prod: CRON_SECRET (och ev. PAGESPEED_API_KEY) i Vercel, migration 0009 körs vid deploy, och kundsajterna behöver events-routen + komponenten.",
+  "last_run_summary": "SEO & Trafik (branch feat/seo-trafik, fyra agenter enligt docs/SEO-TRAFIK.md): egen cookiefri trafikpixel i sitecms-next 0.6.0 (sitecms-next/analytics: POST-route + <SitecmsAnalytics />, init skapar events-routen), POST /api/v1/site/events med robotfilter och rate limit, migration 0009 (traffic_daily, traffic_daily_dims, traffic_visitors, seo_scores — aldrig IP/UA/råevents), SEO-poäng 0–100 (tolv innehållsregler 60 % + Google PageSpeed 40 %), daglig cron /api/cron/daily (03:15 UTC) och panelfliken 'SEO & Trafik' + stat-rutor på översikten och 'Dina sajter'. Dokumentation: /docs#trafik, #seo-poang, #api-events, llms.txt, README 'Trafik', CHANGELOG. 2026-10-23: CRON_SECRET och PAGESPEED_API_KEY satta i Vercel; integrationssidan har kort för Trafik och Offertförfrågningar och AI-prompten täcker pixel/preview/offert. Återstår: kundsajterna (JJ Bygg, Gällivare Traktor) behöver events-routen + komponenten.",
   "criteria": [
     {
       "text": "Adminpanelen deployad på Vercel, senaste deploy grön",

@@ -3,18 +3,37 @@ import { readReveal } from "@/lib/reveal-flash";
 import { hashApiKey, maskApiKey } from "@/lib/api-keys";
 import { ConsumeReveal } from "@/components/admin/ConsumeReveal";
 import { notFound } from "next/navigation";
-import { count, desc, eq } from "drizzle-orm";
-import { BookOpen, Bot, Circle, CircleCheck, Eye, KeyRound, Plug, Server, Settings, Terminal, UserPlus, Webhook } from "lucide-react";
+import { count, desc, eq, max } from "drizzle-orm";
+import {
+  BookOpen,
+  Bot,
+  ChartColumn,
+  Circle,
+  CircleCheck,
+  Eye,
+  Inbox,
+  KeyRound,
+  Plug,
+  Server,
+  Settings,
+  Terminal,
+  UserPlus,
+  Webhook,
+} from "lucide-react";
 import { db } from "@/lib/db";
-import { apiKeys, pages, sites } from "@/lib/db/schema";
+import { apiKeys, pages, quoteRequests, sites, trafficDaily } from "@/lib/db/schema";
 import { requireSiteOwner } from "@/lib/guard";
 import { appUrl } from "@/lib/app-url";
 import { createApiKey, deleteApiKey, regenerateRevalidateSecret, updateSiteSettings } from "@/lib/actions/sites";
 import { checkConnection } from "@/lib/actions/integration";
-import { formatDateTime, relativeTime } from "@/lib/format";
+import { formatDate, formatDateTime, relativeTime } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import {
   aiPromptSnippet,
+  ANALYTICS_FILES,
+  ANALYTICS_INSTALL,
+  analyticsLayoutSnippet,
+  analyticsRouteSnippet,
   clientSnippet,
   configSnippet,
   DEPLOY_HOOK_HOSTS,
@@ -26,6 +45,7 @@ import {
   legacyEnvSnippet,
   maskKeyForDisplay,
   NPM_SYNC,
+  npmQuoteSnippet,
   npmUsageSnippet,
   packageJsonSnippet,
   PREVIEW_FILES,
@@ -34,6 +54,8 @@ import {
   previewLayoutSnippet,
   previewNextConfigSnippet,
   previewRouteSnippet,
+  QUOTE_ACTION_FILE,
+  QUOTE_INSTALL,
   revalidateRouteSnippet,
   snippetApiUrl,
   SNIPPET_FILES,
@@ -215,11 +237,20 @@ export default async function IntegrationPage({
   const [site] = await db.select().from(sites).where(eq(sites.id, siteId)).limit(1);
   if (!site) notFound();
 
-  const [keys, [pageCount], cmsUrl] = await Promise.all([
+  const [keys, [pageCount], cmsUrl, [traffic], [quotes]] = await Promise.all([
     db.select().from(apiKeys).where(eq(apiKeys.siteId, siteId)).orderBy(desc(apiKeys.createdAt)),
     db.select({ n: count() }).from(pages).where(eq(pages.siteId, siteId)),
     appUrl(),
+    // Senaste dag med sidvisningar — visar om pixeln är på plats.
+    db.select({ lastDay: max(trafficDaily.day) }).from(trafficDaily).where(eq(trafficDaily.siteId, siteId)),
+    db
+      .select({ n: count(), last: max(quoteRequests.createdAt) })
+      .from(quoteRequests)
+      .where(eq(quoteRequests.siteId, siteId)),
   ]);
+  const lastTrafficDay = traffic?.lastDay ?? null;
+  const quoteCount = Number(quotes?.n ?? 0);
+  const lastQuoteAt = quotes?.last ?? null;
 
   // Körs panelen på en annan adress än sitecms.se (t.ex. lokalt) behöver
   // kundsajten även CMS_API_URL.
@@ -739,6 +770,164 @@ export default async function IntegrationPage({
               Deploya och öppna en sida under Sidor → <strong className="font-medium text-neutral-700">Förhandsgranska</strong>.{" "}
               <Link href="/docs#forhandsgranskning" className={linkClassName}>
                 Mer om förhandsgranskningen och felsökning
+              </Link>
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Trafik (valfritt) */}
+        <Card id="trafik" className="scroll-mt-6">
+          <CardHeader>
+            <IconTitle icon={<ChartColumn />}>Trafik</IconTitle>
+            <CardDescription>
+              Valfritt, från sitecms-next 0.6: besökare, sidor, källor, länder och enheter under SEO &amp; Trafik och på
+              översikten. Cookiefri — inget cookie-meddelande behövs, och API-nyckeln når aldrig webbläsaren.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-neutral-200 px-4 py-3 text-sm">
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-neutral-500">Senaste sidvisning</p>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  {lastTrafficDay ? (
+                    <>
+                      <Badge tone="success" dot>
+                        Tar emot trafik
+                      </Badge>
+                      <span className="text-neutral-500">{formatDate(lastTrafficDay)}</span>
+                    </>
+                  ) : (
+                    <Badge tone="neutral">Inga sidvisningar ännu</Badge>
+                  )}
+                </div>
+              </div>
+              <ButtonLink href={`/admin/sites/${siteId}/seo`} variant="ghost" size="sm" icon={<ChartColumn />}>
+                SEO &amp; Trafik
+              </ButtonLink>
+            </div>
+
+            <div className="space-y-2">
+              <SubHeading>Uppgradera paketet</SubHeading>
+              <p className="text-sm text-neutral-500">
+                Eller kör <code className="font-mono">{initCommand()}</code> igen — det skapar routen nedan om den
+                saknas och skriver inte över befintliga filer.
+              </p>
+              <CodeBlock code={ANALYTICS_INSTALL} language="bash" maxHeight={null} />
+            </div>
+            <div className="space-y-2">
+              <SubHeading file={ANALYTICS_FILES.route}>tar emot sidvisningarna</SubHeading>
+              <CodeBlock
+                code={analyticsRouteSnippet()}
+                filename={ANALYTICS_FILES.route}
+                language="ts"
+                maxHeight={null}
+              />
+            </div>
+            <div className="space-y-2">
+              <SubHeading file={ANALYTICS_FILES.layout}>sist i body</SubHeading>
+              <p className="text-sm text-neutral-500">
+                Kommandot rör inte layouten, så lägg in komponenten själv. Använder sajten redan{" "}
+                <code className="font-mono">&lt;SitecmsPreview /&gt;</code> läggs den bredvid.
+              </p>
+              <CodeBlock
+                code={analyticsLayoutSnippet()}
+                filename={ANALYTICS_FILES.layout}
+                language="tsx"
+                maxHeight={null}
+              />
+            </div>
+            <p className="text-sm text-neutral-500">
+              Deploya och öppna sajten i en vanlig webbläsare — besök från localhost, förhandsgranskningen och robotar
+              räknas inte.{" "}
+              <Link href="/docs#trafik" className={linkClassName}>
+                Vad som mäts och vad som aldrig lagras
+              </Link>
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Offertförfrågningar (valfritt) */}
+        <Card id="offert" className="scroll-mt-6">
+          <CardHeader>
+            <IconTitle icon={<Inbox />}>Offertförfrågningar</IconTitle>
+            <CardDescription>
+              Valfritt, från sitecms-next 0.5: sajtens offert- eller kontaktformulär skickar till sitecms. Förfrågningarna
+              hamnar under Förfrågningar, företaget får mejl och kunden ett kvitto. Bilder och pdf:er följer med.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-lg border border-neutral-200 px-4 py-3 text-sm">
+                <p className="text-xs font-medium text-neutral-500">Mejl till företaget</p>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  {site.notifyEmail ? (
+                    <>
+                      <Badge tone="success" dot>
+                        På
+                      </Badge>
+                      <code className="break-all font-mono text-xs text-neutral-800">{site.notifyEmail}</code>
+                    </>
+                  ) : (
+                    <Badge tone="warning">Ingen adress — inga mejl går ut</Badge>
+                  )}
+                </div>
+                <Link
+                  href={`/admin/sites/${siteId}/installningar#notifyEmail`}
+                  className={cn(linkClassName, "mt-2 inline-block text-xs")}
+                >
+                  {site.notifyEmail ? "Ändra adress" : "Fyll i under Inställningar"}
+                </Link>
+              </div>
+              <div className="rounded-lg border border-neutral-200 px-4 py-3 text-sm">
+                <p className="text-xs font-medium text-neutral-500">Mottagna förfrågningar</p>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  {quoteCount > 0 ? (
+                    <>
+                      <Badge tone="success" dot>
+                        {quoteCount} st
+                      </Badge>
+                      {lastQuoteAt ? (
+                        <span className="text-neutral-500" title={formatDateTime(lastQuoteAt)}>
+                          senast {relativeTime(lastQuoteAt)}
+                        </span>
+                      ) : null}
+                    </>
+                  ) : (
+                    <Badge tone="neutral">Inga ännu</Badge>
+                  )}
+                </div>
+                <Link
+                  href={`/admin/sites/${siteId}/forfragningar`}
+                  className={cn(linkClassName, "mt-2 inline-block text-xs")}
+                >
+                  Öppna Förfrågningar
+                </Link>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <SubHeading>Uppgradera paketet</SubHeading>
+              <CodeBlock code={QUOTE_INSTALL} language="bash" maxHeight={null} />
+            </div>
+            <div className="space-y-2">
+              <SubHeading file={QUOTE_ACTION_FILE}>server action</SubHeading>
+              <p className="text-sm text-neutral-500">
+                Anropen bär API-nyckeln och görs alltid på servern — aldrig i webbläsaren. Sajten sköter honeypot och
+                tidsfälla; sitecms validerar fälten igen, rate-limitar per <code className="font-mono">ipHash</code> och
+                skickar tillbaka fältfel på svenska. Namn, telefon (svenskt nummer), e-post, typ av jobb, beskrivning och
+                samtycke (<code className="font-mono">consent: true</code>) krävs. Saltet till{" "}
+                <code className="font-mono">hashIp()</code> väljer du själv, t.ex. som{" "}
+                <code className="font-mono">CMS_IP_SALT</code> hos webbhotellet.
+              </p>
+              <CodeBlock code={npmQuoteSnippet()} filename={QUOTE_ACTION_FILE} language="ts" />
+            </div>
+            <p className="text-sm text-neutral-500">
+              Bilagor går genom sajtens server action: Next.js tar som standard emot 1 MB där, så höj{" "}
+              <code className="font-mono">experimental.serverActions.bodySizeLimit</code> i{" "}
+              <code className="font-mono">next.config</code> om formuläret tar bilder. På Vercel är taket 4,5 MB per
+              anrop, även om sitecms tillåter 10 MB per fil.{" "}
+              <Link href="/docs#kod-quote" className={linkClassName}>
+                Alla fält och gränser
               </Link>
             </p>
           </CardContent>
