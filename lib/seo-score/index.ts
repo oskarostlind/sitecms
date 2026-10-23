@@ -6,6 +6,8 @@
  *   getLatestSeoScore(siteId)      — poängkortet
  *   getSeoScoreSeries(siteId, 30)  — trend
  *   getLatestScoresForSites(ids)   — "Dina sajter" (en query)
+ *   getSeoScoreOrLive(siteId)      — översikten (sparad rad, annars innehållspoäng direkt)
+ *   getScoresForSitesOrLive(ids)   — "Dina sajter" med samma reserv
  */
 
 import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
@@ -17,7 +19,7 @@ import { scoreContent } from "./content";
 import { loadContentInput } from "./content-load";
 import { fetchPageSpeed } from "./pagespeed";
 import { sanitizeFindings, sanitizeLighthouse } from "./sanitize";
-import type { LighthouseResult, SeoScore } from "./types";
+import type { Finding, LighthouseResult, SeoScore } from "./types";
 
 export { combineScore, lighthouseSubScore } from "./combine";
 export { sanitizeFindings, sanitizeLighthouse } from "./sanitize";
@@ -151,6 +153,39 @@ export async function getLatestScoresForSites(siteIds: string[]): Promise<Map<st
     .orderBy(seoScores.siteId, desc(seoScores.day));
 
   for (const row of rows) result.set(row.siteId, row.score);
+  return result;
+}
+
+/**
+ * Poängen som panelen visar: senaste sparade raden, annars innehållspoängen
+ * räknad direkt från CMS-datan (samma reserv som SEO & Trafik-fliken). Utan
+ * reserven visar översikten "–" tills cronen eller "Räkna om" har skrivit en
+ * rad, medan fliken redan visar ett tal.
+ */
+export async function getSeoScoreOrLive(
+  siteId: string,
+): Promise<{ score: number; findings: Finding[]; stored: boolean } | null> {
+  const stored = await getLatestSeoScore(siteId);
+  if (stored) return { score: stored.score, findings: stored.findings, stored: true };
+  const live = scoreContent(await loadContentInput(siteId));
+  return { score: live.score, findings: live.findings, stored: false };
+}
+
+/** Som getLatestScoresForSites, men räknar innehållspoängen direkt för sajter utan sparad rad. */
+export async function getScoresForSitesOrLive(siteIds: string[]): Promise<Map<string, number>> {
+  const result = await getLatestScoresForSites(siteIds);
+  const missing = siteIds.filter((id) => !result.has(id));
+  const live = await Promise.all(
+    missing.map(async (id) => {
+      try {
+        return [id, scoreContent(await loadContentInput(id)).score] as const;
+      } catch (err) {
+        console.error(`seo-score: kunde inte räkna innehållspoäng för ${id}`, err);
+        return null;
+      }
+    }),
+  );
+  for (const entry of live) if (entry) result.set(entry[0], entry[1]);
   return result;
 }
 
