@@ -14,6 +14,7 @@ import {
   fieldIds,
 } from "@/components/ui";
 import { cn } from "@/lib/cn";
+import { SiteFavicon } from "@/components/admin/SiteFavicon";
 
 type SeoFormProps = {
   /** Server action, redan bunden till (siteId, seoId). */
@@ -95,12 +96,7 @@ export function SeoForm({
             </p>
             <div className="rounded-lg border border-neutral-200 bg-white p-4">
               <div className="flex items-center gap-3">
-                <span
-                  aria-hidden
-                  className="flex size-7 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-xs font-semibold text-neutral-600 ring-1 ring-neutral-200"
-                >
-                  {initial}
-                </span>
+                <SiteFavicon host={host} fallback={initial} />
                 <div className="min-w-0 leading-tight">
                   <p className="truncate text-sm text-neutral-800">{siteName || host}</p>
                   <p className="truncate text-xs text-neutral-500">

@@ -28,6 +28,7 @@ import {
   PageHeader,
   SubmitButton,
 } from "@/components/ui";
+import { SiteFavicon } from "@/components/admin/SiteFavicon";
 
 /** "Räkna om" kör PageSpeed och kan ta upp till 60 s (docs/SEO-TRAFIK.md §6). */
 export const maxDuration = 90;
@@ -338,12 +339,7 @@ export default async function SeoListPage({
                     <Card interactive className="flex flex-col gap-3 p-5 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-3">
-                          <span
-                            aria-hidden
-                            className="flex size-7 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-xs font-semibold text-neutral-600 ring-1 ring-neutral-200"
-                          >
-                            {initial}
-                          </span>
+                          <SiteFavicon host={host} fallback={initial} />
                           <p className="min-w-0 truncate text-xs text-neutral-500">
                             https://{host}
                             {path ? ` › ${path}` : ""}
