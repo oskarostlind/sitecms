@@ -281,7 +281,12 @@ Regler:
 4. Hämta innehållet i serverkomponenter med getContent() och hjälparna text(), image() och block() från "sitecms-next" (getPosts()/getPost() för nyheter, seo() i generateMetadata). Hårdkoda inte innehållet.
 5. Hämta aldrig innehållet i klientkomponenter eller i webbläsaren – då exponeras API-nyckeln.
 6. Använd inte egen fetch mot sitecms. sitecms-next hämtar med cache-taggen "sitecms", som revalidate-routen tömmer när kunden sparar. Egen fetch utan den taggen gör att ändringar bara syns efter en ny deploy.
-7. Den enda miljövariabeln är CMS_API_KEY. Påminn mig om att lägga in den hos webbhotellet också (Vercel, Netlify, Cloudflare, egen server …).`;
+7. Den enda miljövariabeln som krävs är CMS_API_KEY. Påminn mig om att lägga in den hos webbhotellet också (Vercel, Netlify, Cloudflare, egen server …).
+
+Gör också (paketet ska vara sitecms-next@latest):
+8. Trafik: init har skapat app/api/sitecms/events/route.ts. Lägg <SitecmsAnalytics /> från "sitecms-next/analytics" sist i <body> i app/layout.tsx. Den är cookiefri, så inget cookie-meddelande behövs för den.
+9. Live-förhandsgranskning: init har skapat app/api/sitecms/preview/route.ts. Lägg <SitecmsPreview /> från "sitecms-next/preview" sist i <body>, sätt {...editable("sida", "nyckel")} från "sitecms-next" på elementen som visar fälten i ${SNIPPET_FILES.config}, och lägg headers: previewFrameHeaders() (från "sitecms-next/preview") i next.config (ta bort X-Frame-Options). Stäng av spårning (GTM, Vercel Analytics o.d.) och lås formulär när draftMode() är på.
+10. Har sajten ett offert- eller kontaktformulär: skicka det med submitQuoteRequest() (och bilagor med uploadQuoteAttachment() först) från "sitecms-next" i en server action — aldrig från webbläsaren. Behåll honeypot och tidsfälla, skicka ipHash från hashIp(ip, process.env.CMS_IP_SALT) och visa fältfelen från SitecmsError.fields. Telefon och samtycke (consent: true) är obligatoriska. Exempel: ${DOCS_URL}#kod-quote.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -930,6 +935,11 @@ const nextConfig: NextConfig = {
 
 export default nextConfig;`;
 }
+
+/** Lägsta paketversion med submitQuoteRequest/uploadQuoteAttachment. */
+export const QUOTE_MIN_VERSION = "0.5.0";
+export const QUOTE_INSTALL = `npm install sitecms-next@^${QUOTE_MIN_VERSION}`;
+export const QUOTE_ACTION_FILE = "app/offert/actions.ts";
 
 /** Offertförfrågningar med sitecms-next 0.5: server action med honeypot, tidsfälla, bilagor och fältfel. */
 export function npmQuoteSnippet(): string {

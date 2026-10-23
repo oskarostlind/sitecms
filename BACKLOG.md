@@ -6,21 +6,21 @@ Skriv gärna in egna punkter här mellan körningarna — det är det enklaste s
 
 ## Att göra
 
-- [ ] Sätt `CRON_SECRET` och ev. `PAGESPEED_API_KEY` i Vercel (sitecms-projektet, Production). Utan `CRON_SECRET` svarar `/api/cron/daily` 503 och SEO-poängen räknas bara när kunden trycker "Räkna om"; utan `PAGESPEED_API_KEY` fungerar PageSpeed med låg kvot (kräver Oskar).
 - [ ] Lägg `<SitecmsAnalytics />` + events-route i JJ Bygg och Gällivare Traktor (sitecms-next ^0.6): kör `npx sitecms-next init` igen i respektive repo (skapar `app/api/sitecms/events/route.ts`) och lägg komponenten från `sitecms-next/analytics` sist i `<body>` i layouten. Se /docs#trafik.
 - [ ] Jjbygg: byt formulärets server action till sitecms-next 0.5 (`submitQuoteRequest` + `uploadQuoteAttachment`, se /docs#kod-quote). Kräver två ändringar i formuläret: telefon måste bli obligatoriskt (sitecms kräver svenskt nummer) och en samtyckesruta (`consent: true`) behöver läggas till. Mappa kalla→source, kundtyp→customerType, postnummer→postalCode, bilder→attachments. Fyll i "E-post för förfrågningar" på JJ Bygg under Inställningar.
-- [ ] Beslut (Oskar): bilagor större än 4,5 MB — Vercels funktioner tar emot högst 4,5 MB per anrop, så gränsen på 10 MB nås inte via upload-endpointen. Antingen acceptera 4,5 MB (dokumentera) eller låta sajten ladda upp direkt till Blob via klient-token (`handleUpload`).
+- [ ] Beslut (Oskar): bilagor större än 4,5 MB — Vercels funktioner tar emot högst 4,5 MB per anrop (och Next.js server actions 1 MB som standard), så gränsen på 10 MB nås inte via upload-endpointen. Integrationssidan beskriver dagens läge. Antingen acceptera 4,5 MB (dokumentera) eller låta sajten ladda upp direkt till Blob via klient-token (`handleUpload`).
 - [ ] scripts/preview-test.ts faller på rad 373 sedan b40ec72 (versaler tillåts nu i fältnycklar men testet förväntar null för page "Home") — uppdatera testet.
 - [ ] Skriv alt-texter för de tre bilder som ligger i CMS:et (jjbygg hero, timringskurs hero + porträtt) — fälten finns nu i panelen men är tomma. Kräver att någon beskriver bilderna.
 - [ ] timringskurs-sajten läser fortfarande `value` för richtext-block (kör Sanity idag, se beslutspunkten nedan). Samma byte som gjordes i Jjbygg behövs den dagen sajten kopplas till sitecms.
 - [ ] Vercel-projektet jjbygg saknar CMS_API_URL/CMS_API_KEY i Preview-miljön — preview-deployer visar därför statiskt reservinnehåll i stället för CMS-innehåll, vilket gör dem oanvändbara för att granska CMS-ändringar. Lägg till variablerna under Settings → Environment Variables → Preview (kräver Oskar).
-- [ ] Egen domän för panelen (t.ex. cms.jjbyggboden.se) — läggs till i Vercel-projektet sitecms under Domains, uppdatera ev. AUTH-redirects (kräver Oskar)
-- [ ] Google OAuth: env-variabler GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET behöver skapas i Google Cloud Console (redirect-URI: https://sitecms-oskar-ostlinds-projects.vercel.app/api/auth/callback/google) — koden är på plats, knappen aktiveras automatiskt (kräver Oskar)
 - [ ] Beslut (Oskar): koppla timringskurs-sajten till sitecms content-API — repot kör idag en egen Sanity Studio, så bytet är ett aktivt val, inte bara en integration
 - [ ] Skapa kundkonto för Ola Andersson (info@timringskurs.nu) via panelens användarhantering när sajtkopplingen är beslutad
 
 ## Klart
 
+- [x] Integrationssidan (2026-10-23): nya kort för Trafik (status senaste sidvisning, route + `<SitecmsAnalytics />`) och Offertförfrågningar (status mejladress + antal förfrågningar, server action-exempel, bodySizeLimit/4,5 MB-not). AI-prompten täcker nu även pixel, live-förhandsgranskning och offertformulär (samma prompt i /docs och llms.txt).
+- [x] `CRON_SECRET` satt i Vercel Production (2026-10-23); `PAGESPEED_API_KEY` satt sedan tidigare. Gäller från nästa produktionsdeploy.
+- [x] Städat bort inaktuella punkter (2026-10-23): Google OAuth (klart 2026-08-16) och egen panel-domän (panelen ligger på sitecms.se).
 - [x] Offertförfrågningar v2 (2026-10-22, branch quote-requests-v2): nya fält (kundtyp, budget, ROT, postnummer, leadkälla, bilagor, extra), upload-endpoint mot Vercel Blob med blob-städning, panel + mejl, sitecms-next 0.5.0 med submitQuoteRequest/uploadQuoteAttachment/hashIp, docs + llms.txt. Migration 0008 körd mot Neon. Verifierat med curl, Playwright och riktig uppladdning via preview-deployen.
 - [x] Jjbygg renderar kundens formatering och alt-texter: sajten läser `html` per richtext-block och `bodyHtml` per inlägg (med `value` som fallback), FAQ-svar och hero-underrubrik visar fet/kursiv/listor/länkar, bilder använder `alt` från API:t, och JSON-LD håller ren text. Verifierat skarpt 2026-08-16: fetmarkering i panelen syntes på jjbyggboden.se efter 2 s och var borta 1 s efter Ångra; innehållet återställt byte-identiskt.
 - [x] WYSIWYG-editor för brödtext och richtext-block (tiptap), markdown behålls som lagringsformat via lib/markdown.ts — kunden ser aldrig markdown-syntax
