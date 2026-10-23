@@ -6,7 +6,7 @@ import { Alert, Avatar, Badge, ButtonLink, Card, EmptyState, PageHeader } from "
 import { formatDateTime, formatNumber, relativeTime } from "@/lib/format";
 import { displayDomain } from "@/lib/site-url";
 import { getVisitorSeriesForSites, type DayPoint } from "@/lib/traffic";
-import { getLatestScoresForSites } from "@/lib/seo-score";
+import { getScoresForSitesOrLive } from "@/lib/seo-score";
 import { Sparkline } from "@/components/admin/Sparkline";
 import { scoreTone } from "@/components/admin/ScoreRing";
 
@@ -41,7 +41,7 @@ export default async function AdminHomePage({
   // En query för alla sajter per källa (docs/SEO-TRAFIK.md §8).
   const [visitorSeries, scores] = await Promise.all([
     safeMap<string, DayPoint[]>("getVisitorSeriesForSites", getVisitorSeriesForSites(siteIds, 7)),
-    safeMap<string, number>("getLatestScoresForSites", getLatestScoresForSites(siteIds)),
+    safeMap<string, number>("getScoresForSitesOrLive", getScoresForSitesOrLive(siteIds)),
   ]);
 
   return (

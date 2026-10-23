@@ -26,7 +26,7 @@ import { describeActivity } from "@/lib/audit-labels";
 import { formatDateTime, formatNumber, relativeTime } from "@/lib/format";
 import { displayDomain, siteUrl } from "@/lib/site-url";
 import { getTrafficSummary, type TrafficSummary } from "@/lib/traffic";
-import { getLatestSeoScore, type SeoScore } from "@/lib/seo-score";
+import { getSeoScoreOrLive } from "@/lib/seo-score";
 import { Sparkline } from "@/components/admin/Sparkline";
 import { scoreTextClass } from "@/components/admin/ScoreRing";
 import {
@@ -130,7 +130,7 @@ export default async function SiteOverviewPage({ params }: { params: Promise<{ s
       .orderBy(desc(auditLogs.createdAt))
       .limit(RECENT_ACTIVITY),
     safe<TrafficSummary>("getTrafficSummary", getTrafficSummary(siteId, 7)),
-    safe<SeoScore | null>("getLatestSeoScore", getLatestSeoScore(siteId)),
+    safe("getSeoScoreOrLive", getSeoScoreOrLive(siteId)),
   ]);
 
   if (!site) notFound();
@@ -217,7 +217,12 @@ export default async function SiteOverviewPage({ params }: { params: Promise<{ s
             <span className="text-base font-normal text-neutral-400"> / 100</span>
           </span>
         ),
-      hint: score === null ? "Beräknas i natt" : undefined,
+      hint:
+        score === null
+          ? "Kunde inte räknas just nu"
+          : seoScore && !seoScore.stored
+            ? "Bara innehåll · Google mäts i natt"
+            : undefined,
       href: `${base}/seo`,
       icon: Gauge,
     },
